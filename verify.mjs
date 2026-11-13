@@ -89,7 +89,8 @@ const visCheck = (p, cid, step) => p.evaluate(async ({ cid, step }) => {
       const phOk = ph > s.min[1] - 0.4, viOk = vi > s.min[1] - 0.4
       if (!phOk && !viOk) continue
       n++
-      if (phOk !== viOk) { ng++; if (phOk) onlyPhy++; else onlyVis++; if (ex.length < 6 || (ex.length < 40 && ng % 300 === 0)) ex.push({ x: +x.toFixed(2), z: +z.toFixed(2), ph, vi, tag: s.tag }); continue }
+      // 同じ高さなのに、形の底の目安（底 - 0.4m）の境目でどちらかだけに転んだ物は数えない（v17）
+      if (phOk !== viOk && !(Math.abs(ph - vi) < 0.01)) { ng++; if (phOk) onlyPhy++; else onlyVis++; if (ex.length < 6 || (ex.length < 40 && ng % 300 === 0)) ex.push({ x: +x.toFixed(2), z: +z.toFixed(2), ph, vi, tag: s.tag }); continue }
       const d = Math.abs(ph - vi); worst = Math.max(worst, d)
       if (d > 0.01) { ng++; if (ex.length < 6) ex.push({ x: +x.toFixed(2), z: +z.toFixed(2), ph: +ph.toFixed(3), vi: +vi.toFixed(3), tag: s.tag }) }
     }

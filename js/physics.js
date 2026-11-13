@@ -950,69 +950,150 @@ function hangCatch(world, b, inp, ev) {
     const H = sh.hang, { e } = hangEdge(sh, fc)
     const dh = (fc[0] - e[0]) * H.n[0] + (fc[2] - e[2]) * H.n[2], dv = fc[1] - e[1]
     const into = -(B.h[0] * H.n[0] + B.h[2] * H.n[2])
-    if (into < 0.6 || dh < -0.12 || dh > 0.62 || dv < -0.5 || dv > 0.32 || rc[1] > e[1] - 0.15) continue
+    // v17: 掛かる幅を少し広く（前輪が縁の角の少し下・少し手前でも掛かる）。縁より下から近づく時だけ
+    if (into < 0.6 || dh < -0.16 || dh > 0.72 || dv < -0.62 || dv > 0.36 || rc[1] > e[1] - 0.15) continue
     const lat = Math.abs((fc[0] - e[0]) * H.n[2] - (fc[2] - e[2]) * H.n[0]); if (lat > 3) continue
-    b.hang = { id: sh.id, t: 0, x: clamp((b.w || 0) * -0.15, -0.3, 0.3), xv: 0, slip: 0, climb: 0, psi: Math.atan2(H.n[2], -H.n[0]) + 0, warned: false }
-    // 壁に向く向き（-n の向き）
-    b.hang.psi = Math.atan2(H.n[2], -H.n[0])
-    b.v = [0, 0, 0]; b.w = 0; b.psiRate = 0
+    // 掛かった瞬間の車体の位置・角度・向きを覚え、HANG_BLEND 秒かけて縁の姿勢へ移す（1 刻みで飛ばさない）
+    b.hang = { id: sh.id, t: 0, x: clamp((b.w || 0) * -0.15, -0.3, 0.3), xv: 0, slip: 0, climb: 0, psi: Math.atan2(H.n[2], -H.n[0]), warned: false, bl: 0, th0: b.th, psi0: b.psi, fc0: fc.slice(), s0: b.s.slice() }
+    b.w = 0; b.psiRate = 0 // 速さは次の刻みで、動きから決め直す（ここで 0 にすると 1 刻みの飛びに見える）
     if (ev) ev.push({ t: 'hang', p: e.slice() })
     hangPose(world, b)
     return
   }
 }
+const HANG_BLEND = 0.5, CLIMB_T = 1.3
+const smooth01 = u => { u = clamp(u, 0, 1); return u * u * (3 - 2 * u) }
+const wrapA = a => a - TAU * Math.round(a / TAU)
+// 前輪の中心が fc に来るように、角度 th・向き psi で車体を置く
+function placeByFront(b, th, psi, fc, sF = 0) {
+  b.th = th; b.psi = psi
+  const B = basis(b), w0 = wheelCenter(b, B, 1, sF)
+  b.p = [b.p[0] + fc[0] - w0[0], b.p[1] + fc[1] - w0[1], b.p[2] + fc[2] - w0[2]]
+}
+// 後輪が縁の壁（角の下の面と上の面）にめり込む深さ（壁の外なら 0 以下）
+function rearIntoWall(b, e, n) {
+  const B = basis(b), rc = wheelCenter(b, B, 0, 0), r = BIKE.R + BIKE.rt
+  const h = (rc[0] - e[0]) * n[0] + (rc[2] - e[2]) * n[2], v = rc[1] - e[1]
+  const d = h > 0 && v > 0 ? Math.sqrt(h * h + v * v) : h > 0 ? h : v > 0 ? v : -Math.min(-h, -v)
+  return r - d
+}
 function hangPose(world, b) {
   const sh = world.shapes[b.hang.id], H = sh.hang, hg = b.hang
-  b.psi = hg.psi; b.th = HANG_TH + hg.x * 0.2 - hg.slip * 0.25; b.lean = clamp(b.lean, -1, 1)
-  const B = basis(b), { e } = hangEdge(sh, b.p)
-  // 前輪の中心は縁の角の少し手前・上（ずり落ちた分だけ下がって手前へ）
-  const r = BIKE.R + BIKE.rt, fc = [e[0] + H.n[0] * (r * 0.62 + hg.slip * 0.25), e[1] + r * 0.78 - hg.slip * 0.5, e[2] + H.n[2] * (r * 0.62 + hg.slip * 0.25)]
-  const w0 = wheelCenter(b, B, 1, 0)
-  b.p = [b.p[0] + fc[0] - w0[0], b.p[1] + fc[1] - w0[1], b.p[2] + fc[2] - w0[2]]
-  b.s = [0, 0.04]; b.g = [false, true]; b.cn = [null, { id: sh.id, q: e.slice(), n: [0, 1, 0], nw: [0, 1, 0], depth: 0, mu: 1 }]; b.side = [null, null]
-  b.speed = 0; b.airT = 0
+  b.lean = clamp(b.lean, -1, 1)
+  const { e } = hangEdge(sh, b.p)
+  const r = BIKE.R + BIKE.rt
+  if (hg.cl) {
+    // 登る: 前輪は縁の角から上の面へ転がり、後輪は壁を駆け上がって角を越える。車体はだんだん寝て、最後は縁の上の姿勢（出口の姿勢）にぴったり着く
+    const C = hg.cl, uc = clamp(hg.climb, 0, 1), u = uc * uc * (2 - uc) // 始めはゆっくり、終わりは縁の上を進む速さのまま（出口で速さが飛ばない）
+    const q = u * (C.tab.length - 1), i0 = Math.min(C.tab.length - 2, Math.floor(q)), a = q - i0, A = C.tab[i0], Bq = C.tab[i0 + 1]
+    const Fh = A.F[0] + (Bq.F[0] - A.F[0]) * a, Fv = A.F[1] + (Bq.F[1] - A.F[1]) * a, n = C.n
+    const fc = [C.e[0] + n[0] * Fh, C.e[1] + Fv, C.e[2] + n[2] * Fh]
+    b.s = [b.s[0] * (1 - u), b.s[1] * (1 - u)]
+    placeByFront(b, A.th + (Bq.th - A.th) * a, C.psi, fc, b.s[1])
+    b.g = [u > 0.55, true]
+  } else {
+    const thT = HANG_TH + hg.x * 0.2 - hg.slip * 0.25
+    // 前輪の中心は縁の角の少し手前・上（ずり落ちた分だけ下がって手前へ）
+    const fcT = [e[0] + H.n[0] * (r * 0.62 + hg.slip * 0.25), e[1] + r * 0.78 - hg.slip * 0.5, e[2] + H.n[2] * (r * 0.62 + hg.slip * 0.25)]
+    const k = smooth01(hg.bl)
+    // サスペンションの縮みも一緒に移す（一気に伸ばすと車輪が飛ぶ）
+    b.s = [hg.s0[0] * (1 - k), hg.s0[1] + (0.04 - hg.s0[1]) * k]
+    if (k < 1) {
+      const fc = [hg.fc0[0] + (fcT[0] - hg.fc0[0]) * k, hg.fc0[1] + (fcT[1] - hg.fc0[1]) * k, hg.fc0[2] + (fcT[2] - hg.fc0[2]) * k]
+      placeByFront(b, hg.th0 + (thT - hg.th0) * k, hg.psi0 + wrapA(hg.psi - hg.psi0) * k, fc, b.s[1])
+    } else placeByFront(b, thT, hg.psi, fcT, b.s[1])
+    b.g = [false, true]
+  }
+  b.cn = [null, { id: sh.id, q: e.slice(), n: [0, 1, 0], nw: [0, 1, 0], depth: 0, mu: 1 }]; b.side = [null, null]
+  b.airT = 0
+}
+// 登り始める: 今の姿勢と、縁の上の出口の姿勢（後輪が角から 0.25m 奥・少し前上がり）を覚える
+// 登りの道筋（縁の角の断面の 2 次元。h = 壁から外へ、v = 角から上）。
+// 後輪: 掛かった所 → 壁に着く → 壁を駆け上がる → 角を転がる（角を中心の円）→ 縁の上を少し奥へ。
+// 前輪: 角の上を転がって（角を中心の円）縁の上の面へ出て、後輪から車輪の間の長さ Lw を保って前へ進む。
+// 両輪の位置から車体の角度が決まる。どの刻みも前の刻みからなめらかにつながる（瞬間移動しない）
+function startClimb(world, b) {
+  const sh = world.shapes[b.hang.id], H = sh.hang, hg = b.hang, n = H.n, { e } = hangEdge(sh, b.p)
+  const B0 = basis(b), fw = wheelCenter(b, B0, 1, b.s[1]), rw = wheelCenter(b, B0, 0, b.s[0]), r = BIKE.R + BIKE.rt
+  const toL = q => [(q[0] - e[0]) * n[0] + (q[2] - e[2]) * n[2], q[1] - e[1]]
+  const F0 = toL(fw), R0 = toL(rw), Lw = Math.hypot(F0[0] - R0[0], F0[1] - R0[1])
+  const off = datan2(F0[1] - R0[1], R0[0] - F0[0]) - b.th // 車輪を結ぶ線と車体の角度の差
+  // 後輪の道筋（折れ線）
+  const pts = [R0], hW = Math.max(r, R0[0])
+  pts.push([hW, Math.min(-0.05, R0[1] + 0.12)])
+  for (let k = 1; k <= 8; k++) pts.push([hW, pts[1][1] * (1 - k / 8)])
+  for (let k = 1; k <= 12; k++) { const a = HALF_PI * k / 12; pts.push([hW * dcos(a), r * dsin(a)]) }
+  const vR = r - 0.035 // 縁の上でタイヤが少しつぶれた高さ
+  for (let k = 1; k <= 4; k++) pts.push([-0.3 * k / 4, r + (vR - r) * k / 4])
+  const cum = [0]; for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]))
+  const rearAt = d => { let i = 1; while (i < pts.length - 1 && cum[i] < d) i++; const a = (d - cum[i - 1]) / Math.max(1e-6, cum[i] - cum[i - 1]); return [pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * a, pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * a] }
+  // 前輪の道筋: 角を中心の円（半径は掛かった時の距離）→ 縁の上の面
+  const rF = Math.hypot(F0[0], F0[1]), a0 = datan2(F0[1], F0[0]), arcL = Math.max(0, (HALF_PI - a0) * rF)
+  const frontAt = f => f < arcL ? [rF * dcos(a0 + f / rF), rF * dsin(a0 + f / rF)] : [-(f - arcL), rF + (vR - rF) * Math.min(1, (f - arcL) / 0.4)]
+  const N = 60, tab = []
+  let fPrev = 0
+  for (let i = 0; i <= N; i++) {
+    const R = rearAt(cum[cum.length - 1] * i / N)
+    // 前輪は後輪から Lw の所（前の刻みより先）
+    let lo = fPrev, hi = fPrev + 3
+    for (let k = 0; k < 40; k++) { const m = (lo + hi) / 2, F = frontAt(m); if (Math.hypot(F[0] - R[0], F[1] - R[1]) < Lw) lo = m; else hi = m }
+    fPrev = i === 0 ? 0 : lo
+    const F = frontAt(fPrev)
+    tab.push({ F, th: datan2(F[1] - R[1], R[0] - F[0]) - off })
+  }
+  // 登る時間: 後輪の道筋の長さから、登り切った時の速さが縁の上を進む速さ（約 1.6m/s）になるように（出口で速さが飛ばない）
+  hg.cl = { e: e.slice(), n, tab, psi: hg.psi, lat: [e[0], e[2]], T: clamp(cum[cum.length - 1] / 1.6, 1.0, 1.8) }
 }
 function hangStep(world, b, inp, ev) {
   const hg = b.hang, sh = world.shapes[hg.id], H = sh.hang
-  hg.t += DT
+  const p0 = b.p.slice(), th0 = b.th
+  hg.t += DT; hg.bl = Math.min(1, hg.bl + DT / HANG_BLEND)
   b.lean += clamp(clamp(inp.lean, -1, 1) - b.lean, -6 * DT, 6 * DT)
-  // 揺さぶり: 決まった揺れ（時刻の式）＋風の強さ＋近くを通る鉄球の風圧
-  let dist = 0.55 * dsin(world.time * 2.3 + hg.id) + 0.35 * dsin(world.time * 3.7 + 1.3)
-  for (const wd of world.winds) if (b.p[0] > wd.min[0] - 2 && b.p[0] < wd.max[0] + 2 && b.p[2] > wd.min[2] - 2 && b.p[2] < wd.max[2] + 2 && b.p[1] > wd.min[1] - 3 && b.p[1] < wd.max[1] + 3) dist += (wd.pulse ? gustK(wd, world.time) : 0.5) * 2.2 * (wd.f[0] * H.n[0] + wd.f[2] * H.n[2] >= 0 ? -1 : 1)
-  for (const s2 of world.moving) if (s2.knock && !s2.gone && s2.c) { const d = Math.hypot(s2.c[0] - b.p[0], s2.c[1] - b.p[1], s2.c[2] - b.p[2]); if (d < 3.5) dist += (3.5 - d) * 0.9 * Math.sign(dsin(world.time * 5 + s2.id)) }
-  // 体の釣り合い（放っておくと倒れる）。前体重で前へ、後ろ体重で後ろへ
-  hg.xv += (2.2 * hg.x + 2.6 * b.lean + dist * 0.6 - 1.6 * hg.xv) * DT
-  hg.x += hg.xv * DT
-  // ブレーキを離すと、前輪がずり落ちる
-  if (inp.brk > 0.5) hg.slip = Math.max(0, hg.slip - 0.05 * DT); else hg.slip += 0.28 * DT
-  // 登る: 前体重＋アクセル（釣り合いがとれている時）
-  if (inp.lean > 0.5 && inp.thr > 0.5 && Math.abs(hg.x) < 0.75 && hg.slip < 0.35) { hg.climb += DT / 0.8; hg.xv *= 0.85; hg.x *= 1 - 3 * DT } // 登り始めたら、体は壁に寄って安定する else hg.climb = Math.max(0, hg.climb - DT * 0.8)
-  const max = H.max || 8
-  if (!hg.warned && hg.t > max - 2) { hg.warned = true; if (ev) ev.push({ t: 'hangWarn', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }) }
   const exit = why => {
-    const n = H.n, { e } = hangEdge(sh, b.p)
+    const n = H.n
     b.hang = null
     if (why === 'up') {
-      // 縁の上へ: 角から 0.9m 奥に、少し前上がりで置いて前へ進ませる
-      const yaw = hg.psi; b.psi = yaw; b.th = 0.12; b.w = 0; b.lean = 0.3
-      const B2 = basis(b), w0 = wheelCenter(b, B2, 0, 0.08), back = [e[0] - n[0] * 0.25, e[1] + BIKE.R + BIKE.rt, e[2] - n[2] * 0.25]
-      b.p = [b.p[0] + back[0] - w0[0], b.p[1] + back[1] - w0[1] + 0.02, b.p[2] + back[2] - w0[2]]
-      b.v = [-n[0] * 2.0, 0.6, -n[2] * 2.0]; b.s = [0.08, 0.06]
+      // 縁の上へ: 登りの動きの終わりの姿勢のまま、前へ進ませる（位置は動かさない）
+      // 速さは登りの動きの終わりの速さ（前へ。上下の動きは消す）
+      const vx = (b.p[0] - p0[0]) / DT, vz = (b.p[2] - p0[2]) / DT, vh = Math.max(1.6, Math.hypot(vx, vz)) // 登りの終わりの速さ（約 1.6m/s。遅いと縁の先の溝でウィリーに入れない）
+      b.w = 0; b.v = [-n[0] * vh, 0, -n[2] * vh]; b.sv = [0, 0]
       if (ev) ev.push({ t: 'hangUp' })
       return
     }
     if (why === 'front') { crash(b, 'front', 0, ev); b.v = [-n[0] * 1.5, 0.5, -n[2] * 1.5]; if (ev) ev.push({ t: 'hangFall', why }); return }
-    // 後ろへ・ずり落ちた・縁が欠けた: 壁から少し離れて下へ落ちる
+    // 後ろへ・ずり落ちた・縁が欠けた: 壁から離れる向きへ動きながら下へ落ちる（位置は飛ばさない）
     b.v = [n[0] * 1.2, -0.5, n[2] * 1.2]; b.w = -1.2; b.g = [false, false]; b.cn = [null, null]
-    b.p = [b.p[0] + n[0] * 0.25, b.p[1] - 0.15, b.p[2] + n[2] * 0.25]
     if (ev) ev.push({ t: 'hangFall', why })
   }
-  if (hg.climb >= 1) return exit('up')
-  if (hg.x > 1) return exit('front')
-  if (hg.x < -1) return exit('back')
-  if (hg.slip > 0.5) return exit('slip')
-  if (hg.t > max) { if (ev) ev.push({ t: 'hangBreak', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }); return exit('edge') }
-  hangPose(world, b)
+  const max = H.max || 8
+  if (hg.cl) {
+    // 登り始めたら、釣り合いでは落ちない。前体重＋アクセルの間だけ進み、離すとその姿勢で止まる（縁が欠けるまで）
+    if (inp.lean > 0.3 && inp.thr > 0.3) hg.climb += DT / (hg.cl.T || CLIMB_T)
+    if (hg.climb >= 1) { hg.climb = 1; hangPose(world, b); exit('up') }
+    else if (hg.t > max) { if (ev) ev.push({ t: 'hangBreak', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }); exit('edge') }
+    else hangPose(world, b)
+  } else {
+    // 揺さぶり: 決まった揺れ（時刻の式）＋風の強さ＋近くを通る鉄球の風圧
+    let dist = 0.55 * dsin(world.time * 2.3 + hg.id) + 0.35 * dsin(world.time * 3.7 + 1.3)
+    for (const wd of world.winds) if (b.p[0] > wd.min[0] - 2 && b.p[0] < wd.max[0] + 2 && b.p[2] > wd.min[2] - 2 && b.p[2] < wd.max[2] + 2 && b.p[1] > wd.min[1] - 3 && b.p[1] < wd.max[1] + 3) dist += (wd.pulse ? gustK(wd, world.time) : 0.5) * 2.2 * (wd.f[0] * H.n[0] + wd.f[2] * H.n[2] >= 0 ? -1 : 1)
+    for (const s2 of world.moving) if (s2.knock && !s2.gone && s2.c) { const d = Math.hypot(s2.c[0] - b.p[0], s2.c[1] - b.p[1], s2.c[2] - b.p[2]); if (d < 3.5) dist += (3.5 - d) * 0.9 * Math.sign(dsin(world.time * 5 + s2.id)) }
+    // 体の釣り合い（放っておくと倒れる）。前体重で前へ、後ろ体重で後ろへ。掛かった直後（姿勢を移している間）は倒れない
+    if (hg.bl >= 1) { hg.xv += (2.2 * hg.x + 2.6 * b.lean + dist * 0.6 - 1.6 * hg.xv) * DT; hg.x += hg.xv * DT }
+    // ブレーキを離すと、前輪がずり落ちる
+    // ブレーキを離すと、前輪がずり落ちる（v17: 0.28 → 0.22/秒。少しだけ余裕）
+    if (inp.brk > 0.5) hg.slip = Math.max(0, hg.slip - 0.05 * DT); else hg.slip += 0.22 * DT
+    if (!hg.warned && hg.t > max - 2) { hg.warned = true; if (ev) ev.push({ t: 'hangWarn', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }) }
+    // 登る: 前体重＋アクセル（釣り合いがとれている時）。v17: 釣り合いの幅を広く（0.75→0.85）、ずり落ちかけでも（0.35→0.42）
+    if (inp.lean > 0.5 && inp.thr > 0.5 && Math.abs(hg.x) < 0.85 && hg.slip < 0.42 && hg.bl >= 1) { startClimb(world, b); hg.climb = DT / CLIMB_T; hangPose(world, b) }
+    else if (hg.x > 1) exit('front')
+    else if (hg.x < -1) exit('back')
+    else if (hg.slip > 0.5) exit('slip')
+    else if (hg.t > max) { if (ev) ev.push({ t: 'hangBreak', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }); exit('edge') }
+    else hangPose(world, b)
+  }
+  // 動きの速さ（見た目の補間・カメラ・次の刻みのため。位置は 1 刻みで飛ばない）
+  if (b.hang) { b.v = [(b.p[0] - p0[0]) / DT, (b.p[1] - p0[1]) / DT, (b.p[2] - p0[2]) / DT]; b.w = (b.th - th0) / DT }
+  b.speed = Math.hypot(b.v[0], b.v[2])
 }
 
 // ============================================================ v16 の仕掛けの動き（時刻と、乗っているバイクの位置だけで決まる）

@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=16'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=16'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=17'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=17'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -15,7 +15,7 @@ export function createBot(course, o = {}) {
   for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
   return { fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
-export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null }
+export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.glPh = 0; bot.glGo = false }
 function nearest(bot, b, from, to) {
   let best = 1e9, bi = from
   const scan = (a, z) => { for (let i = Math.max(0, a); i < Math.min(bot.path.length, z); i++) {
@@ -29,6 +29,8 @@ function nearest(bot, b, from, to) {
   if (best > 16 && (from > 0 || to < bot.path.length)) return nearest(bot, b, 0, bot.path.length)
   return bi
 }
+// 人の速さの bot の杭: [角度の先読み秒, 保つ角度, 体重の強さ, アクセル, 速すぎる時のアクセル]（人は 0.2 秒遅れるので、少し先の角度で体重を掛ける）
+const PEG_HUMAN = [0.1, 0.45, 2.5, 0.9, 0.5]
 export function botInput(bot, b) {
   const path = bot.path, P = BIKE
   if (b.hang) return hangInput(bot, b)
@@ -91,6 +93,7 @@ export function botInput(bot, b) {
   if (nitroLip) vT = Math.max(vT, nitroLip) // ジャンプ台で要る速さまでだけニトロ（出しすぎると跳びすぎる）
   if (bot.skill === 'bad') { vT = narrow ? 6 : turnAhead ? 7 : 14 }
   vT *= bot.vMul
+  if (bot.jumpAhead && bot.vMul < 1) vT = Math.max(vT, bot.vJump || 6.5) // 遅めの bot でも、跳ぶ所の要る速さは落とさない（v17: 落ちて同じ所から出し直し続けていた）
   let thr = sp < vT ? 1 : 0, brk = sp > vT + 0.3 ? Math.min(sp > vT + 3 && bot.skill === 'good' ? 0.7 : 0.45, (sp - vT) * 0.4) : 0
   let lean = 0
   const air = !b.g[0] && !b.g[1]
@@ -144,6 +147,7 @@ export function botInput(bot, b) {
       // 地面: 車体が坂から浮きすぎ・突っ込みすぎを直す
       const d = b.th - slope
       if (d > 0.18) lean = Math.min(1, (d - 0.1) * 5)
+      if (d > 0.6 && sp > 2.5 && !stepAt && !bot.react) thr = 0 // 走りながら前輪が上がりすぎたらアクセルを戻す（後ろへ回って転ばない。v17: 溝の出口で全開のまま後ろへ回っていた。段をよじ登る遅い時は戻さない）
       else if (d < -0.15) lean = Math.max(-1, (d + 0.1) * 5)
       if (slope > 0.15 && thr) lean = Math.max(lean, slope > 0.5 ? 1 : 0.5)
       if (brk > 0) lean = Math.min(lean, b.th - slope < -0.08 ? -0.8 : -0.3)
@@ -160,7 +164,7 @@ export function botInput(bot, b) {
     for (let jj = 0, j = SQ[0], dd = 0; jj < Math.min(SQ.length, 16); j = SQ[++jj]) {
       const q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
       if (q.kind === 'seesaw' && dd < 7) { const vs = 2.2; thr = sp < vs ? 1 : 0; brk = sp > vs + 0.4 ? 0.5 : 0; lean = 0 }
-      if (q.door && dd < 14 && bot.phase === 0) { const vd = q.door + 1.5; if (sp < vd) { thr = 1; brk = 0 } }
+      if (q.door && dd < 14 && bot.phase === 0) { const vd = q.door + 1.5; if (sp < vd) { thr = 1; brk = 0 } break } // 扉が先にある時は、扉の先のシーソーのための減速はまだしない（v17: 遅めの bot が扉の手前で減速して跳ね返り続けた）
     }
   }
   // 湧き水の上は止まらない・泥の手前は勢いをつける
@@ -253,8 +257,11 @@ export function botInput(bot, b) {
     const fd = (hangAt.q.p[0] - fw[0]) * hx + (hangAt.q.p[2] - fw[2]) * hz
     if (fd < 2.6) { thr = sp < 1.2 ? 0.5 : 0; brk = sp > 1.8 ? 0.4 : 0; lean = -1 }
   }
+  // ---------------- v17 溝の刻まれた動く床（上手い bot だけ）
+  const gl17 = bot.skill === 'good' && !air && !b.hang ? v17Lift(bot, b, SQ, PV, { sp, B, lean }) : null
+  if (gl17) { thr = gl17.thr; brk = gl17.brk; lean = gl17.lean; bot.stuckT = 0; bot.backT = 0; bot.waiting = !!gl17.wait; bot.phase = 0 }
   // ---------------- v16 の仕掛け（上手い bot だけ）
-  if (bot.skill === 'good') {
+  if (bot.skill === 'good' && !gl17) {
     const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
     if (o) { thr = o.thr; brk = o.brk; lean = o.lean; if (o.steer != null) steer = o.steer; if (o.nitroOff) nitroNeed = false; bot.stuckT = 0; bot.backT = 0; bot.waiting = true }
   }
@@ -285,9 +292,10 @@ function hangInput(bot, b) {
     for (const h of bot.hz) {
       const d = Math.hypot(h.p[0] - b.p[0], h.p[2] - b.p[2]), dy = h.p[1] - b.p[1]
       if (d > 8 || dy < -1 || dy > 3) continue
-      for (let t = 0.5; t <= 1.7; t += 0.1) if (h.unsafe(T0 + t)) { safe = false; break }
+      for (let t = 0.2; t <= 2.0; t += 0.1) if (h.unsafe(T0 + t)) { safe = false; break } // v17: 登りは 1.3 秒かかる（瞬間移動をやめた）ので、その間ずっと空いているか
     }
   }
+  if (hg.cl) return { thr: 1, brk: 0, lean: 0.6, steer: 0, nitro: 0 } // 登り始めたら止まらずに登り切る
   const tMax = (bot.world && bot.world.shapes[hg.id].hang.max) || 8
   const minWait = 0.7
   if ((safe && hg.t > minWait) || hg.t > tMax - 1.6) return { thr: 1, brk: 0, lean: Math.max(0.6, l), steer: 0, nitro: 0 }
@@ -343,11 +351,12 @@ function v16Input(bot, b, SQ, PV, c) {
     if (al > fk.gap - 0.2) { bot.forkOn = false; bot.forkExit = false; if (al > fk.gap + 4 && bot.forkWant) { bot.forkN++; bot.forkWant = null } }
   }
   // ウィリーの溝: 溝の 2.6m 手前から、前輪を 25〜35 度に上げたまま 3.6m/s で
-  const gv = ahead(10, (q, dd) => q.groove && dd < 2.6 ? q : undefined) || (cur.grooveRun && cur.kind === 'groove' ? cur : null)
+  const gv = ahead(10, (q, dd) => q.groove && dd < 2.6 ? q : undefined) || (cur.grooveRun && (cur.kind === 'groove' || cur.kind === 'peg') ? cur : null)
   if (gv && !c.air && !b.hang) {
     const vg = ((gv.groove || gv.grooveRun) || {}).vg || 3.7
     const th = b.th - (cur.slope || 0) * 0.6, k = 0 // 坂では坂に対する角度で。反応の遅い人は早めに戻す
-    if (bot.react && ((gv.groove || gv.grooveRun) || {}).slope > 0.05) { const H = globalThis.__hw || [0.5, 2, 0.3], ln = Math.max(-1, Math.min(1, (th - H[0]) * H[1] + b.w * H[2])); return { thr: th < 0.3 ? 1 : th < 0.5 ? (sp < vg ? 0.8 : 0.4) : 0.15, brk: sp > vg + 0.8 ? 0.3 : 0, lean: ln } } // 人の速さ: なめらかに体重で保つ
+    if (bot.react && ((gv.grooveRun || {}).peg || !(((gv.groove || gv.grooveRun) || {}).slope > 0.05))) { const C = PEG_HUMAN, thp = th + b.w * C[0], ln = Math.max(-1, Math.min(1, (thp - C[1]) * C[2])); return { thr: sp > vg + 0.5 ? C[4] : th < 0.25 ? 1 : C[3], brk: 0, lean: ln } } // 人の速さ（杭）: アクセルは一定、体重は少し先の角度で
+    if (bot.react && ((gv.groove || gv.grooveRun) || {}).slope > 0.05 ) { const pg = (gv.grooveRun || {}).peg, H = [0.5, 2, 0.3], thp = th, ln = Math.max(-1, Math.min(1, (thp - H[0]) * H[1] + b.w * H[2])); const T2 = (gv.groove || gv.grooveRun || {}).peg || (gv.grooveRun || {}).peg ? [1, 0.6, 0.35] : [0.8, 0.4, 0.15]; return { thr: th < 0.3 ? 1 : th < 0.5 ? (sp < vg ? T2[0] : T2[1]) : T2[2], brk: sp > vg + 0.8 ? 0.3 : 0, lean: ln } } // 人の速さ: なめらかに体重で保つ（杭は角をよじ登るので少し強くアクセル）
     if (sp < vg - 0.3 && th > 0.25) return { thr: 1, brk: 0, lean: th > 0.55 - k ? 1 : 0 }
     return { thr: th < 0.35 - k ? 1 : th < 0.55 - k ? 0.45 : 0, brk: sp > vg + 0.6 ? 0.3 : 0, lean: th > 0.65 - k ? 1 : th > 0.45 - k ? 0 : -1 }
   }
@@ -366,4 +375,52 @@ function v16Input(bot, b, SQ, PV, c) {
   const sw = cur.swing || ahead(30, (q, dd) => q.swing && dd < 20 ? q.swing : undefined)
   if (sw && !c.air) { const o = hold((sw.vMin + sw.vMax) / 2); if (sp < sw.vMin + 0.3) { o.thr = 1; o.brk = 0 } return o }
   return null
+}
+
+// v17: 段のある動く床。手前で床が止まっている間に乗り、ウィリーで段に前輪を掛けて上がり、段の上で止まって運ばれる。
+// 床が向こうで止まったら、ふつうの高い縁の技（前輪を掛ける）に任せる（null を返す）
+function v17Lift(bot, b, SQ, PV, c) {
+  const path = bot.path, cur = path[bot.i], W = bot.world, sp = c.sp
+  if (!W) return null
+  let gl = cur.glift || null
+  if (!gl) for (let jj = 0, dd = 0; jj < Math.min(SQ.length, 12); jj++) { const j = SQ[jj], q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2]); if (q.glift && dd < 7) { gl = q.glift; break } if (q.kind === 'hang') break }
+  if (!gl) { bot.glGo = false; return null }
+  const st = liftPos(gl.m, W.time), f = gl.f
+  const al = (b.p[0] - gl.start[0]) * f[0] + (b.p[2] - gl.start[2]) * f[2]
+  if (al > gl.len + 0.2) return null
+  const s = al - (gl.amp + st.k) // 床の後ろの端から、バイクの真ん中まで
+  const onDeck = b.carryId >= 0 && W.shapes[b.carryId].mov === gl.m
+  const P = BIKE, rs = s + P.rear[0], fs = s + P.front[0]
+  const delay = bot.react ? bot.react / 60 : 0
+  if (!onDeck && s < 0.2) {
+    // 手前で待つ: 床が手前で止まっていて、残りの時間で段を上がって止まれる時に乗る
+    const ready = st.at === 'lo' && st.left > 2.6 + delay * 2
+    if (ready || bot.glGo) { bot.glGo = st.at === 'lo'; return { thr: sp < 3.4 ? 1 : 0, brk: 0, lean: 0 } }
+    const stopAt = -4.0 - al // 切れ目の手前で、助走の分だけ下がって待つ
+    if (stopAt > 0.3) { const vM = Math.min(3, Math.sqrt(2 * 2.5 * stopAt)); return { thr: sp < vM - 0.3 ? 1 : 0, brk: sp > vM ? 0.6 : 0, lean: 0, wait: true } }
+    return { thr: 0, brk: Math.abs(sp) > 0.1 ? 1 : 0.6, lean: 0, wait: true }
+  }
+  bot.glGo = false
+  // 段: 前輪が段の 1.1m 手前（速いほど早め）で、歩く速さのウィリー → 前輪が段の上に出たら前体重で後輪を引き上げる（ふつうの段の技と同じ）
+  const yTop = gl.start[1] + gl.stepH, Bs = c.B, fw = wheelCenter(b, Bs, 1, b.s[1])
+  const fd = gl.stepS - fs, rd = gl.stepS - rs
+  if (rd > -0.3) {
+    if (!bot.glPh) { if (fd < 1.1 + Math.max(0, sp) * 0.65) bot.glPh = 1; else return { thr: sp < gl.vIn ? 1 : 0, brk: sp > gl.vIn + 0.6 ? 0.4 : 0, lean: 0 } }
+    if (bot.glPh === 1) {
+      let thr = b.th < 0.3 ? 1 : b.th < 0.5 ? 0.45 : 0, lean = b.th > 0.6 ? 1 : b.th > 0.42 ? 0 : -1, brk = 0
+      if (sp > 4.2) { thr = 0; brk = 0.35 } else if (sp > 3.8 && b.th > 0.25) { thr = 0; brk = 0.2 }
+      if (b.th > 0.9) lean = 1
+      if (fd < -0.15 && fw[1] - (P.R + P.rt) > yTop - 0.05) bot.glPh = 2
+      return { thr, brk, lean }
+    }
+    return { thr: b.th > 0.55 ? 0 : sp > 4 ? 0.4 : 1, brk: b.th > 0.75 ? 0.4 : 0, lean: 1 }
+  }
+  bot.glPh = 0
+  // 段を越えた: 床が向こうで止まっていて、縁を登る時間が残っていれば、縁の技へ
+  if (st.at === 'hi' && st.left > 3.0) return null
+  // 床の先の平らな所で止まって待つ（前輪を下ろす）
+  const stopS = gl.Ld - 1.0, e = stopS - s
+  if (e < 0.4 + Math.max(0, sp) * 0.45) return { thr: 0, brk: Math.abs(sp) > 0.1 ? 1 : 0.6, lean: b.th > 0.1 ? 0.6 : 0, wait: true }
+  if (Math.abs(sp) < 0.8) return { thr: 0.5, brk: 0, lean: b.th > 0.1 ? 1 : 0, wait: true }
+  return { thr: 0, brk: 0, lean: b.th > 0.1 ? 1 : 0, wait: true }
 }
