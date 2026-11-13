@@ -9,13 +9,13 @@ const OWNER = (() => { try { return execSync('gh api user -q .login', { encoding
 const URL0 = 'https://tom3games.github.io/sky-bike/'
 const out = []
 for (const [name, bt, opts] of [['chromium', chromium, {}], ['webkit', webkit, { isMobile: true, hasTouch: true, deviceScaleFactor: 2 }]]) {
-  const b = await bt.launch(bt === chromium ? MUTE_LAUNCH : {}), ctx = await b.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 }, ...opts })
-  await muteContext(ctx)
+  const b = await bt.launch(bt === chromium ? { ...MUTE_LAUNCH, args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle', '--ignore-gpu-blocklist'] } : {}), ctx = await b.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 }, ...opts })
+  await muteContext(ctx) // chromium は GPU で描く（GPU なしの描画だと準備に 25 秒以上かかる。本物の端末は GPU で 2 秒）
   const p = await ctx.newPage()
   const errs = []
   p.on('pageerror', e => errs.push(e.message)); p.on('console', m => { if (m.type() === 'error') errs.push(m.text()) })
   p.on('requestfailed', r => errs.push('fail ' + r.url()))
-  await p.goto(URL0 + '?stay=1&t=' + Date.now(), { waitUntil: 'load' })
+  await p.goto(URL0 + '?stay=1&t=' + Date.now(), { waitUntil: 'load', timeout: 60000 })
   await p.waitForFunction(() => window.__skyReady, null, { timeout: 45000 })
   // 遊びの通し: 第1面を始めて進む（PC は ↑、スマホはアクセルのボタン）
   await p.click('.course[data-course="stage1"]'); await p.waitForTimeout(400)

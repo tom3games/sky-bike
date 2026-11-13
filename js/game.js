@@ -733,7 +733,8 @@ async function boot() {
   bikeView = new BikeView(scene)
   bikeView.root.visible = false
   await new Promise(r => setTimeout(r, 30))
-  renderer.compile(scene, camera); fill.style.width = '100%'
+  const LM = window.__loadMarks = window.__loadMarks || {}, c0 = performance.now(); LM.boot = Math.round(c0)
+  try { await renderer.compileAsync(scene, camera) } catch (e) { renderer.compile(scene, camera) } fill.style.width = '100%'; LM.compile = Math.round(performance.now() - c0)
   G.state = 'title'; show('title')
   window.__skyReady = true
   if (Q.get('course')) startRun(Q.get('course'))
