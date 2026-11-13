@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=17'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=17'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=18'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=18'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -30,7 +30,8 @@ function nearest(bot, b, from, to) {
   return bi
 }
 // 人の速さの bot の杭: [角度の先読み秒, 保つ角度, 体重の強さ, アクセル, 速すぎる時のアクセル]（人は 0.2 秒遅れるので、少し先の角度で体重を掛ける）
-const PEG_HUMAN = [0.1, 0.45, 2.5, 0.9, 0.5]
+const PEG_HUMAN = [0.1, 0.45, 2.5, 0.9, 0.5] // 平らな溝
+const PEG_HUMAN_P = [0.15, 0.5, 2, 0.9, 0.5] // 片輪の杭
 export function botInput(bot, b) {
   const path = bot.path, P = BIKE
   if (b.hang) return hangInput(bot, b)
@@ -292,6 +293,7 @@ function hangInput(bot, b) {
     for (const h of bot.hz) {
       const d = Math.hypot(h.p[0] - b.p[0], h.p[2] - b.p[2]), dy = h.p[1] - b.p[1]
       if (d > 8 || dy < -1 || dy > 3) continue
+      { const n = bot.world.shapes[hg.id].hang.n; if ((h.p[0] - b.p[0]) * -n[0] + (h.p[2] - b.p[2]) * -n[2] < -1.5) continue } // 縁の手前（後ろ）の物は登りに関係ない（v18: 後ろの鐘まで待っていて、縁が欠ける前に無理に登っていた）
       for (let t = 0.2; t <= 2.0; t += 0.1) if (h.unsafe(T0 + t)) { safe = false; break } // v17: 登りは 1.3 秒かかる（瞬間移動をやめた）ので、その間ずっと空いているか
     }
   }
@@ -355,7 +357,7 @@ function v16Input(bot, b, SQ, PV, c) {
   if (gv && !c.air && !b.hang) {
     const vg = ((gv.groove || gv.grooveRun) || {}).vg || 3.7
     const th = b.th - (cur.slope || 0) * 0.6, k = 0 // 坂では坂に対する角度で。反応の遅い人は早めに戻す
-    if (bot.react && ((gv.grooveRun || {}).peg || !(((gv.groove || gv.grooveRun) || {}).slope > 0.05))) { const C = PEG_HUMAN, thp = th + b.w * C[0], ln = Math.max(-1, Math.min(1, (thp - C[1]) * C[2])); return { thr: sp > vg + 0.5 ? C[4] : th < 0.25 ? 1 : C[3], brk: 0, lean: ln } } // 人の速さ（杭）: アクセルは一定、体重は少し先の角度で
+    if (bot.react && ((gv.grooveRun || {}).peg || !(((gv.groove || gv.grooveRun) || {}).slope > 0.05))) { const C = (gv.grooveRun || {}).peg ? PEG_HUMAN_P : PEG_HUMAN, thp = th + b.w * C[0], ln = Math.max(-1, Math.min(1, (thp - C[1]) * C[2])); return { thr: sp > vg + 0.5 ? C[4] : th < 0.25 ? 1 : C[3], brk: 0, lean: ln } } // 人の速さ（杭）: アクセルは一定、体重は少し先の角度で
     if (bot.react && ((gv.groove || gv.grooveRun) || {}).slope > 0.05 ) { const pg = (gv.grooveRun || {}).peg, H = [0.5, 2, 0.3], thp = th, ln = Math.max(-1, Math.min(1, (thp - H[0]) * H[1] + b.w * H[2])); const T2 = (gv.groove || gv.grooveRun || {}).peg || (gv.grooveRun || {}).peg ? [1, 0.6, 0.35] : [0.8, 0.4, 0.15]; return { thr: th < 0.3 ? 1 : th < 0.5 ? (sp < vg ? T2[0] : T2[1]) : T2[2], brk: sp > vg + 0.8 ? 0.3 : 0, lean: ln } } // 人の速さ: なめらかに体重で保つ（杭は角をよじ登るので少し強くアクセル）
     if (sp < vg - 0.3 && th > 0.25) return { thr: 1, brk: 0, lean: th > 0.55 - k ? 1 : 0 }
     return { thr: th < 0.35 - k ? 1 : th < 0.55 - k ? 0.45 : 0, brk: sp > vg + 0.6 ? 0.3 : 0, lean: th > 0.65 - k ? 1 : th > 0.45 - k ? 0 : -1 }

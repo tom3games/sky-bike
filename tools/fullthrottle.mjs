@@ -8,9 +8,9 @@ import * as S from '../js/steer.js'
 const V = +(process.env.V || 15), cid = process.argv[2] || 'stage1'
 const c = COURSES[cid](), w = new World(c.shapes); w.winds = c.winds || []
 const WALL = new Set(['tower', 'pillar', 'parapet', 'post', 'gate', 'rail', 'wall', 'castle', 'barrel', 'statue', 'sign', 'boulder'])
-const TECH = new Set(['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'draw', 'lowledge', 'trap', 'seesaw', 'lift', 'slide', 'spin', 'hang']) // 跳ぶ・段・時間で動く物だけ数えない（崩れる板・水・泥・急坂・木箱の上は数える）
+const TECH = new Set(['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'draw', 'lowledge', 'trap', 'seesaw', 'lift', 'slide', 'spin', 'hang', 'glift', 'peg']) // 跳ぶ・段・時間で動く物だけ数えない（崩れる板・水・泥・急坂・木箱の上は数える）
 // v16: 床の動きや速さを読む仕掛け（分かれ道の床・吊り橋・歯車・煙突・跳ね板・溝）の手前 34m からは始めない（全開で突っ込むと落ちるのが仕掛けどおり）
-const TIMED = new Set(['fork', 'forkRide', 'swing', 'gear', 'chimney', 'kick', 'groove'])
+const TIMED = new Set(['fork', 'forkRide', 'swing', 'gear', 'chimney', 'kick', 'groove', 'glift', 'peg']) // v17: 段のある動く床・片輪の杭も
 const nearHz = p => (c.hazards || []).some(h => Math.hypot(h.p[0] - p[0], h.p[2] - p[2]) < h.half + (h.kind === 'pend' ? 6 : 3) && Math.abs(h.p[1] - p[1]) < 3) // 鉄球は横へ弾き飛ばす範囲まで
 const markOf = i => { let n = '出発'; for (const m of c.marks || []) if (i >= m.i0) n = m.name; return n }
 const per = {}; let runs = 0, off = 0, wall = 0

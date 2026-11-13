@@ -11,7 +11,7 @@ const P = c.path
 const brNx = {}; P.forEach(q => { if (q.branch && q.nx != null) brNx[q.br] = q.nx })
 const prog = i => P[i].branch ? (brNx[P[i].br] ?? i) - 1 : i
 // 判断の出来事になる道の点
-const EV = new Set(['jump', 'lip', 'ramp', 'stepUp', 'stepDown', 'trap', 'crumble', 'crate', 'mud', 'water', 'steep', 'seesaw', 'lift', 'slide', 'spin', 'draw', 'narrow', 'bump', 'uturn', 'pad', 'landing', 'hang', 'nitro', 'can', 'room', 'whoop', 'pinch'])
+const EV = new Set(['jump', 'lip', 'ramp', 'stepUp', 'stepDown', 'trap', 'crumble', 'crate', 'mud', 'water', 'steep', 'seesaw', 'lift', 'slide', 'spin', 'draw', 'narrow', 'bump', 'uturn', 'pad', 'landing', 'hang', 'nitro', 'can', 'room', 'whoop', 'pinch', 'glift', 'peg'])
 const evAt = new Array(P.length).fill(null)
 for (let i = 1; i < P.length; i++) {
   const q = P[i], pr = P[i - 1]; if (q.branch) continue

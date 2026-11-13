@@ -1041,8 +1041,8 @@ function startClimb(world, b) {
     const F = frontAt(fPrev)
     tab.push({ F, th: datan2(F[1] - R[1], R[0] - F[0]) - off })
   }
-  // 登る時間: 後輪の道筋の長さから、登り切った時の速さが縁の上を進む速さ（約 1.6m/s）になるように（出口で速さが飛ばない）
-  hg.cl = { e: e.slice(), n, tab, psi: hg.psi, lat: [e[0], e[2]], T: clamp(cum[cum.length - 1] / 1.6, 1.0, 1.8) }
+  // 登る時間: 後輪の道筋の長さから、登り切った時の速さが縁の上を進む速さ（約 2.5m/s）になるように。v18: 1.6m/s（約 1.3 秒）だと縁の上を通る鐘のすき間（約 1 秒）に登り切れなかった（出口で速さが飛ばない）
+  hg.cl = { e: e.slice(), n, tab, psi: hg.psi, lat: [e[0], e[2]], T: clamp(cum[cum.length - 1] / 2.5, 0.7, 1.8) }
 }
 function hangStep(world, b, inp, ev) {
   const hg = b.hang, sh = world.shapes[hg.id], H = sh.hang

@@ -110,6 +110,7 @@ button{background:none;border:0;cursor:pointer}
 .tb.on{border-color:var(--fireHi);color:var(--fireHi);box-shadow:0 0 0 2px rgba(230,166,99,.35),0 0 22px rgba(230,166,99,.35)}
 .tb.on span{color:var(--fireHi)}
 html.touchui #keysMini{display:none}
+html.touchui .keys .pconly{display:none}
 html.touchui .alt{bottom:calc(150px + var(--bot))}
 
 /* 結果: 石の板に刻む */

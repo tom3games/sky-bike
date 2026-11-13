@@ -8,14 +8,14 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=17'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=17'
-import { COURSES } from './course.js?v=17'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=17'
-import { BikeView, snap } from './bikeview.js?v=17'
-import { createBot, botInput, resetBot } from './bot.js?v=17'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=17'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=17'
+import { buildGimmicks } from './gimmicks.js?v=18'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=18'
+import { COURSES } from './course.js?v=18'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=18'
+import { BikeView, snap } from './bikeview.js?v=18'
+import { createBot, botInput, resetBot } from './bot.js?v=18'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=18'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=18'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -40,8 +40,8 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
 
 // ------------------------------------------------------------ 言葉（日英）
 const TXT = {
-  ja: { loading: '塔へ向かう', kicker: '奈落の底から、雲の上の城まで。', c_practice: '練習場', c_stage1: '登る', c_stage1_sub: '第1面 奈落から天空へ', how: '遊び方', sound_on: '音 あり', sound_off: '音 なし', how_lead: 'ハンドルは自動で道をなぞる。操るのはアクセル・ブレーキ・体重の前後の4つだけ。', k_thr: 'アクセル', k_brk: 'ブレーキ（止まると下がる）', k_back: '後ろ体重', k_fwd: '前体重', k_nit: 'ニトロ（押すだけで全開。旗と燃料の缶で満タン）', tip10: 'ニトロは押すだけで全開になる。休憩所の旗と道の燃料の缶で満たせる。曲がりの手前で押しても、自動の減速で切れる', k_cp: '休憩所からやり直す', k_pause: '一時停止', tip1: '段の前は後ろ体重で前輪を上げ、乗ったら前体重', tip2: '登りは前体重、下りは後ろ体重', tip3: '空中は体重で車体を着地の坂に合わせる', tip4: '曲がる前はブレーキ。速すぎると外へふくらむ', tip5: '後ろ体重のあとすぐ前体重で、車体が跳ねる', tip6: '止まったまま後ろ体重で前輪が上がる（約33度で止まる）。前体重＋ブレーキで前輪で立つ', tip7: '回りすぎ・頭から落ちると転んで少し前から。道の外へ落ちたら着いた所から登り直し', tip8: '高い縁は ゆっくり ←＋↑ で前輪を掛け、↓で耐え、→＋↑ で登る', tip9: '扉は速さで破る。シーソーはゆっくり。ひびの入った床は速さで越える', logo_sub: '崩れた塔を、雲の上まで', t_climb: '高い縁: ←＋↑ で前輪を掛け、↓で耐え、→＋↑', credit: '素材: Poly Haven・Quaternius・Kenney ほか（CC0）。火の音: Work With Sounds / La Fonderie（CC BY 4.0）。一覧は CREDITS.md', back: 'もどる', faults: 'フォルト', arrived: '到着', time: '時間', best: '自己ベスト', retry: 'もう一回', next: '登る', share: 'Xでポスト', menu: 'メニュー', paused: '一時停止', resume: '続ける', restart: '最初から', why_head: '頭を打った', why_back: '後ろへ回りすぎた', why_front: '前へ回った', why_body: '体が当たった', why_hard: '着地が強すぎ', why_belly: '車体の下を強く打った', why_fall: '落ちた', medal: ['金', '銀', '銅', '完走'], newBest: '自己ベスト更新', rest: 'セーブした', fell: 'Nm 落ちた', net: '休憩所に戻った', lava: '溶岩に落ちた', best_alt: '最高', hard_on: 'ハードコア 入', hard_off: 'ハードコア 切', t_thr: 'アクセル', t_back: '段の前は 後ろ体重', t_fwd: '登りは 前体重', t_air: '空中は体重で角度を合わせる', t_brk: '曲がる前は ブレーキ', keys: '<b>↑</b>アクセル <b>↓</b>ブレーキ <b>←</b>後ろ体重 <b>→</b>前体重 <b>Shift</b>ニトロ <i></i><b>R</b>休憩所へ <b>Esc</b>止める' },
-  en: { loading: 'Heading to the tower', kicker: 'From the abyss to the castle above the clouds.', c_practice: 'Practice Yard', c_stage1: 'Climb', c_stage1_sub: 'Stage 1: Abyss to the Sky', how: 'How to play', sound_on: 'Sound on', sound_off: 'Sound off', how_lead: 'Steering is automatic. You only control throttle, brake and leaning back or forward.', k_thr: 'Throttle', k_brk: 'Brake (reverse when stopped)', k_back: 'Lean back', k_fwd: 'Lean forward', k_nit: 'Nitro (full throttle on its own; refill at flags and fuel cans)', tip10: 'Nitro gives full throttle by itself. Refill it at rest flags and fuel cans. It cuts out when the bike slows for a corner', k_cp: 'Back to rest point', k_pause: 'Pause', tip1: 'Lean back to lift the front onto a step, then lean forward', tip2: 'Lean forward going up, back going down', tip3: 'In the air, lean to match the landing slope', tip4: 'Brake before corners. Too fast and you run wide', tip5: 'Lean back then quickly forward to hop', tip6: 'Standing still, lean back to lift the front (holds at about 33°). Lean forward + brake to stand on the front wheel', tip7: 'Loop out or land on your head and you restart a little way back. Fall off and you climb from where you land', tip8: 'Tall ledge: creep ← + ↑ to hook the front wheel, hold ↓, then → + ↑ to climb', tip9: 'Smash doors with speed. Ride seesaws slowly. Keep your speed over cracking floors', logo_sub: 'Ride the ruined tower above the clouds', t_climb: 'Tall ledge: ← + ↑ to hook, ↓ to hold, → + ↑', credit: 'Assets: Poly Haven, Quaternius, Kenney and others (CC0). Fire sound: Work With Sounds / La Fonderie (CC BY 4.0). Full list in CREDITS.md', back: 'Back', faults: 'Faults', arrived: 'Arrived', time: 'Time', best: 'Best', retry: 'Retry', next: 'Climb', share: 'Post on X', menu: 'Menu', paused: 'Paused', resume: 'Resume', restart: 'Restart', why_head: 'Head hit', why_back: 'Looped out backward', why_front: 'Over the bars', why_body: 'Body hit', why_hard: 'Landing too hard', why_belly: 'Bottomed out hard', why_fall: 'Fell', medal: ['GOLD', 'SILVER', 'BRONZE', 'DONE'], newBest: 'New best', rest: 'Saved', fell: 'Fell Nm', net: 'Back to rest point', lava: 'Into the lava', best_alt: 'Best', hard_on: 'Hardcore ON', hard_off: 'Hardcore OFF', t_thr: 'Throttle', t_back: 'Lean back before a step', t_fwd: 'Lean forward going up', t_air: 'Lean to match the landing', t_brk: 'Brake before the corner', keys: '<b>↑</b>throttle <b>↓</b>brake <b>←</b>lean back <b>→</b>lean fwd <b>Shift</b>nitro <i></i><b>R</b>rest point <b>Esc</b>pause' },
+  ja: { loading: '塔へ向かう', kicker: '奈落の底から、雲の上の城まで。', c_practice: '練習場', c_stage1: '登る', c_stage1_sub: '第1面 奈落から天空へ', how: '遊び方', sound_on: '音 あり', sound_off: '音 なし', how_lead: 'ハンドルは自動で道をなぞる。操るのはアクセル・ブレーキ・体重の前後の4つだけ。PC はマウスでカメラも回せる。', k_thr: 'アクセル', k_brk: 'ブレーキ（止まると下がる）', k_back: '後ろ体重', k_fwd: '前体重', k_nit: 'ニトロ（押すだけで全開。旗と燃料の缶で満タン）', k_cam: 'カメラ（クリックでマウスを固定・Esc で外す）', kc_thr: '左クリック / ↑ / W', kc_brk: '右クリック / ↓ / S', kc_cam: 'マウス', tip10: 'ニトロは押すだけで全開になる。休憩所の旗と道の燃料の缶で満たせる。曲がりの手前で押しても、自動の減速で切れる', k_cp: '休憩所からやり直す', k_pause: '一時停止', tip1: '段の前は後ろ体重で前輪を上げ、乗ったら前体重', tip2: '登りは前体重、下りは後ろ体重', tip3: '空中は体重で車体を着地の坂に合わせる', tip4: '曲がる前はブレーキ。速すぎると外へふくらむ', tip5: '後ろ体重のあとすぐ前体重で、車体が跳ねる', tip6: '止まったまま後ろ体重で前輪が上がる（約33度で止まる）。前体重＋ブレーキで前輪で立つ', tip7: '回りすぎ・頭から落ちると転んで少し前から。道の外へ落ちたら着いた所から登り直し', tip8: '高い縁は ゆっくり近づき 後ろ体重＋アクセルで前輪を掛け、ブレーキで耐え、前体重＋アクセルで登る', tip9: '扉は速さで破る。シーソーはゆっくり。ひびの入った床は速さで越える', logo_sub: '崩れた塔を、雲の上まで', t_climb: '高い縁: 後ろ体重＋アクセルで掛け、前体重＋アクセル', credit: '素材: Poly Haven・Quaternius・Kenney ほか（CC0）。火の音: Work With Sounds / La Fonderie（CC BY 4.0）。一覧は CREDITS.md', back: 'もどる', faults: 'フォルト', arrived: '到着', time: '時間', best: '自己ベスト', retry: 'もう一回', next: '登る', share: 'Xでポスト', menu: 'メニュー', paused: '一時停止', resume: '続ける', restart: '最初から', why_head: '頭を打った', why_back: '後ろへ回りすぎた', why_front: '前へ回った', why_body: '体が当たった', why_hard: '着地が強すぎ', why_belly: '車体の下を強く打った', why_fall: '落ちた', medal: ['金', '銀', '銅', '完走'], newBest: '自己ベスト更新', rest: 'セーブした', fell: 'Nm 落ちた', net: '休憩所に戻った', lava: '溶岩に落ちた', best_alt: '最高', hard_on: 'ハードコア 入', hard_off: 'ハードコア 切', t_thr: 'アクセル', t_back: '段の前は 後ろ体重', t_fwd: '登りは 前体重', t_air: '空中は体重で角度を合わせる', t_brk: '曲がる前は ブレーキ', keys: '<b>左クリック</b>アクセル <b>右クリック</b>ブレーキ <b>A</b>後ろ体重 <b>D</b>前体重 <b>Space</b>ニトロ <b>マウス</b>カメラ <i></i><b>R</b>休憩所へ <b>Esc</b>止める' },
+  en: { loading: 'Heading to the tower', kicker: 'From the abyss to the castle above the clouds.', c_practice: 'Practice Yard', c_stage1: 'Climb', c_stage1_sub: 'Stage 1: Abyss to the Sky', how: 'How to play', sound_on: 'Sound on', sound_off: 'Sound off', how_lead: 'Steering is automatic. You only control throttle, brake and leaning back or forward. On PC the mouse turns the camera.', k_thr: 'Throttle', k_brk: 'Brake (reverse when stopped)', k_back: 'Lean back', k_fwd: 'Lean forward', k_nit: 'Nitro (full throttle on its own; refill at flags and fuel cans)', k_cam: 'Camera (click to lock the mouse, Esc to release)', kc_thr: 'Left click / ↑ / W', kc_brk: 'Right click / ↓ / S', kc_cam: 'Mouse', tip10: 'Nitro gives full throttle by itself. Refill it at rest flags and fuel cans. It cuts out when the bike slows for a corner', k_cp: 'Back to rest point', k_pause: 'Pause', tip1: 'Lean back to lift the front onto a step, then lean forward', tip2: 'Lean forward going up, back going down', tip3: 'In the air, lean to match the landing slope', tip4: 'Brake before corners. Too fast and you run wide', tip5: 'Lean back then quickly forward to hop', tip6: 'Standing still, lean back to lift the front (holds at about 33°). Lean forward + brake to stand on the front wheel', tip7: 'Loop out or land on your head and you restart a little way back. Fall off and you climb from where you land', tip8: 'Tall ledge: creep up, lean back + throttle to hook the front wheel, hold the brake, then lean forward + throttle to climb', tip9: 'Smash doors with speed. Ride seesaws slowly. Keep your speed over cracking floors', logo_sub: 'Ride the ruined tower above the clouds', t_climb: 'Tall ledge: lean back + throttle to hook, lean forward + throttle', credit: 'Assets: Poly Haven, Quaternius, Kenney and others (CC0). Fire sound: Work With Sounds / La Fonderie (CC BY 4.0). Full list in CREDITS.md', back: 'Back', faults: 'Faults', arrived: 'Arrived', time: 'Time', best: 'Best', retry: 'Retry', next: 'Climb', share: 'Post on X', menu: 'Menu', paused: 'Paused', resume: 'Resume', restart: 'Restart', why_head: 'Head hit', why_back: 'Looped out backward', why_front: 'Over the bars', why_body: 'Body hit', why_hard: 'Landing too hard', why_belly: 'Bottomed out hard', why_fall: 'Fell', medal: ['GOLD', 'SILVER', 'BRONZE', 'DONE'], newBest: 'New best', rest: 'Saved', fell: 'Fell Nm', net: 'Back to rest point', lava: 'Into the lava', best_alt: 'Best', hard_on: 'Hardcore ON', hard_off: 'Hardcore OFF', t_thr: 'Throttle', t_back: 'Lean back before a step', t_fwd: 'Lean forward going up', t_air: 'Lean to match the landing', t_brk: 'Brake before the corner', keys: '<b>Left click</b>throttle <b>Right click</b>brake <b>A</b>lean back <b>D</b>lean fwd <b>Space</b>nitro <b>Mouse</b>camera <i></i><b>R</b>rest point <b>Esc</b>pause' },
 }
 let lang = 'ja'
 try { lang = localStorage.getItem('sky-lang') || ((navigator.language || 'ja').slice(0, 2) === 'ja' ? 'ja' : 'en') } catch (e) {}
@@ -366,10 +366,10 @@ function startRun(id) {
   for (const k in G.touch) G.touch[k] = false; document.querySelectorAll('.tb').forEach(b => b.classList.remove('on', 'down'))
 }
 function ghostSpawn(rs) { const b = doRespawn(G.world, G.course, { rest: 0 }, rs); b.ghost = true; return b }
-function show(id) { for (const s of ['loading', 'title', 'how', 'result', 'pause']) $(s).hidden = s !== id; $('hud').hidden = !(id === 'hud' || id === 'pause'); if (id !== 'hud' && id !== 'pause') $('touch').hidden = true }
+function show(id) { if (id !== 'hud') unlockMouse(); for (const s of ['loading', 'title', 'how', 'result', 'pause']) $(s).hidden = s !== id; $('hud').hidden = !(id === 'hud' || id === 'pause'); if (id !== 'hud' && id !== 'pause') $('touch').hidden = true }
 
 // ------------------------------------------------------------ 入力（アクセル・ブレーキ・後ろ体重・前体重の4つ。ハンドルは自動）
-const KEYMAP = { ArrowUp: 'thr', KeyW: 'thr', ArrowDown: 'brk', KeyS: 'brk', ArrowLeft: 'back', KeyA: 'back', ArrowRight: 'fwd', KeyD: 'fwd', ShiftLeft: 'nit', ShiftRight: 'nit', KeyN: 'nit' }
+const KEYMAP = { ArrowUp: 'thr', KeyW: 'thr', ArrowDown: 'brk', KeyS: 'brk', ArrowLeft: 'back', KeyA: 'back', ArrowRight: 'fwd', KeyD: 'fwd', ShiftLeft: 'nit', ShiftRight: 'nit', KeyN: 'nit', Space: 'nit' } // v17: Space もニトロ（走っている間だけ。結果の画面では「もう一回」）
 addEventListener('keydown', e => {
   if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return }
   startAudio()
@@ -385,7 +385,30 @@ addEventListener('keydown', e => {
   }
 })
 addEventListener('keyup', e => { if (KEYMAP[e.code]) G.keys.delete(KEYMAP[e.code]) })
-addEventListener('blur', () => G.keys.clear())
+addEventListener('blur', () => { G.keys.clear(); G.mouse.thr = G.mouse.brk = false })
+// ------------------------------------------------------------ PC のマウス（v17）: 左クリックを押す間アクセル・右クリックを押す間ブレーキ（止まると下がる）・マウスを動かしてカメラ
+// クリックでマウスを画面に固定（Pointer Lock）。Esc で外れる（もう一度 Esc で一時停止）。ハンドルは今まで通り自動（道に沿う）
+G.mouse = { thr: false, brk: false }
+G.camOff = { yaw: 0, pitch: 0, idle: 9 }
+const lockEl = () => renderer.domElement
+const onGame = e => G.state === 'play' && !isTouch && !(e.target && e.target.closest && e.target.closest('button, a, input, .tb, #touch, .screen'))
+addEventListener('mousedown', e => {
+  if (!onGame(e)) return
+  startAudio()
+  if (e.button === 0) G.mouse.thr = true
+  if (e.button === 2) G.mouse.brk = true
+  if (document.pointerLockElement !== lockEl()) { try { const pr = lockEl().requestPointerLock(); if (pr && pr.catch) pr.catch(() => {}) } catch (err) {} }
+  e.preventDefault()
+})
+addEventListener('mouseup', e => { if (e.button === 0) G.mouse.thr = false; if (e.button === 2) G.mouse.brk = false })
+addEventListener('contextmenu', e => { if (G.state === 'play' || G.state === 'pause') e.preventDefault() })
+addEventListener('mousemove', e => {
+  if (G.state !== 'play' || (document.pointerLockElement !== lockEl() && !G.camFree)) return
+  G.camOff.yaw -= (e.movementX || 0) * 0.0032; G.camOff.yaw = Math.atan2(Math.sin(G.camOff.yaw), Math.cos(G.camOff.yaw))
+  G.camOff.pitch = Math.max(-0.35, Math.min(0.75, G.camOff.pitch + (e.movementY || 0) * 0.0024)); G.camOff.idle = 0
+})
+document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement !== lockEl()) { G.mouse.thr = G.mouse.brk = false } })
+const unlockMouse = () => { try { if (document.pointerLockElement) document.exitPointerLock() } catch (e) {} }
 let padPrev = {}
 function readPad() {
   const gp = navigator.getGamepads ? [...navigator.getGamepads()].find(g => g && g.connected) : null
@@ -409,7 +432,8 @@ document.querySelectorAll('.tb').forEach(btn => {
 function gatherInput() {
   if (G.testInput) return G.testInput()
   const K = G.keys, T = G.touch, pad = readPad()
-  let thr = K.has('thr') || T.thr ? 1 : 0, brk = K.has('brk') || T.brk ? 1 : 0
+  const M = G.mouse || {}
+  let thr = K.has('thr') || T.thr || M.thr ? 1 : 0, brk = K.has('brk') || T.brk || M.brk ? 1 : 0
   let lean = (K.has('fwd') || T.fwd ? 1 : 0) - (K.has('back') || T.back ? 1 : 0)
   let nit = K.has('nit') || T.nit ? 1 : 0
   if (pad) { thr = Math.max(thr, pad.thr); brk = Math.max(brk, pad.brk); if (pad.lean) lean = pad.lean; if (pad.nit) nit = 1 }
@@ -437,7 +461,7 @@ function respawn(rs, manual) {
   if (manual) toast(G.course.cps[rs.cp ?? 0].name)
 }
 function togglePause() {
-  if (G.state === 'play') { G.state = 'pause'; show('pause') }
+  if (G.state === 'play') { G.state = 'pause'; unlockMouse(); show('pause') }
   else if (G.state === 'pause') { G.state = 'play'; show('hud'); if (isTouch) $('touch').hidden = false }
 }
 let toastT = 0
@@ -535,7 +559,7 @@ function finish() {
 }
 
 // ------------------------------------------------------------ チュートリアル（第1面の序盤で1つずつ。やったら消える）
-const TUT_KEY = { thr: '↑', back: '←', fwd: '→', air: '← →', brk: '↓', climb: '← → ↑' }
+const TUT_KEY = { thr: '左クリック', back: 'A', fwd: 'D', air: 'A D', brk: '右クリック', climb: 'A D 左クリック' } // PC（v17 のマウスと A/D）
 function tutorialStep(inp) {
   const T = G.tut, c = G.course
   if (!T || !c.tuts || !c.tuts.length || G.bot) return
@@ -585,9 +609,13 @@ function updateCamera(dt, alpha) {
   G.camSide += ((G.camSideT ?? 1) - G.camSide) * Math.min(1, dt * 1.2)
   let ang = 0.62 + (air ? Math.min(0.3, b.airT * 0.4) : 0)
   G.camAng = G.camAng == null ? ang : G.camAng + (ang - G.camAng) * Math.min(1, dt * 1.8)
-  const a = G.camYaw + Math.PI + G.camSide * G.camAng
-  const dist = 6.4, hgt = 2.7
-  const hx = Math.cos(G.camYaw), hz = -Math.sin(G.camYaw)
+  // v17: マウスで回したカメラ（バイクのまわりを回る・上下）。動かさずに 2 秒たつと、走っている間はゆっくり後ろへ戻る
+  const CO = G.camOff || { yaw: 0, pitch: 0, idle: 9 }
+  CO.idle += dt
+  if (CO.idle > 2 && Math.abs(b.speed) > 1.5 && !G.fallFrom) { const k = Math.min(1, dt * 1.2); CO.yaw -= CO.yaw * k; CO.pitch -= CO.pitch * k }
+  const a = G.camYaw + Math.PI + G.camSide * G.camAng * Math.max(0, 1 - Math.abs(CO.yaw) * 1.5) + CO.yaw
+  const dist = 6.4 * (1 - CO.pitch * 0.25), hgt = 2.7 + CO.pitch * 4.2
+  const lookYaw = G.camYaw + CO.yaw, hx = Math.cos(lookYaw), hz = -Math.sin(lookYaw)
   let lookUp = 0
   const ah2 = path[Math.min(path.length - 1, si + 9)]; if (ah2 && ah2.p) lookUp = Math.max(-1.5, Math.min(3, ah2.p[1] + 0.8 - bp.y))
   G.lookUp = (G.lookUp || 0) + (lookUp - (G.lookUp || 0)) * Math.min(1, dt * 2)

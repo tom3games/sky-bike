@@ -3,7 +3,7 @@
 //   塔のまわり（tower モード）: 塔の中心のまわりの円弧（1 周しない。塔ごとに 1 回だけ）
 //   自由な道（free モード）: 区間の向き hd に沿って、ゆるい S 字で進む円弧。excursion は外へ出て戻らず、そのまま先へ進む
 // 当たりと見た目は今まで通り同じ形の一覧（B.shapes）から作る。
-import { dsin, dcos } from './physics.js?v=17'
+import { dsin, dcos } from './physics.js?v=18'
 
 const DEG = Math.PI / 180
 const RM0 = 17.1 // v15 の周の道の半径（区間の長さは「角度 × これ」で決めてあった）
@@ -94,6 +94,7 @@ export function makeWorldX(B, o = {}) {
     if (B.noDeco > 0) { B.noDeco--; return X.orbitRaw(ang, rise, ro) }
     const free = X.mode === 'free'
     if (ro.kind || ro.plain || ro.mu || ro.w || !B.decoOn || ang * RM0 < 6) return X.orbitRaw(ang, rise, ro)
+    { const lc = B.cps[B.cps.length - 1]; if (lc && lc.rest && Math.hypot(lc.p[0] - B.t.p[0], lc.p[2] - B.t.p[2]) < 3 && Math.abs(lc.p[1] - B.t.p[1]) < 2) { decoN++; return X.orbitRaw(ang, rise, ro) } } // 仕込みの順番は進める（後の道の仕込みを変えない） // v17: 休憩所の旗のすぐ先には切れ目などを仕込まない（止まった所から出し直すと助走が足りず、切れ目に前輪を落として進めなくなる）
     // 自由な道では、6m 以上の道には毎回何かを仕込む（何もしなくていい時間を 4 秒より短く）
     const kind = ['trap', 'groove', 'log', 'once', 'step', 'groove', 'trap', 'log'][(decoN++) % 8] // 6m 以上の道には毎回何かを仕込む（v16。何もしなくていい時間を 4 秒より短く）
     const L = ang * RM0, L1 = L * 0.42, r1 = rise * 0.42
@@ -116,6 +117,8 @@ export function makeWorldX(B, o = {}) {
     }
     return first
   }
+  // v17: 足した区間の中の道の仕込みで、後の道の仕込みの順番がずれないように（前の版の並びを保つ）
+  X.decoKeep = fn => { const n0 = decoN; fn(); decoN = n0 }
   X.ogap = (len, dy) => {
     B.noDeco = 1
     if (X.mode === 'tower') return B.curve(X.RM, len / X.RM * B.orbitSign, { noShape: true, rise: dy, kind: 'jump', pw: 0, vJump: 2.0 + len * 1.9 })

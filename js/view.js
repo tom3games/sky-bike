@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=17'
+import { arcPoint } from './physics.js?v=18'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -1146,7 +1146,9 @@ export function updateFlames(fl, t) { for (const m of fl.mats) m.uniforms.time.v
 // 看板の文字（練習場。当たりのある板の、手前の面にぴったり重ねる）
 export function buildSigns(course, scene) {
   const g = new THREE.Group(); g.name = 'signs'
-  for (const sg of course.signs) {
+  const coarse = typeof matchMedia === 'function' && (matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window)
+  for (const sg0 of course.signs) {
+    const sg = typeof sg0.text === 'string' ? sg0 : { ...sg0, text: coarse ? sg0.text.touch : sg0.text.pc } // v17: スマホと PC で文言を分ける
     const sh = sg.shape
     const c = document.createElement('canvas'); c.width = 640; c.height = 216
     const x = c.getContext('2d')

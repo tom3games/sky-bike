@@ -1,9 +1,10 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=17'
-import * as P16 from './parts16.js?v=17'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=17'
-import { lab16 } from './parts16.js?v=17'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=17'
+import * as Z from './zones.js?v=18'
+import * as P16 from './parts16.js?v=18'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=18'
+import { lab16 } from './parts16.js?v=18'
+import * as P17 from './parts17.js?v=18'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=18'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -406,12 +407,12 @@ export function practice() {
   B.box({ c: [120, -9, 0], h: [900, 3, 900], mat: 'grass', tag: 'ground' })
   B.solid = true; B.base = -6.6
   B.t.p = [0, 0.6, 0]
-  B.road(14, { w: 5, mat: 'concrete', thick: 0.6 }); B.cp('スタート', { w: 5 }); B.sign('↑ アクセル  ↓ ブレーキ  ←→ 体重', { at: 3 })
+  B.road(14, { w: 5, mat: 'concrete', thick: 0.6 }); B.cp('スタート', { w: 5 }); B.sign({ touch: '↑ アクセル  ↓ ブレーキ  ←→ 体重', pc: '左クリック アクセル  右クリック ブレーキ  A D 体重' }, { at: 3 })
   B.road(10, { w: 5, mat: 'concrete', thick: 0.6 })
   // 1 低い段（勢いで越える）
   B.step(0.22); B.road(8, { w: 5, mat: 'concrete', thick: 0.82, noOverlap: true }); B.step(-0.22); B.road(10, { w: 5, mat: 'concrete', thick: 0.6, noOverlap: true })
   // 2 高い段（ウィリーで前輪を上げてから）
-  B.cp('段差', { w: 5 }); B.sign('高い段は ← 後ろ体重で前輪を上げる', { at: 1 })
+  B.cp('段差', { w: 5 }); B.sign({ touch: '高い段は ← 後ろ体重で前輪を上げる', pc: '高い段は A 後ろ体重で前輪を上げる' }, { at: 1 })
   B.road(10, { w: 5, mat: 'concrete', thick: 0.6 })
   B.step(0.5); B.road(6, { w: 5, mat: 'concrete', thick: 1.1, noOverlap: true })
   B.step(0.5); B.road(8, { w: 5, mat: 'concrete', thick: 1.6, noOverlap: true })
@@ -424,19 +425,19 @@ export function practice() {
   B.road(16, { w: 5, slope: -16 * DEG, mat: 'concrete', thick: 1.2 })
   B.road(10, { w: 5, mat: 'concrete', thick: 0.6 })
   // 3.5 急な登りと急な下り（登りは → で前に、下りは ← で後ろに）
-  B.cp('急な坂', { w: 5 }); B.sign('登りは → 前体重 下りは ← 後ろ体重', { at: 1 })
+  B.cp('急な坂', { w: 5 }); B.sign({ touch: '登りは → 前体重 下りは ← 後ろ体重', pc: '登りは D 前体重 下りは A 後ろ体重' }, { at: 1 })
   B.road(8, { w: 5, mat: 'concrete', thick: 0.6 })
   B.road(5, { w: 4, slope: 30 * DEG, mat: 'concrete', thick: 1.2 })
   B.road(2, { w: 4, mat: 'concrete', thick: 1.2 })
   B.road(5, { w: 4, slope: -28 * DEG, mat: 'concrete', thick: 1.2 })
   B.road(6, { w: 5, mat: 'concrete', thick: 0.6 })
   // 3.6 段の連続（勢いで越えるか、← のあとすぐ → で跳ねる）
-  B.cp('段の連続', { w: 5 }); B.sign('← のあとすぐ → で跳ねる', { at: 1 })
+  B.cp('段の連続', { w: 5 }); B.sign({ touch: '← のあとすぐ → で跳ねる', pc: 'A のあとすぐ D で跳ねる' }, { at: 1 })
   B.road(8, { w: 5, mat: 'concrete', thick: 0.6 })
   for (let i = 0; i < 3; i++) { B.step(0.28); B.road(2.3, { w: 5, mat: 'concrete', thick: 0.9 + i * 0.3, noOverlap: true }) }
   B.road(4, { w: 5, mat: 'concrete', thick: 1.5 })
   // 4 ジャンプ台 → すき間 → 下り坂に着地
-  B.cp('ジャンプ台', { w: 5 }); B.sign('空中は ←→ で角度を合わせる', { at: 1 })
+  B.cp('ジャンプ台', { w: 5 }); B.sign({ touch: '空中は ←→ で角度を合わせる', pc: '空中は A D で角度を合わせる' }, { at: 1 })
   B.road(22, { w: 5, mat: 'concrete', thick: 0.6 })
   const rise = B.kicker(4, 20 * DEG, { w: 3.4 })
   B.gap(7, rise - 0.6, 'jump')
@@ -450,7 +451,7 @@ export function practice() {
   B.solid = true
   B.road(4, { w: 5, mat: 'concrete', thick: 0.6 })
   // 6 曲がり角（ハンドルは自動。速すぎると曲がり切れずに外へ出る）
-  B.cp('曲がり角', { w: 5 }); B.sign('曲がる前は ↓ で減速', { at: 1 })
+  B.cp('曲がり角', { w: 5 }); B.sign({ touch: '曲がる前は ↓ で減速', pc: '曲がる前は 右クリック で減速' }, { at: 1 })
   B.road(6, { w: 5, mat: 'concrete', thick: 0.6 })
   B.curve(6, 90 * DEG, { w: 3.2, mat: 'concrete', thick: 0.6 })
   B.road(3, { w: 3.2, mat: 'concrete', thick: 0.6 })
@@ -588,7 +589,7 @@ export function stage1() {
   // → 鐘楼 → 氷の尖塔（屋上から谷を跳ぶ）→ 雲の上の城。1 つの塔のまわりは 1 周しない。
   const W = 4.2
   const x = makeWorldX(B, { W })
-  x.P = P16; x.fork = makeFork(x, P16)
+  x.P = P16; x.P17 = P17; x.fork = makeFork(x, P16)
   const { orbit, otorch } = x
   // 谷底の街の地面（出発の広場から墓所の塔の根もとまで）。その外は崖で、下は溶岩の谷
   { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of B.path) if (q.p) { x0 = Math.min(x0, q.p[0]); x1 = Math.max(x1, q.p[0]); z0 = Math.min(z0, q.p[2]); z1 = Math.max(z1, q.p[2]) }
@@ -753,7 +754,7 @@ function towerDressing(B) {
       const y = s.y0 + s.b * (ph - s.phi0), p = [s.cx + dcos(ph) * rp, y, s.cz - dsin(ph) * rp]
       // 別の道が近くを横切る所（屋上の助走路が下の張り出しの上を通る所など）には置かない
       const tang = ph + Math.PI / 2, cross = nearPts(p, 2.8, q => q.yaw != null && Math.hypot(q.p[0] - p[0], q.p[2] - p[2]) < 2.8 && Math.abs(q.p[1] - y) < 2.4 && Math.abs(Math.sin(q.yaw - tang)) > 0.35)
-      if (!cross && !near(p, ['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'water', 'mud', 'draw'], 1.6)) {
+      if (!cross && !near(p, ['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'water', 'mud', 'draw'], 1.6) && !near(p, ['bump', 'curve'], 2.6)) { // 丸太は曲がりの中で道の縁より外へ出るので広めに・屋上へ曲がる道（curve）の横にも置かない（v17）
         const h = 0.32 + rr() * 0.3, slope = Math.atan2(s.b, rp)
         const yaw = ph + Math.PI / 2
         const mat = s.mat === 'grate' ? 'rust' : s.mat === 'ice' || s.mat === 'snowrock' ? 'snowrock' : s.mat === 'basalt' ? 'basalt' : s.mat === 'plank' ? 'plankold' : 'ruinwall'
@@ -866,4 +867,4 @@ function finishCourse(B, o) {
   }
   return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
-export const COURSES = { practice, stage1, lab16 }
+export const COURSES = { practice, stage1, lab16, lab17: P17.lab17 }

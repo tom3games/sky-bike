@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=17'
+import { hbeam } from './course.js?v=18'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -206,6 +206,20 @@ export function ruinsMore(x) {
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
+  x.decoKeep(() => {
+  // v17 片輪しか乗らない杭（2）: 高い縁を登った直後（速さが出せない）。杭の頭は車輪の間より短く、杭の間は前輪が落ちる幅。ウィリーで後輪だけで乗り継ぐ
+  B.mark('片輪の杭')
+  excursion({
+    sRise: 4.2,
+    out: () => {
+      B.road(6, { w: 3.2, mat: 'cobble', thick: 1.0, back: 0 }) // 縁の前で速さを落とす長さ（3m だと止まり切れず、縁に掛からない）
+      B.hangLedge(1.6, 2.2, { w: 3.2, mat: 'cobble', max: 10 })
+      x.P17.pegRow(B, {})
+      B.road(3, { w: 3.2, mat: 'cobble', thick: 1.0, back: 0 })
+    },
+  })
+  orbit(0.45, 1.0); otorch()
+  })
 }
 
 // ================= 工場に足す: 動く床（必ず勢いかよじ登りと組み合わせる）
@@ -216,6 +230,20 @@ export function factoryMore(x) {
   B.mark('回る歯車'); orbit(0.4, 0.2); x.P.gearRun(B, { exit: 3.6 }); x.ostep(0.7); B.road(4, { w: 3.2, mat: 'rust', thick: 1.0, noOverlap: true, back: 0 }); orbit(0.4, 0.3); otorch() // 出口は短く、先に段の壁（勢いのまま来ると当たる）
   B.mark('倒れる煙突'); B.can(3); B.road(24, { w: 3.2, mat: 'rust', thick: 1.0, back: 0 }); x.P.chimney(B, {}); orbit(0.4, 0.3)
   B.cp('煙突の向こう', { w: W, rest: true })
+  x.decoKeep(() => {
+  // v17 段のある動く床（2+時間）: 手前で止まった床に乗り、床の上の段（0.5m）へウィリーで前輪を掛けて上がり、段の上で止まって運ばれる。向こうで止まったら高い縁を登る
+  B.mark('段のある動く床')
+  excursion({
+    sRise: 5.2,
+    out: () => {
+      B.road(8, { w: 3.2, mat: 'grate', thick: 0.6, back: 0 })
+      x.P17.stepLift(B, {})
+      B.road(3, { w: 3.2, mat: 'rust', thick: 1.0, back: 0 })
+    },
+  })
+  orbit(0.45, 1.0); otorch()
+  orbit(0.9, 0.6) // v17 後（短いと鐘楼の塔の円柱が工場の道を飲む）
+  })
   // 前後に動く床 → 着いた先は高い段（床の上で待って、向こうの端で段によじ登る）
   B.mark('動く床と高い段')
   excursion({
