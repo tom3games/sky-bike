@@ -121,7 +121,7 @@ composer.addPass(grade)
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/scream.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'] })
+Snd.def({ land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'] })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -457,7 +457,7 @@ function fixedStep() {
     // 長く落ちている時（1.2 秒以上か 8m 以上）は乗り手が叫ぶ。さらに長いと声が裏返る。同じ落下では 1 回、続けて落ちても 5 秒はあける
     const F = G.fallFrom, drop = F.y - b.p[1]
     if (!F.scream && !b.crashed && (F.t > 1.2 || drop > 8) && G.time - (G.lastScream ?? -99) > 5) { F.scream = Snd.play('scream', { vol: 0.75, rate: 0.9 + Math.random() * 0.14, jitter: 0 }); F.sAt = F.t; G.lastScream = G.time; G.screams = (G.screams || 0) + 1 }
-    if (F.scream && !F.crack && F.t - F.sAt > 1.45) { F.crack = Snd.play('scream', { vol: 0.55, rate: 1.22 + Math.random() * 0.08, jitter: 0, offset: 0.35 }) || true }
+    if (F.scream && !F.crack && F.t - F.sAt > 2.6) { F.crack = Snd.play('scream', { vol: 0.55, rate: 1.22 + Math.random() * 0.08, jitter: 0, offset: 0.35 }) || true }
   } else if (!wasAir && G.fallFrom) {
     const d = G.fallFrom.y - b.p[1]
     // 着いたら叫びを止めて、短く「うっ」

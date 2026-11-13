@@ -42,5 +42,5 @@
 - snd/nitro.mp3（ニトロの噴射の唸り）: File:WWS Bloweroftheforge.ogg / Work With Sounds / La Fonderie / CC BY 4.0 / https://commons.wikimedia.org/wiki/File:WWS_Bloweroftheforge.ogg
 - snd/whoosh.mp3（ニトロの点火）: Air whoosh / pyranostudios / CC0
 - snd/gravel1〜3.mp3（砂利を巻き上げる・滑る）: 100 CC0 SFX #2 / rubberduck / CC0
-- snd/scream.mp3（長く落ちる時の叫び声）: File:Wilhelm Scream.ogg / Wikimedia Commons（SSE Library VOICES より）/ CC0 1.0 / https://commons.wikimedia.org/wiki/File:Wilhelm_Scream.ogg
+- snd/fall_ahhh.mp3（長く落ちる時の叫び声。声を低くするために 0.82 倍の速さに変えた）: UncleSigmund - ahhh (cc0) / UncleSigmund（Freesound 30988）/ CC0 1.0 / https://commons.wikimedia.org/wiki/File:UncleSigmund_-_ahhh_(cc0)_(freesound).mp3 （v15 で使った Wilhelm の叫びは、1951 年の映画の効果音の録音を切り出した物で、新しく録った物ではないため使うのをやめた）
 - snd/grunt1〜3.mp3（着地の「うっ」）: Little Grunts / crueltyinc / CC0
