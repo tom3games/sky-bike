@@ -49,7 +49,7 @@ const visCheck = (p, cid, step) => p.evaluate(async ({ cid, step }) => {
       for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { const k = x * 100000 + z; let L = grid.get(k); if (!L) grid.set(k, L = []); L.push(id) }
     }
   }
-  built.group.traverse(o => { if (o.isMesh && o.name !== 'mover') addMesh(o) })
+  built.group.traverse(o => { if (o.isMesh && o.name !== 'mover' && !o.userData.far) addMesh(o) }) // 遠くの軽い影のメッシュ（LOD）は比べない（近くの本物と入れ替わる）
   built.signs.traverse(o => { if (o.isMesh) addMesh(o) })
   const visDown = (x, z, y0) => {
     const L = (grid.get(Math.floor(x / CELL) * 100000 + Math.floor(z / CELL)) || []).concat(bigTris)

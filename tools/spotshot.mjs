@@ -3,7 +3,7 @@
 import '../mute-auto.mjs'
 import { chromium } from 'playwright'
 import { MUTE_LAUNCH, muteContext } from '../mute.mjs'
-process.chdir('/Users/tomoki/Desktop/claudecode/sky-bike')
+process.chdir(new URL('..', import.meta.url).pathname)
 const PORT = process.env.PORT = process.env.PORT || '6321'
 await import('../server.mjs')
 const br = await chromium.launch({ ...MUTE_LAUNCH, args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle', '--ignore-gpu-blocklist'] })

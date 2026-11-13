@@ -1,6 +1,9 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=15'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=15'
+import * as Z from './zones.js?v=16'
+import * as P16 from './parts16.js?v=16'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=16'
+import { lab16 } from './parts16.js?v=16'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=16'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -511,10 +514,10 @@ export function stage1() {
   B.log(2, 0.14, 4.6); B.road(5, L)
   B.step(0.42); B.road(6, { ...L, noOverlap: true })
   B.curve(14, -64 * DEG, L)
-  B.road(4, L)
+  B.log(1.5, 0.15, 4.6); B.road(4, L)
   B.tut('fwd')
   B.road(9, { ...L, slope: 18 * DEG })
-  B.road(6, L)
+  B.log(3, 0.15, 4.6); B.road(6, L)
   B.torch(-1, 3, { down: 3 })
   B.curve(14, 32 * DEG, L)
   B.tut('air')
@@ -547,11 +550,11 @@ export function stage1() {
   {
     const HC = 4.8, yL = B.t.p[1]
     B.mark('見極めの台')
-    B.road(12, { ...L, kind: 'lowledge' }); B.trapStraight({ ...L, w: 5 }); B.road(20, { ...L, kind: 'lowledge', back: 0 })
+    B.road(5, { ...L, kind: 'lowledge' }); B.log(1.5, 0.15, 4.6); B.road(7, { ...L, kind: 'lowledge' }); B.trapStraight({ ...L, w: 5 }); B.road(20, { ...L, kind: 'lowledge', back: 0 })
     B.torch(1, -4, { down: 3 }); B.torch(-1, -4, { down: 3 })
     B.solid = false
     B.uturn(4, -1, { plat: 'cobble', platThick: 0.8 })
-    B.road(44, { w: 4, mat: 'cobble', thick: 0.7, slope: Math.atan2(HC, 44), back: 0 })
+    for (let k = 0; k < 4; k++) { B.road(11, { w: 4, mat: 'cobble', thick: 0.7, slope: Math.atan2(HC, 44), back: k ? 0.6 : 0 }); if (k < 3) B.log(0.3, 0.14, 3.6) } // 坂の途中に丸太（v16）
     B.uturn(4, -1, { plat: 'cobble', platThick: 0.8 })
     // 助走路（長さが見えるように、6m ごとに両脇の松明）
     B.sign('速さで 着地が変わる', { at: 1 })
@@ -577,258 +580,47 @@ export function stage1() {
     B.curve(9, -90 * DEG, { w: 4.2, mat: 'cobble', thick: 0.8 })
     B.road(8, { w: 4.2, mat: 'cobble', thick: 0.8 })
     B.solid = true
-    B.road(6, { ...L, w: 4.2 })
+    B.log(2.5, 0.15, 3.8); B.road(6, { ...L, w: 4.2 })
   }
 
-  // ---------------- 塔（中心は今の道の左。道はこの円に接して入る）
-  const TR = 15, W = 4.2, RM = TR + W / 2
-  const lf = B.right(B.t.yaw)
-  const cx = B.t.p[0] - lf[0] * RM, cz = B.t.p[2] - lf[2] * RM
-  B.tower = { cx, cz, r: TR, rm: RM }
-  // 地面（塔の根もとから出発の広場まで）。その外は崖で、下は溶岩の谷
-  { const x0 = Math.min(-24, cx - 70), x1 = Math.max(cx + 70, 40), z0 = Math.min(-30, cz - 70), z1 = Math.max(cz + 70, 30)
+  // ================= v16 広い世界: 塔がいくつもある廃墟の世界を、塔から塔へ渡っていく
+  // 谷底の街 → 墓所の塔（溶岩に追われて半周）→ 崖沿いの墓所の道 → 水道橋で廃墟の塔へ → 鎖でつないだ浮き島 → 工場の鉄骨と歯車の塔
+  // → 鐘楼 → 氷の尖塔（屋上から谷を跳ぶ）→ 雲の上の城。1 つの塔のまわりは 1 周しない。
+  const W = 4.2
+  const x = makeWorldX(B, { W })
+  x.P = P16; x.fork = makeFork(x, P16)
+  const { orbit, otorch } = x
+  // 谷底の街の地面（出発の広場から墓所の塔の根もとまで）。その外は崖で、下は溶岩の谷
+  { let x0 = 1e9, x1 = -1e9, z0 = 1e9, z1 = -1e9; for (const q of B.path) if (q.p) { x0 = Math.min(x0, q.p[0]); x1 = Math.max(x1, q.p[0]); z0 = Math.min(z0, q.p[2]); z1 = Math.max(z1, q.p[2]) }
+    x0 -= 24; x1 += 50; z0 -= 40; z1 += 30
     B.box({ c: [(x0 + x1) / 2, -4, (z0 + z1) / 2], h: [(x1 - x0) / 2, 4, (z1 - z0) / 2], mat: 'ground', tag: 'ground', zone: 'ground' }) }
-  B.orbitSign = 1
   B.solid = false
-  // 周の道。幅を変える時は、塔の側の縁を塔の壁に付けたまま、外側へ広げる・狭める（道の中心の半径が変わる）
-  const orbitRaw = (ang, rise, o = {}) => {
-    const w = o.w ?? W, R = TR + w / 2
-    const dx = B.t.p[0] - cx, dz = B.t.p[2] - cz, r0 = Math.hypot(dx, dz)
-    // 周の道は、いつも塔の中心のまわりの円に乗せる（まっすぐな板・段・扉の後で、向きがずれて円が塔の中へ寄っていかないように）
-    if (r0 > 1) {
-      const ph = Math.atan2(-dz, dx), want = ph + (ang * B.orbitSign > 0 ? 1 : -1) * Math.PI / 2
-      let d = want - B.t.yaw; d -= Math.round(d / (2 * Math.PI)) * 2 * Math.PI
-      if (Math.abs(d) > 1e-4) { B.t.yaw += d; B.last = null }
-      if (Math.abs(r0 - R) > 0.02) {
-        // 幅が変わる時は、3 つに分けて少しずつ（道の中心が急に横へ跳ばない）
-        const w0 = Math.max(1.6, Math.min(8, (r0 - TR) * 2))
-        if (Math.abs(w0 - w) > 0.5 && Math.abs(ang) > 0.2 && !o.noBlend) { const a0 = 0.05; for (let k = 1; k <= 2; k++) { orbitRaw(a0, rise * a0 / ang, { ...o, w: w0 + (w - w0) * k / 3, noBlend: true }) } ang -= a0 * 2; rise -= rise * a0 * 2 / (ang + a0 * 2) }
-        const dx2 = B.t.p[0] - cx, dz2 = B.t.p[2] - cz, r2 = Math.hypot(dx2, dz2)
-        B.t.p[0] = cx + dx2 / r2 * R; B.t.p[2] = cz + dz2 / r2 * R; B.last = null
-      }
-    }
-    return B.curve(R, ang * B.orbitSign, { w, rise, mat: o.mat || B.omat, mu: o.mu, thick: o.thick ?? 1.4, kind: o.kind || 'orbit', side: o.side })
-  }
-  // ふつうの周の道（長さ 7.5m 以上）には、2 本に 1 本、何かを仕込む: 急に抜ける床・横切る溝（幅を変える）・一度通ると崩れる敷石
-  let decoN = 0
-  const orbit = (ang, rise, o = {}) => {
-    if (B.noDeco > 0) { B.noDeco--; return orbitRaw(ang, rise, o) } // 切れ目や段のすぐ後には仕込まない（着地や段の直後に続けない）
-    if (o.kind || o.plain || o.mu || o.w || !B.decoOn || ang * RM < 7.5 || (decoN++ % 2)) return orbitRaw(ang, rise, o)
-    const kind = ['trap', 'groove', 'once', 'groove', 'trap', 'once'][(decoN >> 1) % 6]
-    const a1 = ang * 0.42, r1 = rise * 0.42
-    const first = orbitRaw(a1, r1, o)
-    if (kind === 'groove') {
-      const gw = [1.2, 1.8, 2.4, 1.5][(decoN >> 1) % 4]
-      ogap(gw, 0); { const ra = Math.max(0.05, ang - a1 - gw / RM); orbitRaw(ra, Math.min(rise - r1, ra * RM * 0.3), o) }
-    } else if (kind === 'trap') {
-      const tl = 1.8, s2 = B.curve(RM, tl / RM * B.orbitSign, { w: W, rise: 0, mat: o.mat || B.omat, thick: 0.5, kind: 'trap' })
-      s2.mov = { type: 'trap', trig: 6.5, warn: 0.45 }; s2.tag = 'road'
-      { const ra = Math.max(0.05, ang - a1 - tl / RM); orbitRaw(ra, Math.min(rise - r1, ra * RM * 0.3), o) }
-    } else {
-      const n = 3, al = Math.min(ang - a1 - 0.05, 0.36)
-      for (let k = 0; k < n; k++) { const s3 = B.curve(RM, al / n * B.orbitSign, { w: W, rise: 0, mat: 'plankold', thick: 0.35, kind: 'crumble' }); s3.mov = { type: 'crumble', delay: 0.28, back: 1e9, once: true } }
-      { const ra = Math.max(0.05, ang - a1 - al); orbitRaw(ra, Math.min(rise - r1, ra * RM * 0.3), o) }
-    }
-    return first
-  }
-  const ogap = (len, dy) => { B.noDeco = 1; return B.curve(RM, len / RM * B.orbitSign, { noShape: true, rise: dy, kind: 'jump', pw: 0, vJump: 2.0 + len * 1.9 }) }
-  const ostep = dy => { B.noDeco = 1; return B.step(dy) }
-  const outer = () => -B.orbitSign // 塔と反対側（右回りなら左）
-  const otorch = () => B.torch(outer(), 0, { w: W, down: 1.2 })
-  // 外へ張り出す道 → 浮いた広場で U ターン → 行きの真上を通って塔へ戻る。戻ったら逆回り
-  const excursion = o => {
-    const sg = B.orbitSign, u = -sg
-    const leave = { p: B.t.p.slice(), yaw: B.t.yaw }
-    B.last = null
-    o.out()
-    // 帰りの道（back と、塔へ戻る2つの曲がり）が、行きの道の始まりを越えないだけの長さを、行きの道に足す
-    { const f0 = B.dir(leave.yaw), done = (B.t.p[0] - leave.p[0]) * f0[0] + (B.t.p[2] - leave.p[2]) * f0[2]
-      const aa = Math.acos(1 - o.Ru / o.Rs), need = (o.backLen ?? 6) + 2 * o.Rs * Math.sin(aa) + 1.5
-      if (done < need) B.road(need - done, { w: o.w, mat: o.mat, thick: o.thick ?? 0.8 }) }
-    B.uturn(o.Ru, u, o)
-    o.back()
-    const a = Math.acos(1 - o.Ru / o.Rs), so = { w: o.w, mat: o.mat, thick: o.thick ?? 0.8, kind: 'bridge' }
-    B.curve(o.Rs, u * a, { ...so, rise: o.sRise / 2 })
-    B.curve(o.Rs, -u * a, { ...so, rise: o.sRise / 2 })
-    const f = B.dir(B.t.yaw)
-    const d = (leave.p[0] - B.t.p[0]) * f[0] + (leave.p[2] - B.t.p[2]) * f[2]
-    if (d > 0.3) B.road(d, { w: o.w, slope: Math.atan2(o.stackRise || 0.4, d), mat: o.mat, thick: o.thick ?? 0.8, back: 0 })
-    B.t.p[0] = leave.p[0]; B.t.p[2] = leave.p[2]; B.t.yaw = leave.yaw + u * Math.PI
-    B.orbitSign = u; B.last = null
-  }
+  B.decoOn = true // ここから先の道には、抜ける床・溝・崩れる敷石を仕込む
+  Z.crypt(x)
+  Z.ruins(x)
+  Z.ruinsMore(x)
+  Z.storm(x)
+  Z.factory(x)
+  Z.factoryMore(x)
+  Z.belfry(x)
+  Z.ice(x)
 
-  // 屋根と外壁のある回廊（塔の中の通路に入る）: 道の円弧 s に沿って、外側に窓のある壁、上に屋根。中は松明の灯りだけ
-  const gallery = (s, o = {}) => {
-    const H = o.h ?? 3.6, mat = o.mat || 'castle', r1 = s.r2, r2 = s.r2 + 0.5, span = s.phi1 - s.phi0
-    const yAt = ph => s.y0 + s.b * (ph - s.phi0)
-    const step = 3.2 / r2, n = Math.max(1, Math.round(span / step))
-    for (let k = 0; k < n; k++) {
-      const a = s.phi0 + span * k / n, b2 = s.phi0 + span * (k + 1) / n, m = a + (b2 - a) * 0.28
-      B.arc({ cx, cz, r1, r2, phi0: a, phi1: m, y0: yAt(a) + H, b: s.b, thick: H + 1.2, mat, tag: 'wall' }) // 柱
-      B.arc({ cx, cz, r1, r2, phi0: m, phi1: b2, y0: yAt(m) + 1.0, b: s.b, thick: 2.2, mat, tag: 'wall' }) // 窓の下の壁
-      B.arc({ cx, cz, r1, r2, phi0: m, phi1: b2, y0: yAt(m) + H, b: s.b, thick: 0.75, mat, tag: 'wall' }) // 窓の上
-      const ph = (a + m) / 2, rr = r1 - 0.12
-      if (k % 2 === 0) B.torches.push([cx + rr * Math.cos(ph), yAt(ph) + 2.5, cz - rr * Math.sin(ph)])
-    }
-    B.arc({ cx, cz, r1: TR - 0.3, r2: r2 + 0.3, phi0: s.phi0, phi1: s.phi1, y0: s.y0 + H + 0.35, b: s.b, thick: 0.35, mat, tag: 'roof' })
-  }
-  const X = { B, orbit, orbitRaw, ogap, ostep, otorch, outer, excursion, gallery, W, RM, TR, cx, cz, DEG }
-  // ---------------- 墓所と地下水路（v13）
-  B.decoOn = true // ここから上の周の道には、抜ける床・溝・崩れる敷石を仕込む
-  Z.crypt(X)
-
-  // ---------------- B 廃墟（崩れた石の張り出し。左回り）
-  B.zone = 'ruin'; B.omat = 'cobble'
-  B.cp('廃墟の張り出し', { w: W, rest: true })
-  orbit(0.55, 0.9); otorch()
-  B.log(1.6, 0.16, W - 0.3, 'marble')
-  B.mark('崩れた張り出し'); orbit(0.5, 0.8)
-  ogap(3.4, -0.5)
-  orbit(0.5, 0.6); otorch()
-  B.mark('崩れた石の段'); for (const h of [0.5, 0.62, 0.72]) { ostep(h); orbit(0.16, 0, { mat: 'crate', kind: 'crate' }) }
-  orbit(0.85, 0.5); ogap(4.3, -0.5); orbit(0.3, 0.3); otorch() // 段を登ってから、助走して切れ目
-  // 泥の坂（車輪が沈んで重い。勢いをつけて入る）
-  B.mark('泥の坂')
-  orbit(0.8, 0.2) // 勢いをつける助走
-  { const s = orbit(0.6, 4.0, { mat: 'mud', mu: 0.3, kind: 'mud' }); s.mud = 60 } // 21 度のぬかるみ（歩くと滑り落ちる。勢いで登る）
-  orbit(0.25, 0.75) // 坂の上はゆるく折る（速いと頂上で跳ねて、曲がった道の外へ飛ばない）
-  orbit(0.6, 0.4)
-  B.tut('brk')
-  B.mark('朽ちた木の橋と U ターン')
-  excursion({
-    Ru: 6, Rs: 12, sRise: 5.2, w: 2.8, mat: 'cobble', plat: 'cobble', thick: 1.0,
-    out: () => {
-      const P = { w: 2.2, mat: 'plank', thick: 0.35, kind: 'bridge' }, i0 = B.path.length
-      B.road(5, { ...P, back: 0 }); B.gap(1.3, 0, 'jump'); B.crumbleRun(7, 4, 2.2, 0.3)
-      B.road(10, { ...P, slope: 3 * DEG }); B.road(5, P)
-      B.chainRails(i0 + 1, B.path.length - 1, 2.2)
-    },
-    back: () => { B.road(6, { w: 2.8, slope: 12 * DEG, mat: 'cobble', thick: 1.0 }) },
-  })
-  // 右回り（廃墟の上の段）
-  orbit(0.6, 1.4); otorch()
-  B.log(1.6, 0.18, W - 0.3, 'marble')
-  orbit(0.4, 0.8)
-  // 湧き水の流れ（塔の壁から湧いた水が道を横切って外へ流れ落ちる。立ち止まると流される）
-  B.mark('湧き水の流れ')
-  orbit(0.12, 0)
-  { const s = orbit(0.3, 0, { mat: 'wetstone', mu: 0.7, kind: 'water' }); s.flowR = 1.8; B.waters.push({ arc: s, u: 1.8 }) }
-  orbit(0.5, 0.6)
-  ogap(3.6, -0.4)
-  orbit(0.5, 1.0); otorch()
-  orbit(0.45, 1.0)
-
-  Z.ruinsMore(X)
-
-  // ---------------- C 工場（さびた鉄骨。右回り → 外の足場で U ターン → 左回り）
-  B.zone = 'factory'; B.omat = 'grate'
-  B.cp('鉄の階', { w: W, rest: true })
-  orbit(0.5, 0.8); otorch()
-  B.mark('ウィリーの段'); orbit(0.25, 0); ostep(0.44); orbit(0.8, 0.6); ogap(4.3, -0.5); orbit(0.4, 0.4)
-  orbit(0.45, 0.8); otorch()
-  B.mark('細い鉄骨と急な登り')
-  excursion({
-    Ru: 6, Rs: 12, sRise: 5.4, w: 2.6, mat: 'grate', plat: 'rust', thick: 0.5,
-    out: () => {
-      B.road(3, { w: 2.6, mat: 'grate', thick: 0.5, back: 0 })
-      hbeam(B, 8, 0.62, 0, 'narrow')
-      B.last = null
-      B.road(3, { w: 2.6, mat: 'grate', thick: 0.5, back: 0 })
-      B.road(8, { w: 2.6, mat: 'grate', slope: 26 * DEG, thick: 0.5, mu: 0.48, kind: 'steep' }) // すべる急な登り（止まるとずり落ちる。歩く人は登れない）
-      B.road(3, { w: 2.6, mat: 'grate', thick: 0.5 })
-      B.road(9, { w: 2.6, mat: 'grate', thick: 0.5 })
-    },
-    back: () => {
-      B.road(1.5, { w: 2.6, mat: 'rust', thick: 0.5, back: 0 })
-      B.crumbleRun(5.4, 3, 2.4, 0.5)
-      B.road(1.2, { w: 2.6, mat: 'rust', thick: 0.5, back: 0, noOverlap: true })
-    },
-  })
-  orbit(0.55, 1.3); otorch()
-  // 三段の壁（車輪の径くらいの段が3つ続く。1段ずつ前輪を掛けてよじ登る）
-  B.mark('三段の壁'); orbit(0.2, 0)
-  for (let k = 0; k < 2; k++) { ostep(0.72); orbit(0.16, 0) }
-  orbit(0.12, 0); B.hangLedge(1.6, 3.4, { w: W, max: 9, mat: B.omat }); orbit(0.3, 0) // 3 段目は高い縁（前輪を掛けて登る）
-  orbit(0.25, 0.3)
-  B.mark('跳ね橋'); orbit(0.6, 0.6)
-  { // 切れ目に渡した跳ね橋（向こう側の蝶番で手前が持ち上がる）。下りている間に渡る
-    const p0 = B.t.p.slice(), y0 = B.t.yaw, i0 = B.path.length
-    B.curve(RM, 3.2 / RM * B.orbitSign, { noShape: true, rise: 0, kind: 'draw', pw: 3 })
-    for (let k = i0; k < B.path.length; k++) B.path[k].w = 3
-    const p1 = B.t.p.slice()
-    B.drawbridgeAt(p0, p1, { w: 3.2, ph: 0, roadW: W }) // 柱は続く周の道の幅の外
-  }
-  orbit(0.85, 0.8); ogap(4.3, -0.5); orbit(0.3, 0.4); otorch() // 跳ね橋を渡ってから、助走して切れ目
-  ostep(0.44); orbit(0.45, 0.8)
-  orbit(0.4, 0.8)
-
-  B.zone = 'factory'; B.omat = 'grate'
-  Z.factoryMore(X)
-  // ---------------- 鐘楼（v13）
-  Z.belfry(X)
-
-  // ---------------- D 氷（凍った岩と滑る面。左回り → 浮いた氷の岩で U ターン → 右回り）
-  B.zone = 'ice'; B.omat = 'snowrock'
-  B.cp('氷の階', { w: W, rest: true })
-  orbit(0.45, 0.6); otorch()
-  // 濡れた段（すべる氷の段。前輪を掛けても後輪を引き上げる力が弱い）
-  B.mark('濡れた段'); orbit(0.4, 0.3); ogap(4.2, -0.5); orbit(0.3, 0.2)
-  ostep(0.72); orbit(0.3, 0, { mat: 'ice', mu: 0.62 })
-  // 凍った急坂（すべる。途中で止まると下までずり落ちる。勢いをつけて一気に）
-  B.mark('凍った急坂'); orbit(0.45, 0.2)
-  orbit(0.6, 4.6, { mat: 'ice', mu: 0.4, kind: 'steep' }); orbit(0.25, 0.1)
-  orbit(0.35, 0.4, { mat: 'ice' })
-  B.cp('凍った坂の上', { w: W, rest: true })
-  // 落石（上から周期的に岩が落ちる。落ちる前に小石と砂ぼこり）
-  B.mark('落石'); orbit(0.15, 0)
-  // 凍った登りの上に落石（坂の途中では待てない。下で間を計って一気に）
-  B.rockfall(2.5, { ph: 0, hd: 5.6 }); B.rockfall(7.5, { ph: 1.7, hd: 7.2, lat: 0.6 })
-  orbit(0.65, 4.6, { mat: 'ice', mu: 0.45 }) // 22 度の凍った登り（歩くと滑り落ちる）
-  B.mark('氷の岩を跳ぶ')
-  excursion({
-    Ru: 6, Rs: 12, sRise: 5.2, w: 2.8, mat: 'snowrock', plat: 'snowrock', thick: 1.2,
-    out: () => {
-      const S = { w: 3.0, mat: 'snowrock', thick: 1.2 }
-      B.road(6, { ...S, back: 0 }); B.road(3, S)
-      { const rise = B.kicker(2.4, 14 * DEG, { w: 2.6, mat: 'snowrock', thick: 0.8 }); B.path[B.path.length - 1].vNeed = 8; B.gap(4.2, rise - 0.5, 'jump') }
-      // 着地は短い。速すぎると向こうの高い段の壁に当たる。遅いと切れ目へ落ちる
-      B.road(3.5, { ...S, back: 0, kind: 'landing' }); B.step(0.7); B.road(3, { ...S, noOverlap: true }); B.torch(-1, 1, { w: 3, down: 1 })
-      B.road(7, { w: 2.6, mat: 'ice', thick: 0.8, slope: 4 * DEG, back: 0 })
-      B.road(4, S)
-    },
-    back: () => { B.road(6, { w: 2.8, slope: 12 * DEG, mat: 'snowrock', thick: 1.2 }) },
-  })
-  orbit(0.5, 1.2, { mat: 'ice' }); otorch()
-  orbit(0.4, 0.8)
-  B.cp('突風の手前', { w: W, rest: true })
-  B.mark('突風の細い張り出し')
-  orbit(0.55, 0.3)
-  B.gust(9, { sgn: -outer(), a: 5.5, T: 6.5 })
-  orbit(0.55, 1.0, { mat: 'ice', mu: 0.5, w: 2.7 })
-  orbit(0.3, 0.2)
-  ogap(3.0, -0.3)
-  orbit(0.45, 0.9); otorch()
-  orbit(0.5, 0.9)
-
-  // ---------------- 嵐の吊り橋（v13）
-  Z.storm(X)
-
-  // ---------------- E 塔の屋上（休憩所）→ 助走 → ジャンプ台 → 谷を越えて浮き島 → 天空城
+  // ---------------- E 氷の尖塔の屋上（休憩所）→ 助走 → ジャンプ台 → 谷を越えて浮き島 → 天空城
+  const TT = B.towers[B.towers.length - 1], cx = TT.cx, cz = TT.cz, TR = TT.r
+  x.closeTower()
   B.zone = 'roof'
   const yT = B.t.p[1]
-  B.tower.top = yT
-  B.cyl({ a: [cx, B.lavaY - 4, cz], b: [cx, yT, cz], r: TR, mat: 'tower', tag: 'tower', zone: 'tower' })
+  TT.top = yT; TT.roof = true
+  B.tower = TT
   B.curve(6, B.orbitSign * 90 * DEG, { w: 4, mat: 'castle', thick: 0.3 })
   B.cp('塔の屋上', { w: 4, rest: true })
   B.mark('助走して谷を飛ぶ')
-  // 屋上を横切る助走路（中心から 5m 横を通る直線）。向こうのふちにジャンプ台
   {
     const P0 = B.t.p, d = B.dir(B.t.yaw), CP = [cx - P0[0], 0, cz - P0[2]]
     const tc = CP[0] * d[0] + CP[2] * d[2], ex = CP[0] - d[0] * tc, ez = CP[2] - d[2] * tc
     const far = tc + Math.sqrt(Math.max(0, TR * TR - ex * ex - ez * ez))
     B.solid = true; B.base = yT - 0.4
     B.road(far + 0.3, { w: 3, mat: 'castle', thick: 0.3, kind: 'runway' })
-    // 屋上のふちから外へ張り出した木の足場（平ら。坂にすると速い時に跳ねて速さを失う）
     B.solid = false
     B.road(9, { w: 3, mat: 'plank', thick: 0.4, kind: 'runway' })
     B.torch(1, -1, { w: 3, down: 1.5 }); B.torch(-1, -1, { w: 3, down: 1.5 })
@@ -848,7 +640,11 @@ export function stage1() {
   B.cp('浮き島', { w: 6, noGate: true })
   // ふつうの道: 右へ回り、細い板を渡って下り、浮き島2の横から入る（近道の着地坂とは 10m 以上離す）
   // 曲がりは小さめ（半径 4m）。全開で跳んだ人が、この曲がりの縁に引っかからずに近道の着地坂まで届くように
-  B.curve(4, -90 * DEG, { w: 2.6, mat: 'plank', thick: 0.4 })
+  // v16: 浮き島1 の上を、曲がる所まで広い平らな板にする（踏み切り 15.5〜16m/s で、曲がる道の縁や島の下の岩に当たっていた）
+  { const c0 = at(23.15, 0.5, Y1 - 0.6); B.box({ c: c0, h: [2.65, 0.6, 3.5], yaw: yawJ, mat: 'snowrock', tag: 'road' })
+    // 板の向こうはそのまま近道の下り坂（段も切れ目もなし。速いまま曲がれずに走り抜けても落ちない。v15 は 15.5〜16m/s で曲がる道の縁に当たって落ちた）
+  }
+  B.curve(4, -90 * DEG, { noShape: true, pw: 2.6, kind: 'pad' })
   B.road(4, { w: 1.8, mat: 'plank', thick: 0.3, kind: 'narrow', back: 0 })
   B.curve(5, 90 * DEG, { w: 2.6, mat: 'plank', thick: 0.4, rise: -0.4 })
   B.road(10, { w: 1.8, mat: 'plank', thick: 0.35, slope: -Math.atan2(2.6, 10) })
@@ -867,13 +663,13 @@ export function stage1() {
     floatIsland(B, [isl2[0], Y2 - 1.2, isl2[2]], yawJ, 6, 5.5)
     B.curve(4.5, -90 * DEG, { noShape: true, pw: 6, kind: 'pad' })
     // 着地用の下り坂（近道で跳んできた人がここに降りる）
-    const st = at(27.5, 0, Y2 + 2.6) // 浮き島1の曲がる道の下に入らない所から（頭の上の空きを取る）
-    const landLen = alNow - 7 - 27.5
+    const st = at(25.75, 1.75, Y1) // 浮き島1の曲がる道の下に入らない所から（頭の上の空きを取る）
+    const landLen = alNow - 7 - 25.75
     const S2 = new Builder(); S2.shapes = B.shapes; S2.path = []; S2.zone = 'sky'
     S2.t = { p: st, yaw: yawJ }
-    S2.road(landLen + 0.4, { w: 6, slope: -Math.atan2(2.6, landLen), mat: 'snowrock', thick: 1.0, back: 0, kind: 'landing' })
+    S2.road(landLen + 0.4, { w: 8.5, slope: -Math.atan2(Y1 - Y2, landLen), mat: 'snowrock', thick: 1.0, back: 0, kind: 'landing' })
     B.notes.push({ kind: 'shortcut', name: '屋上から浮き島2へ跳ぶ', p: lip, isl2, landAt: st })
-    B.branches = (B.branches || []).concat([S2.path.map(q => ({ ...q, branch: true }))]) // 近道の着地坂も道の線に入れる（自動ハンドルが上の周の道へ引っぱらない）
+    B.branches = (B.branches || []).concat([S2.path.map(q => ({ ...q, branch: true, zone: 'sky' }))]) // 近道の着地坂も道の線に入れる（自動ハンドルが上の周の道へ引っぱらない）
     B.cp('浮き島2', { w: 8, noGate: true })
     { const jm = B.marks.find(m => m.name === '助走して谷を飛ぶ'); if (jm) { jm.ends = [jm.end, B.cps[B.cps.length - 1].p.slice()]; jm.drop = 9 } }
     const al2 = (B.t.p[0] - lip[0]) * fJ[0] + (B.t.p[2] - lip[2]) * fJ[2]
@@ -900,20 +696,30 @@ export function stage1() {
   // 門の前の広場も「浮いた広場」として、下に岩・持ち送り・垂れる鎖を付ける
   for (const sh of B.shapes.slice(-12)) if (sh.type === 'box' && sh.tag === 'road' && sh.mat === 'castle' && sh.h[2] >= 2) B.plats.push({ c: [sh.c[0] + sh.ax[1][0] * sh.h[1], sh.c[1] + sh.h[1], sh.c[2] + sh.ax[1][2] * sh.h[1]], h: [sh.h[0], sh.h[2]], yaw: sh.base.yaw, zone: 'castle', thick: sh.h[1] * 2 })
   castle(B)
-  towerDressing(B, cx, cz, TR, RM, W, yT)
+  addSupports(B)
+  towerDressing(B)
   return finishCourse(B, { id: 'stage1', name: '第1面 奈落から天空へ', killBelow: 10, spawnBack: 2, climb: true, groundKill: true })
 }
 // 塔の壁の柱（当たりあり。ほとんど壁に埋まり、張り出しの内側へ 0.15m だけ出る）と、張り出しの外の縁の欠けた低い石の縁（当たりあり）
-function towerDressing(B, cx, cz, TR, RM, W, yT) {
+function towerDressing(B) {
   let sd = 77; const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
   B.pillars = []
-  const n = 13
-  for (let k = 0; k < n; k++) {
-    const a = k / n * Math.PI * 2 + (rr() - 0.5) * 0.16
-    const x = cx + dcos(a) * (TR - 0.17), z = cz - dsin(a) * (TR - 0.17) // 道の内側へ出るのは 0.15m だけ
-    B.cyl({ a: [x, B.lavaY - 2, z], b: [x, yT - 0.35, z], r: 0.32, mat: 'tower', tag: 'pillar', zone: 'tower' })
-    B.pillars.push(a)
+  // v16: 塔ごとに本体の円柱と柱。塔の頭は、道が離れた高さより crown だけ上（屋上を走る最後の塔は屋上の高さ）
+  for (const T of B.towers) {
+    T.top2 = T.roof ? T.top : T.top + T.crown
+    B.cyl({ a: [T.cx, B.lavaY - 4, T.cz], b: [T.cx, T.top2, T.cz], r: T.r, mat: 'tower', tag: 'tower', zone: 'tower' })
+    T.pillars = []
+    const n = Math.max(9, Math.round(T.r * 0.87))
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2 + (rr() - 0.5) * 0.16
+      const x = T.cx + dcos(a) * (T.r - 0.17), z = T.cz - dsin(a) * (T.r - 0.17) // 道の内側へ出るのは 0.15m だけ
+      B.cyl({ a: [x, B.lavaY - 2, z], b: [x, T.top2 - 0.35, z], r: 0.32, mat: 'tower', tag: 'pillar', zone: 'tower' })
+      T.pillars.push(a)
+    }
   }
+  B.pillars = B.towers.length ? B.towers[0].pillars : []
+  const onTowerArc = s => B.towers.some(T => Math.abs(s.cx - T.cx) < 0.01 && Math.abs(s.cz - T.cz) < 0.01 && Math.abs(s.r1 - T.r) < 0.01)
+  const towerOf = s => B.towers.find(T => Math.abs(s.cx - T.cx) < 0.01 && Math.abs(s.cz - T.cz) < 0.01)
   // 欠けた石の縁: 張り出し（塔のまわりの arc）の外の 0.3m に、長さ・高さ・すき間がばらばらの石の塊
   // 道の点を 3m の格子に入れて、近くだけ調べる（遅い端末でも読み込みを速く）
   const PG = new Map(), pk = (x, z) => Math.floor(x / 3) * 100003 + Math.floor(z / 3)
@@ -927,7 +733,7 @@ function towerDressing(B, cx, cz, TR, RM, W, yT) {
   const zoneAt = i => { let z = 'ground'; for (const m of B.zoneMarks) if (m.i <= i) z = m.zone; return z }
   { const zt = {}; B.path.forEach((q, i) => { if (!q.p) return; const z = zoneAt(i); zt[z] = Math.max(zt[z] ?? -1e9, q.p[1]) }); Object.assign(ztop, zt) }
   for (const s of B.shapes.slice()) {
-    if (s.type !== 'arc' || s.tag !== 'road' || Math.abs(s.cx - cx) > 0.01 || Math.abs(s.r1 - TR) > 0.01) continue
+    if (s.type !== 'arc' || s.tag !== 'road' || !onTowerArc(s)) continue
     const ym = s.y0 + s.b * (s.phi1 - s.phi0) / 2, top = ztop[s.zone] ?? ym
     const APRW = Math.min(9, APRON + 0.2 * Math.max(0, top - ym))
     const a = B.arc({ cx: s.cx, cz: s.cz, r1: s.r2, r2: s.r2 + APRW, phi0: s.phi0, phi1: s.phi1, y0: s.y0 - ADROP, b: s.b, thick: 0.7, mat: 'ruinwall', tag: 'apron', zone: s.zone })
@@ -935,16 +741,16 @@ function towerDressing(B, cx, cz, TR, RM, W, yT) {
   }
   for (const s of B.shapes.slice()) for (const edge of ['out', 'in']) {
     if (s.type !== 'arc' || (s.tag !== 'road' && s.tag !== 'apron')) continue
-    const onTower = Math.abs(s.cx - cx) < 0.01 && Math.abs(s.r1 - TR) < 0.01
+    const onTower = onTowerArc(s)
     if (s.tag === 'apron' && edge === 'in') continue
     if (onTower && s.tag === 'road') continue // 道の外の縁の石は、一段低い縁の外側へ移した
-    if (!onTower && s.tag !== 'apron' && (s.r2 - s.r1 < 2.4 || Math.hypot(s.cx - cx, s.cz - cz) < 1)) continue
+    if (!onTower && s.tag !== 'apron' && (s.r2 - s.r1 < 2.4 || towerOf(s))) continue
     const rp = edge === 'out' ? s.r2 - 0.16 : s.r1 + 0.16, L = (s.phi1 - s.phi0) * rp
     let d = 0.4 + rr() * 1.2
     while (d < L - 0.8) {
       const len = 0.9 + rr() * 1.8, ph = s.phi0 + (d + len / 2) / rp
       if ((d + len) > L - 0.3) break
-      const y = s.y0 + s.b * (ph - s.phi0), p = [cx + dcos(ph) * rp, y, cz - dsin(ph) * rp]
+      const y = s.y0 + s.b * (ph - s.phi0), p = [s.cx + dcos(ph) * rp, y, s.cz - dsin(ph) * rp]
       // 別の道が近くを横切る所（屋上の助走路が下の張り出しの上を通る所など）には置かない
       const tang = ph + Math.PI / 2, cross = nearPts(p, 2.8, q => q.yaw != null && Math.hypot(q.p[0] - p[0], q.p[2] - p[2]) < 2.8 && Math.abs(q.p[1] - y) < 2.4 && Math.abs(Math.sin(q.yaw - tang)) > 0.35)
       if (!cross && !near(p, ['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'water', 'mud', 'draw'], 1.6)) {
@@ -960,7 +766,7 @@ function towerDressing(B, cx, cz, TR, RM, W, yT) {
 function datanYaw(d) { return datan2(-d[2], d[0]) }
 
 // H 形の鉄骨（上のフランジが走る面）。今の位置から len
-function hbeam(B, len, w, slope, kind) {
+export function hbeam(B, len, w, slope, kind) {
   const t = B.t, f = B.dir(t.yaw, slope), up = B.upv(t.yaw, slope)
   const p0 = t.p.slice()
   B.road(len, { w, slope, mat: 'girder', thick: 0.12, kind: kind || 'narrow', back: 0 })
@@ -969,7 +775,7 @@ function hbeam(B, len, w, slope, kind) {
   B.box({ c: add3(mid, up, -0.12 - 0.6 - 0.06), h: [len / 2, 0.06, w / 2], yaw: t.yaw, pitch: slope, mat: 'girder', tag: 'flange' })
 }
 // 浮き島: 上の平らな面（top）と、下に重ねた岩の塊
-function floatIsland(B, p, yaw, a, b, deep = 2) {
+export function floatIsland(B, p, yaw, a, b, deep = 2) {
   // 浮き島: 上の平らな面と、下に重ねた岩の塊（deep 段。下の道に届かない深さにする）
   B.box({ c: [p[0], p[1] - 0.15, p[2]], h: [a, 0.15, b], yaw, mat: 'rock', tag: 'island' })
   B.box({ c: [p[0], p[1] - 0.3 - 1.6, p[2]], h: [a * 0.9, 1.6, b * 0.9], yaw, mat: 'rockdark', tag: 'island' })
@@ -1049,7 +855,7 @@ function finishCourse(B, o) {
   // 枝道（近道の着地坂など）は、道の線の一番最後に足す（本線の並びは変えない）
   for (const br of B.branches || []) B.path.push(...br)
   // 道の点ごとの区間
-  { let k = 0; const zm = B.zoneMarks || []; for (let i = 0; i < B.path.length; i++) { while (k + 1 < zm.length && zm[k + 1].i <= i) k++; B.path[i].zone = zm[k] ? zm[k].zone : 'ground' } }
+  { let k = 0; const zm = B.zoneMarks || []; for (let i = 0; i < B.path.length; i++) { while (k + 1 < zm.length && zm[k + 1].i <= i) k++; if (!(B.path[i].branch && B.path[i].zone)) B.path[i].zone = zm[k] ? zm[k].zone : 'ground' } }
   // 道の点ごとの曲がり具合（1/半径）。曲がる板は curv、直角の踊り場などは向きの変わり方から（前後 2 点で）
   const P = B.path, wrapA = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
   for (let i = 0; i < P.length; i++) {
@@ -1058,6 +864,6 @@ function finishCourse(B, o) {
     if (a.p && c.p && a.yaw != null && c.yaw != null && a.kind !== 'jump' && c.kind !== 'jump') { const ds = Math.hypot(c.p[0] - a.p[0], c.p[2] - a.p[2]); if (ds > 0.5) k = Math.max(k, Math.abs(wrapA(c.yaw - a.yaw)) / ds) }
     P[i].kap = k
   }
-  return { ...o, pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
-export const COURSES = { practice, stage1 }
+export const COURSES = { practice, stage1, lab16 }

@@ -8,8 +8,9 @@ await import('../server.mjs')
 const br = await chromium.launch({ ...MUTE_LAUNCH, args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle'] })
 const ctx = await br.newContext({ viewport: { width: 640, height: 360 } }); await muteContext(ctx)
 const page = await ctx.newPage(); page.on('pageerror', e => console.log('ERR', e.message))
+await page.addInitScript(c => { window.__COURSE = c }, process.env.COURSE || 'stage1') // COURSE=lab16 などで別のコース
 await page.goto(`http://localhost:${PORT}/?stay=1`); await page.waitForFunction('window.__skyReady', null, { timeout: 40000 })
-await page.evaluate(() => window.sky.startRun(window.__COURSE || 'stage1')); await page.waitForTimeout(2500)
+await page.evaluate(() => { window.sky.startRun(window.__COURSE || 'stage1'); const A = window.sky.api; if (A.buildAll) A.buildAll(); if (A.lodAll) A.lodAll(true) }); await page.waitForTimeout(2500) // 遠くの飾りも全部作って見せた状態で調べる
 const r = await page.evaluate(() => {
   const G = window.sky, A = G.api, THREE = A.three, scene = A.scene, c = G.course, w = G.world
   const SKIPN = new Set(['course', 'sky', 'lava', 'foglayers', 'far', 'flames', 'grass', 'cards', 'signs'])
@@ -29,7 +30,7 @@ const r = await page.evaluate(() => {
   const v = new THREE.Vector3(), a = new THREE.Vector3(), b = new THREE.Vector3(), cc = new THREE.Vector3(), m4 = new THREE.Matrix4(), mi = new THREE.Matrix4()
   const test = (p, label) => { pts++; const q = inCorr(p.x, p.y, p.z); if (!q) return; if (hasPhys(p.x, p.y, p.z)) return; const k = label + '@' + Math.round(p.x) + ',' + Math.round(p.y) + ',' + Math.round(p.z); if (!ng.has(k)) ng.set(k, { label, p: [+p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)], kind: q.kind }) }
   const visit = (o, label) => {
-    if (!o.visible || o.name === 'water') return // 水の幕・滝は通り抜けてよい（水）
+    if (!o.visible || o.name === 'water' || o.name === 'pickup') return // 水の幕・滝は通り抜けてよい（水）。燃料の缶は拾う物
     if ((o.isMesh || o.isInstancedMesh) && !(o.material && o.material.depthWrite === false)) { // 光のにじみ（光るだけの板）は数えない
       const g = o.geometry, P = g.attributes.position; if (!P) return
       const idx = g.index ? g.index.array : null, nTri = (idx ? idx.length : P.count) / 3

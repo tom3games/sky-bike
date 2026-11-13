@@ -5,10 +5,12 @@ import { COURSES } from '../js/course.js'
 import { createBot, botInput, resetBot } from '../js/bot.js'
 import { settle } from '../js/run.js'
 
-const c = COURSES.stage1()
+const c = COURSES[process.env.COURSE || 'stage1']()
 const mkWorld = () => { const w = new World(c.shapes); w.winds = c.winds; return w }
+let FORK = null // 道を選ぶ床の区間は、左と右の両方で試す
 const policies = {
-  上手い: () => createBot(c, { skill: 'good' }),
+  上手い: () => createBot(c, { skill: 'good', fork: FORK || 'R' }),
+  人の速さ: () => createBot(c, { skill: 'good', fork: FORK || 'R', react: 12 }),
   適当な全開: () => createBot(c, { skill: 'bad' }),
   慎重だが技なし: () => { const b = createBot(c, { skill: 'bad' }); b.cautious = true; return b },
 }
@@ -25,34 +27,40 @@ function tryMark(m, pol, seed) {
   let sd = 1234 + seed * 77
   const queue = []
   const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
-  for (let s = 0; s < 60 * (/回廊/.test(m.name) ? 90 : 30); s++) {
+  for (let s = 0; s < 60 * (/回廊/.test(m.name) ? 90 : FORK ? 60 : 30); s++) { // 道を選ぶ床は、床が来るのを待つ分（1 周 16 秒）だけ長く
     let inp = botInput(bot, b)
     if (bot.cautious) { inp = { ...inp, thr: b.speed < 3 ? 1 : 0, brk: b.speed > 4 ? 0.3 : 0, lean: 0 } }
     // ハンドルは全員自動（ゲームと同じ）。人の手の遅れ: アクセル・ブレーキ・重心だけ遅らせる（上手い 0 秒・ほか 0.25 秒）
     queue.push(inp)
-    const late = queue.length > (pol === '上手い' ? 0 : 15) ? queue.shift() : { thr: 0, brk: 0, lean: 0, steer: 0 }
+    const late = queue.length > (pol === '上手い' || pol === '人の速さ' ? 0 : 15) ? queue.shift() : { thr: 0, brk: 0, lean: 0, steer: 0 }
     inp = { ...late, steer: inp.steer }
     w.tick(); const ev = []; stepBike(w, b, inp, ev)
-    if (process.env.DEBUG === m.name && pol === '上手い' && seed === 0 && s % 6 === 0) console.log(s, b.p.map(v => v.toFixed(2)).join(','), 'th', (b.th * 57.3).toFixed(0), 'v', b.speed.toFixed(1), 'g', +b.g[0] + '' + +b.g[1], 's', b.s.map(v => v.toFixed(2)).join(','), 'in', inp.thr, inp.brk, inp.lean, inp.steer, 'psi', (b.psi * 57.3 % 360).toFixed(0), 'pyaw', ((c.path[bot.i].yaw || 0) * 57.3 % 360).toFixed(0), 'ph', bot.phase, ev.map(e => e.t + (e.why || '')).join(' '), b.cn[0] ? 'n0 ' + (b.cn[0].nw || b.cn[0].n).map(v => v.toFixed(2)) + ' ' + c.shapes[b.cn[0].id].tag : '', b.cn[1] ? 'n1 ' + (b.cn[1].nw || b.cn[1].n).map(v => v.toFixed(2)) + ' ' + c.shapes[b.cn[1].id].tag : '')
-    if (b.crashed) { if (process.env.DEBUG === m.name && seed === 0) console.log('CRASH', pol, b.crashed.why, b.p.map(v => v.toFixed(2)).join(','), (b.cn[0] || b.cn[1]) ? c.shapes[(b.cn[0] || b.cn[1]).id].tag : '-'); return { ok: false, why: '転倒', t: s * DT } }
+    if (process.env.DEBUG === m.name && pol === (process.env.DPOL || '上手い') && seed === +(process.env.DSEED || 0) && s % (+process.env.EV || 6) === 0) console.log(s, b.p.map(v => v.toFixed(2)).join(','), 'th', (b.th * 57.3).toFixed(0), 'v', b.speed.toFixed(1), 'g', +b.g[0] + '' + +b.g[1], 's', b.s.map(v => v.toFixed(2)).join(','), 'in', inp.thr, inp.brk, inp.lean, inp.steer, 'ab', inp.ab || 0, 'psi', (b.psi * 57.3 % 360).toFixed(0), 'pyaw', ((c.path[bot.i].yaw || 0) * 57.3 % 360).toFixed(0), 'bi', bot.i, c.path[bot.i].kind, 'si', bot.st.i, c.path[bot.st.i].kind, ((c.path[bot.st.i].yaw || 0) * 57.3 % 360).toFixed(0), 'ph', bot.phase, ev.map(e => e.t + (e.why || '')).join(' '), b.cn[0] ? 'n0 ' + (b.cn[0].nw || b.cn[0].n).map(v => v.toFixed(2)) + ' ' + c.shapes[b.cn[0].id].tag : '', b.cn[1] ? 'n1 ' + (b.cn[1].nw || b.cn[1].n).map(v => v.toFixed(2)) + ' ' + c.shapes[b.cn[1].id].tag : '')
+    if (b.crashed) { if (process.env.DEBUG === m.name && seed === 0 && pol === (process.env.DPOL || '上手い')) console.log('CRASH', pol, b.crashed.why, b.p.map(v => v.toFixed(2)).join(','), (b.cn[0] || b.cn[1]) ? c.shapes[(b.cn[0] || b.cn[1]).id].tag : '-'); return { ok: false, why: '転倒', t: s * DT } }
     if (b.p[1] < y0 - (m.drop || 3)) return { ok: false, why: '落下', t: s * DT }
     for (const e of m.ends || [m.end]) if (Math.hypot(b.p[0] - e[0], b.p[2] - e[2]) < 2.2 && Math.abs(b.p[1] - 0.79 - e[1]) < 1.5) return { ok: true, t: s * DT }
   }
-  return { ok: false, why: '進めない', t: 30 }
+  return { ok: false, why: '進めない', t: FORK ? 60 : 30 }
 }
 const rows = []
+const todo = []
 for (const m of c.marks.filter(m => !process.env.ONLY || process.env.ONLY.split(',').some(n => m.name.includes(n)))) {
-  const row = { 区間: m.name }
+  const hasFork = c.path.slice(m.i0, m.i1 + 1).some(q => q.kind === 'fork')
+  if (hasFork) for (const fk of ['L', 'R']) todo.push({ m, fk }); else todo.push({ m, fk: null })
+}
+for (const { m, fk } of todo) {
+  FORK = fk
+  const row = { 区間: m.name + (fk ? ' ' + fk : '') }
   for (const pol of Object.keys(policies)) {
     let ok = 0, n = 0, why = {}, tt = []
-    for (let seed = 0; seed < 8; seed++) { const r = tryMark(m, pol, seed); n++; if (r.ok) { ok++; tt.push(r.t) } else why[r.why] = (why[r.why] || 0) + 1 }
+    for (let seed = 0; seed < 8; seed++) { const r = tryMark(m, pol, seed); if (process.env.SEEDS && pol === (process.env.DPOL || "上手い")) console.log(m.name, FORK, seed, JSON.stringify(r)); n++; if (r.ok) { ok++; tt.push(r.t) } else why[r.why] = (why[r.why] || 0) + 1 }
     row[pol] = `${ok}/${n}` + (tt.length ? ` ${(tt.reduce((a, b) => a + b, 0) / tt.length).toFixed(1)}秒` : '') + (Object.keys(why).length ? ' ' + Object.entries(why).map(([k, v]) => k + v).join('') : '')
   }
   rows.push(row)
 }
 console.table(rows)
 
-if (process.env.ONLY && !process.env.JUMP) process.exit(0)
+if ((process.env.ONLY || process.env.COURSE) && !process.env.JUMP) process.exit(0)
 // 谷のジャンプ: 踏み切りの速さを変えて、どこに降りるか
 const jm = c.marks.find(m => m.name === '助走して谷を飛ぶ')
 const lipI = c.path.findLastIndex(q => q.kind === 'lip' && q.vNeed)

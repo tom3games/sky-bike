@@ -259,7 +259,10 @@ function seesawPose(s) {
 // 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
 export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } }
 // 乗ると一緒に運ばれる動く床の種類
-const CARRY = new Set(['lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge'])
+const CARRY = new Set(['lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge', 'wave', 'kick', 'shuttle', 'topple'])
+// v16: 床の加速を体に感じる（床の座標系の見かけの力）。止まる跳ね板から飛び出す・揺れる吊り橋から投げ出される
+const FICT = new Set(['wave', 'kick', 'shuttle', 'topple'])
+const NOIDLE = new Set(['wave', 'kick', 'topple']) // 何もしない時に床と一緒に止める補助を使わない（橋・跳ね板・煙突はふつうの路面と同じに転がる）
 // 止まってブレーキを押し続けて下がり始めるまでの時間（動く床の上では長押し）
 function revHold(b) { return b.onMov ? 1e9 : 0.45 } // 動く床の上では下がらない（ブレーキは床と一緒に止まっているだけ）
 // 塔のまわりの道に沿って流れる水（flowT: 左回りの向きを正とする速さ）
@@ -275,18 +278,20 @@ export class World {
     this.shapes = shapes
     this.grid = new Map()
     this.stamp = new Int32Array(shapes.length); this.st = 0
-    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.hangs = []; this.time = 0
+    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.hangs = []; this.trigs = []; this.bridges = []; this.time = 0
     shapes.forEach((s, id) => {
       s.id = id
+      if (s.mov && s.mov.type === 'wave' && !this.bridges.includes(s.mov.br)) this.bridges.push(s.mov.br)
       if (s.hang) this.hangs.push(s)
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
         // 動く足場: 動く範囲を全部含む箱で当たりの候補に入れる
         const R = s.type === 'sph' ? s.r : s.type === 'arc' ? 0 : Math.sqrt(s.h[0] * s.h[0] + s.h[1] * s.h[1] + s.h[2] * s.h[2])
-        const m = s.mov, ex = m.type === 'slide' || m.type === 'lift' ? [Math.abs(m.axis[0]) * m.amp, Math.abs(m.axis[1]) * m.amp, Math.abs(m.axis[2]) * m.amp]
+        const m = s.mov, ex = m.ext ? m.ext : m.type === 'slide' || m.type === 'lift' ? [Math.abs(m.axis[0]) * m.amp, Math.abs(m.axis[1]) * m.amp, Math.abs(m.axis[2]) * m.amp]
           : m.type === 'pend' ? [m.L, m.L, m.L] : m.type === 'hinge' || m.type === 'seesaw' ? [R * 2, R * 2, R * 2] : m.type === 'drop' ? [0, m.hd, 0] : [0, 0, 0]
         if (s.type !== 'arc') { s.min = [0, 1, 2].map(k => s.base.c[k] - R - ex[k]); s.max = [0, 1, 2].map(k => s.base.c[k] + R + ex[k]) }
         s.touch = 0; s.gone = false
+        if (m.type === 'kick' || m.type === 'topple') this.trigs.push(s)
         if (m.type === 'trap') { s.tc = s.type === 'arc' ? arcPoint(s, (s.phi0 + s.phi1) / 2, (s.r1 + s.r2) / 2, 0) : s.c.slice(); this.traps.push(s) }
         this.moving.push(s); this.big.push(id); return
       }
@@ -301,7 +306,9 @@ export class World {
   }
   // 時刻 t（秒）の位置に動く足場を置く。決まった式なので、同じ時刻なら同じ位置
   setTime(t) {
+    const dtT = t - this.time
     this.time = t
+    if (t === 0) for (const br of this.bridges) { br.tOn = null; br.on = false; br.sb = 0; br.vs = 0; br.lastOn = -1e9 }
     for (const s of this.moving) {
       const m = s.mov, B0 = s.base
       if (m.type === 'slide') { const k = m.amp * dsin(t * m.w + (m.ph || 0)); s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
@@ -317,6 +324,7 @@ export class World {
       else if (m.type === 'drop') { const st = dropState(m, t); s.c = [B0.c[0], B0.c[1] + st.y, B0.c[2]]; s.gone = st.hidden; s.min = s.c.map(v => v - s.r); s.max = s.c.map(v => v + s.r) }
       else if (m.type === 'trap') { if (t === 0) { s.gone = false; s.warnT = null } }
       else if (m.type === 'crumble') { if (t === 0) { s.gone = false; s.touch = 0; s.goneAt = -1e9 } }
+      else if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle' || m.type === 'topple') v16Pose(s, t, dtT)
       if (m.type === 'crumble') { if (s.gone && t - s.goneAt > m.back) { s.gone = false; s.touch = 0 } else if (!s.gone && s.touch > 0 && s.lastTouch !== undefined && t - s.lastTouch > 1.5) s.touch = 0 }
     }
   }
@@ -340,6 +348,9 @@ export class World {
     if (m.type === 'drop') { return [0, dropState(m, this.time).v, 0] }
     if (m.type === 'seesaw') { const w = m.w || 0, R0 = m.right, r = [q[0] - m.pivot[0], q[1] - m.pivot[1], q[2] - m.pivot[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
     if (m.type === 'spin') { const dx = q[0] - s.c[0], dz = q[2] - s.c[2]; return [m.rate * dz, 0, -m.rate * dx] }
+    if (m.type === 'gear') { const o = m.om, r = [q[0] - s.a[0], q[1] - s.a[1], q[2] - s.a[2]]; return [o[1] * r[2] - o[2] * r[1], o[2] * r[0] - o[0] * r[2], o[0] * r[1] - o[1] * r[0]] }
+    if (m.type === 'topple') { const w = m.wNow || 0, R0 = m.right, r = [q[0] - m.hinge[0], q[1] - m.hinge[1], q[2] - m.hinge[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
+    if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle') return s.vel ? s.vel.slice() : [0, 0, 0]
     return null
   }
   near(x, y, z, rad) {
@@ -524,6 +535,7 @@ export function stepBike(world, b, inp, ev) {
   if (b.hang) { hangStep(world, b, inp, ev); b.steps++; return }
   for (let k = 0; k < SUB; k++) sub(world, b, inp, ev)
   if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
+  if (!b.ghost) v16Track(world, b, ev)
   b.steps++
 }
 const ZERO = { thr: 0, brk: 0, lean: 0, steer: 0 }
@@ -560,6 +572,7 @@ function sub(world, b, inpIn, ev) {
       b.carryId = nc
     } }
   const velAt = q => { const v = velAt0(q); if (curId < 0 || curId === b.carryId) return v; const sh = world.shapes[curId]; const u = sh.mov ? world.shapeVel(sh, q) : sh.flow || (sh.flowR ? flowRad(sh, q) : sh.flowT ? flowTan(sh, q) : null); return u ? [v[0] - u[0], v[1] - u[1], v[2] - u[2]] : v } // 湧き水の流れの上は、水と一緒に動く面として扱う
+  if (b.carryId >= 0) { const sh = world.shapes[b.carryId]; if (sh.mov && FICT.has(sh.mov.type)) { const a = frameAcc(sh, b.p); fx -= P.m * a[0]; fy -= P.m * a[1]; fz -= P.m * a[2] } }
   const ids = world.near(b.p[0], b.p[1], b.p[2], 2.4)
   // 深く沈んだ接触は、沈む向きの速さをその場で打ち消す（強い着地でも面の奥へ入り込ませない）
   const stopSink = (q, n, depth) => {
@@ -619,8 +632,9 @@ function sub(world, b, inpIn, ev) {
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
     if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
     Ft -= vt * 6 + (vt > 0 ? 1 : -1) * 0.012 * N // 転がり
-    if (b.carryId >= 0 && con.id === b.carryId && inp.thr <= 0.05 && inp.brk <= 0.05) Ft -= clamp(vt * 900, -0.6 * lim, 0.6 * lim) // 動く床の上で何もしない時は、床と一緒に止まる（転がって取り残されない）
+    if (b.carryId >= 0 && con.id === b.carryId && inp.thr <= 0.05 && inp.brk <= 0.05 && !NOIDLE.has(world.shapes[con.id].mov.type)) Ft -= clamp(vt * 900, -0.6 * lim, 0.6 * lim) // 動く床の上で何もしない時は、床と一緒に止まる（転がって取り残されない）
     { const sh = world.shapes[con.id]; if (sh.mud) Ft -= clamp(vt, -3, 3) * sh.mud } // 泥: 車輪が沈んで重い
+    { const sh = world.shapes[con.id]; if (sh.mov && sh.mov.type === 'gear') Ft -= clamp(vt * sh.mov.grip, -0.9 * lim, 0.9 * lim) } // v16 歯車: 歯にタイヤが噛んで、面の速さに引っぱられる（逆らうと進めない）
     let Fl = -clamp(vl * 2600, -lim, lim)
     const tot = Math.sqrt(Ft * Ft + Fl * Fl)
     if (tot > lim) { Ft *= lim / tot; Fl *= lim / tot }
@@ -687,6 +701,9 @@ function sub(world, b, inpIn, ev) {
     b.wheelRot[i] += vt * H / (P.R + P.rt)
     if (i === 0) b.vtRel = (con || side) ? vt : null
   }
+  // ---- v16 傾いた着地点（landTol の付いた面）: 空中から降りた瞬間、車体の傾きが面と合っていなければ転倒（弾かれて落ちる）
+  if (!b.crashed && b.airT > 0.25) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn || !b.g[i]) continue; const sh = world.shapes[cn.id]; if (!sh.landTol) continue
+    const n = cn.nw || cn.n, sa = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]; if (Math.abs(sa) > dsin(sh.landTol)) { crash(b, 'land', 0, ev); b.v[0] += n[0] * 2.5; b.v[1] += n[1] * 2.5; b.v[2] += n[2] * 2.5; break } }
   // ---- 最高速度がなかった時の速さとの差 vx（v11 と同じ走りをした時の速さ - 今の速さ）。アクセルを離す・ブレーキで消える
   { const v = Math.max(0, b.speed), vx = b.vx || 0
     let d = (b.vxAcc || 0) / P.m * H - 0.35 * ((v + vx) * (v + vx) - v * v) / P.m * H
@@ -996,4 +1013,114 @@ function hangStep(world, b, inp, ev) {
   if (hg.slip > 0.5) return exit('slip')
   if (hg.t > max) { if (ev) ev.push({ t: 'hangBreak', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }); return exit('edge') }
   hangPose(world, b)
+}
+
+// ============================================================ v16 の仕掛けの動き（時刻と、乗っているバイクの位置だけで決まる）
+// 横に往復する床（道を選ぶ床）: 端で dwell 秒止まる → move 秒で反対の端へ（加速 ta 秒・あとは一定の速さ）。k は -amp..amp
+export function shuttlePos(m, t) {
+  const P = 2 * (m.dwell + m.move), ph = (t + (m.ph || 0)) - P * Math.floor((t + (m.ph || 0)) / P), D = 2 * m.amp, ta = m.ta ?? 0.8
+  const vc = D / (m.move - ta), a = vc / ta
+  const run = u => u < ta ? [0.5 * a * u * u, a * u] : u < m.move - ta ? [0.5 * a * ta * ta + vc * (u - ta), vc] : [D - 0.5 * a * (m.move - u) * (m.move - u), a * (m.move - u)]
+  if (ph < m.dwell) return { k: -m.amp, v: 0, at: 'lo', left: m.dwell - ph }
+  if (ph < m.dwell + m.move) { const [x, v] = run(ph - m.dwell); return { k: -m.amp + x, v, at: 'up', left: m.dwell + m.move - ph } }
+  if (ph < 2 * m.dwell + m.move) return { k: m.amp, v: 0, at: 'hi', left: 2 * m.dwell + m.move - ph }
+  const [x, v] = run(ph - 2 * m.dwell - m.move); return { k: m.amp - x, v: -v, at: 'down', left: P - ph }
+}
+// 跳ね板: 踏まれてから τ 秒の持ち上がり（0..stroke）。入った速さ ve で跳ね上がる速さが変わる
+export function kickPos(m, t) {
+  if (m.trig == null || t < m.trig) return 0
+  const tau = t - m.trig, vpk = Math.min(m.vmax ?? 14, m.k0 + m.kv * (m.ve || 0)), T1 = m.stroke * PI / (2 * vpk)
+  if (tau < T1) return m.stroke * (1 - dcos(PI * tau / T1)) / 2
+  if (tau < T1 + m.hold) return m.stroke
+  const u = (tau - T1 - m.hold) / m.back
+  if (u < 1) return m.stroke * (1 + dcos(PI * u)) / 2
+  return 0
+}
+// 倒れていく煙突: 踏まれてから、落ちる物と同じく加速して倒れる（a0 → aEnd を tFall 秒）。倒れ切ってバイクが離れて back 秒で、rise 秒かけて元へ
+export function toppleAng(m, t) {
+  if (m.trig == null || t < m.trig) return { a: m.a0, w: 0, al: 0, st: 'up' }
+  const al = 2 * (m.a0 - m.aEnd) / (m.tFall * m.tFall), tau = t - m.trig
+  if (m.resetAt != null && t >= m.resetAt) { const u = Math.min(1, (t - m.resetAt) / m.rise), k = u * u * (3 - 2 * u), dk = 6 * u * (1 - u) / m.rise; return { a: m.aEnd + (m.a0 - m.aEnd) * k, w: (m.a0 - m.aEnd) * dk, al: 0, st: u >= 1 ? 'done' : 'rise' } }
+  const a = m.a0 - 0.5 * al * tau * tau
+  if (a > m.aEnd) return { a, w: -al * tau, al: -al, st: 'fall' }
+  return { a: m.aEnd, w: 0, al: 0, st: 'down' }
+}
+// 鎖の吊り橋: 板の中心の、橋の始まりからの距離 sI での形。重さで沈む・速さで波打つ・乗っている時間で横揺れが大きくなる（風でも）
+export function bridgePose(br, sI, t) {
+  const L = br.L, e = s => dsin(PI * Math.max(0, Math.min(L, s)) / L)
+  const tOn = br.tOn != null && t >= br.tOn ? t - br.tOn : 0
+  const Aw = Math.min(br.waMax ?? 0.35, br.wa * Math.max(0, (br.vs || 0) - (br.v0w ?? 6.5)))
+  const yAt = s => { const es = e(s), d = (s - (br.sb || 0)) / br.lam; return -br.sag * es - br.dip * (br.dw || 0) * es * Math.exp(-d * d) + Aw * es * dsin(br.k * s + br.om * t * 0.15) }
+  const gk = br.gust ? gustK(br.gust, t) : 0
+  const As = br.A0 + Math.min(br.Amax - br.A0, br.grow * tOn + (br.swv || 0) * Math.max(0, (br.vs || 0) - (br.v0w ?? 6.5)) + (br.tJolt && tOn > br.tJolt ? (tOn - br.tJolt) * 4 : 0)) + (br.windA || 0) * gk // 長く乗っていると大きくあおられる（tJolt 秒から）
+  const sw = dsin(br.oms * t + (br.ph || 0)), es = Math.min(1, 1.6 * e(sI)) // 横揺れは橋のほとんど全体で大きい（両端の柱の近くだけ小さい）
+  const lat = As * es * sw
+  const y = yAt(sI), dy = (yAt(sI + 0.3) - yAt(sI - 0.3)) / 0.6
+  return { y, lat, slope: datan2(dy, 1), roll: (br.rollK ?? 0.18) * lat }
+}
+const sub3 = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
+function setPose(s, c, pitch, roll, dtT) {
+  const nb = makeBox({ c, h: s.h, yaw: s.base.yaw, pitch, roll })
+  const ok = dtT > 1e-6 && dtT < 0.1 && s.c
+  const vel = ok ? sub3(c, s.c).map(v => v / dtT) : [0, 0, 0]
+  s.acc = ok && s.vel ? sub3(vel, s.vel).map(v => v / dtT) : [0, 0, 0]
+  s.vel = vel; s.c = nb.c; s.ax = nb.ax
+}
+function v16Pose(s, t, dtT) {
+  const m = s.mov, B0 = s.base
+  if (t === 0) { m.trig = null; m.resetAt = null; m.ve = 0; m.armed = true; m.lastTouch = -1e9; s.vel = [0, 0, 0]; s.acc = [0, 0, 0] }
+  if (m.type === 'shuttle') { const k = shuttlePos(m, t).k; setPose(s, [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k], B0.pitch, B0.roll, dtT) }
+  else if (m.type === 'kick') { if (m.trig != null && t < m.trig) m.trig = null; const k = kickPos(m, t); if (m.trig != null && k === 0 && t - m.trig > 1) m.trig = null; setPose(s, [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k], B0.pitch, B0.roll, dtT) }
+  else if (m.type === 'wave') {
+    const br = m.br, st = bridgePose(br, m.s, t), f = br.f, R = br.R
+    const c = [br.p0[0] + f[0] * m.s + R[0] * st.lat, br.p0[1] + st.y - s.h[1], br.p0[2] + f[2] * m.s + R[2] * st.lat]
+    setPose(s, c, st.slope, st.roll, dtT)
+  } else if (m.type === 'topple') {
+    if (m.trig != null && t < m.trig) { m.trig = null; m.resetAt = null }
+    if (m.trig != null && m.resetAt == null) { const st0 = toppleAng(m, t); if (st0.st === 'down' && t - (m.lastTouch ?? -1e9) > m.back) m.resetAt = t }
+    const st = toppleAng(m, t); if (st.st === 'done') { m.trig = null; m.resetAt = null }
+    m.aNow = st.a; m.wNow = st.w; m.alNow = st.al
+    const d = st.a - m.a0, H0 = m.hinge, d0 = sub3(B0.c, H0), R0 = m.right, ca = dcos(d), sa = dsin(d)
+    const kd = R0[0] * d0[0] + R0[1] * d0[1] + R0[2] * d0[2], cr = [R0[1] * d0[2] - R0[2] * d0[1], R0[2] * d0[0] - R0[0] * d0[2], R0[0] * d0[1] - R0[1] * d0[0]]
+    const nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw, pitch: B0.pitch + d, roll: B0.roll })
+    s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa + R0[k] * kd * (1 - ca)); s.ax = nb.ax
+  }
+}
+// 乗っている床の、点 p での加速（見かけの力に使う）
+function frameAcc(sh, p) {
+  const m = sh.mov
+  if (m.type !== 'topple') return sh.acc || [0, 0, 0]
+  const w = m.wNow || 0, al = m.alNow || 0, R0 = m.right, r = sub3(p, m.hinge), kd = R0[0] * r[0] + R0[1] * r[1] + R0[2] * r[2]
+  const rp = [r[0] - R0[0] * kd, r[1] - R0[1] * kd, r[2] - R0[2] * kd], cr = [R0[1] * r[2] - R0[2] * r[1], R0[2] * r[0] - R0[0] * r[2], R0[0] * r[1] - R0[1] * r[0]]
+  return [al * cr[0] - w * w * rp[0], al * cr[1] - w * w * rp[1], al * cr[2] - w * w * rp[2]]
+}
+// 1 コマごと: 跳ね板・煙突の引き金と、吊り橋に乗っているか
+function v16Track(world, b, ev) {
+  const T = world.time
+  for (const s of world.trigs) {
+    const m = s.mov, on0 = b.cn[0] && b.cn[0].id === s.id, on1 = b.cn[1] && b.cn[1].id === s.id
+    if (m.type === 'topple') {
+      if (on0 || on1) { m.lastTouch = T; if (m.trig == null && !b.crashed) { m.trig = T; if (ev) ev.push({ t: 'topple', p: s.c.slice() }) } }
+    } else if (m.type === 'kick') {
+      if (on0 || on1) m.lastTouch = T
+      if (m.trig == null && on0 && b.g[0] && on1 && b.g[1] && !b.crashed && (m.armed ?? true)) {
+        const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
+        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }) }
+      }
+      if (!on0 && !on1 && m.trig == null && T - (m.lastTouch ?? -1e9) > 0.8) m.armed = true
+    }
+  }
+  if (world.bridges.length) {
+    const sh = b.carryId >= 0 ? world.shapes[b.carryId] : null, cur = sh && sh.mov && sh.mov.type === 'wave' ? sh.mov.br : null
+    for (const br of world.bridges) {
+      if (br === cur && !b.crashed) {
+        br.sb = (b.p[0] - br.p0[0]) * br.f[0] + (b.p[2] - br.p0[2]) * br.f[2]
+        br.vs = (br.vs || 0) + (Math.abs(b.speed) - (br.vs || 0)) * 0.08
+        if (br.tOn == null) { br.tOn = T; if (ev) ev.push({ t: 'bridgeOn', p: b.p.slice() }) }
+        br.lastOn = T; br.on = true
+      } else if (br.on && T - (br.lastOn ?? -1e9) > 0.6) { br.on = false; br.tOn = null }
+      if (!br.on) br.vs = (br.vs || 0) * 0.97
+      br.dw = Math.max(0, Math.min(1, (br.dw || 0) + (br.on ? 0.05 : -0.03)))
+    }
+  }
 }

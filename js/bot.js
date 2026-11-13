@@ -1,20 +1,30 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos } from './physics.js?v=15'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=15'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=16'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=16'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
+// 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
+export function seq(path, i, n) {
+  const out = []; let k = i
+  while (k >= 0 && k < path.length && out.length < n) { out.push(k); const q = path[k]; if (q.nx != null) { k = q.nx; continue } const z = path[k + 1]; if (!z || !z.branch !== !q.branch || z.br !== q.br) break; k++ }
+  return out
+}
 export function createBot(course, o = {}) {
   const path = o.path || course.path
-  return { path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
+  // 道を選ぶ床: 枝道の始まりの番号（finish の後に決まる）
+  for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
+  return { fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
-export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0 }
+export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null }
 function nearest(bot, b, from, to) {
   let best = 1e9, bi = from
-  for (let i = Math.max(0, from); i < Math.min(bot.path.length, to); i++) {
+  const scan = (a, z) => { for (let i = Math.max(0, a); i < Math.min(bot.path.length, z); i++) {
     const p = bot.path[i].p; if (!p) continue
     const d = (p[0] - b.p[0]) ** 2 + (p[2] - b.p[2]) ** 2 + ((p[1] + 0.8 - b.p[1]) * 2) ** 2
     if (d < best) { best = d; bi = i }
-  }
+  } }
+  scan(from, to)
+  for (let i = Math.max(0, from); i < Math.min(bot.path.length, to); i++) { const nx = bot.path[i].nx; if (nx != null) scan(nx, nx + 25) }
   // 近くに道の点がない（跳んで届かず下の道へ落ちた時など）は全部から探す
   if (best > 16 && (from > 0 || to < bot.path.length)) return nearest(bot, b, 0, bot.path.length)
   return bi
@@ -24,6 +34,7 @@ export function botInput(bot, b) {
   if (b.hang) return hangInput(bot, b)
   bot.hangT0 = null
   bot.i = nearest(bot, b, bot.i - 2, bot.i + 25)
+  const SQ = seq(path, bot.i, 60), PV = {}; for (let a = 1; a < SQ.length; a++) PV[SQ[a]] = SQ[a - 1]
   const B = basis(b)
   const sp = b.speed
   // ハンドルは自動（ゲームと同じ js/steer.js）
@@ -34,26 +45,26 @@ export function botInput(bot, b) {
   let vCap = 99
   bot.jumpAhead = false; bot.steepAhead = false
   const need = (v, d) => { vCap = Math.min(vCap, Math.sqrt(v * v + 2 * 2.5 * Math.max(0, d - 1))) }
-  for (let j = bot.i, dd = 0; j < Math.min(path.length, bot.i + 60); j++) {
+  for (let jj = 0, j = SQ[0], dd = 0; jj < Math.min(SQ.length, 60); j = SQ[++jj]) {
     const q = path[j]
-    if (j > bot.i && path[j - 1].p && q.p) dd += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
+    if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
     if (q.kind === 'stepUp' && q.dy > 0.25) need(q.dy > 0.55 ? 1.1 : q.dy > 0.4 ? 3.4 : 3.5, dd)
     if (q.kind === 'lift' && !bot.liftGo) need(0.8, Math.max(0, dd - 3.2))
     if (((q.slope || 0) > 0.38 || q.kind === 'steep' || q.kind === 'mud') && dd < 12) bot.steepAhead = true
     if (q.kind === 'narrow' || q.kind === 'pipe' || (q.w && q.w < 1.3)) need(3.6, dd)
-    if (j > bot.i && !q.curv && !path[bot.i].curv && Math.abs(wrap((q.yaw ?? b.psi) - (path[bot.i].yaw ?? b.psi))) > 0.9) need((q.w || 9) < 2 ? 2.6 : 2.9, dd)
+    if (jj > 0 && !q.curv && !path[bot.i].curv && Math.abs(wrap((q.yaw ?? b.psi) - (path[bot.i].yaw ?? b.psi))) > 0.9) need((q.w || 9) < 2 ? 2.6 : 2.9, dd)
     if (q.curv && dd < 20) need(Math.sqrt(20 / (1.42 * Math.abs(q.curv))) * 0.85, dd)
     if (q.kind === 'lip') break
     if (q.kind === 'jump') { if (dd < 9) { bot.jumpAhead = true; bot.vJump = q.vJump } break }
   }
-  for (let j = bot.i; j < Math.min(path.length, bot.i + 40); j++) {
+  for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 40); j = SQ[++jj]) {
     const q = path[j]
-    if (j > bot.i && path[j - 1].p && q.p) dsum += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
+    if (jj > 0 && path[PV[j]].p && q.p) dsum += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
     if (q.kind === 'stepUp' && q.dy > 0.25 && stepAt == null && dsum < 14) stepAt = { d: dsum, q }
     if (q.kind === 'lip' && lipAt == null && dsum < 30) lipAt = { d: dsum, q }
     if (q.kind === 'bump' && dsum < 6) vT = Math.min(vT, 6)
     if ((q.kind === 'narrow' || q.kind === 'pipe' || (q.w && q.w < 1.3)) && dsum < 10) narrow = true
-    if (!turnAhead && j > bot.i && !q.curv && Math.abs(wrap((q.yaw ?? b.psi) - (path[bot.i].yaw ?? b.psi))) > 0.9 && dsum < 9) { turnAhead = true; if (bot.corner == null || bot.corner.j !== j) bot.corner = { j, d: dsum, yaw: q.yaw, narrow: (q.w || 9) < 2 } ; else bot.corner.d = dsum }
+    if (!turnAhead && jj > 0 && !q.curv && Math.abs(wrap((q.yaw ?? b.psi) - (path[bot.i].yaw ?? b.psi))) > 0.9 && dsum < 9) { turnAhead = true; if (bot.corner == null || bot.corner.j !== j) bot.corner = { j, d: dsum, yaw: q.yaw, narrow: (q.w || 9) < 2 } ; else bot.corner.d = dsum }
   }
   const cur = path[bot.i]
   if (cur.kind === 'spiral' || cur.kind === 'narrowSpiral' || cur.kind === 'orbit') vT = 10
@@ -65,18 +76,18 @@ export function botInput(bot, b) {
   if (bot.jumpAhead) vT = Math.max(vT, bot.vJump || 6.5)
   if (bot.steepAhead && !stepAt) vT = Math.max(vT, 9) // すべる急坂は勢いで一気に
   if (cur.kind === 'crumble' || (path[bot.i + 2] && path[bot.i + 2].kind === 'crumble')) vT = Math.max(vT, 7) // 崩れる板の上では止まらない
-  for (let j = bot.i; j < Math.min(path.length, bot.i + 9); j++) if (path[j].kind === 'trap') { vT = Math.max(vT, 7); break } // 抜け落ちる床は速さで越える
+  for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 9); j = SQ[++jj]) if (path[j].kind === 'trap') { vT = Math.max(vT, 7); break } // 抜け落ちる床は速さで越える
   // 高い縁（前輪を掛ける）: 歩く速さで近づき、手前でウィリー
   let hangAt = null, nitroNeed = false, nitroLip = 0
-  for (let j = bot.i, dd = 0; j < Math.min(path.length, bot.i + 30); j++) {
-    const q = path[j]; if (j > bot.i && path[j - 1].p && q.p) dd += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
-    if ((q.kind === 'jump' || q.kind === 'lip') && j > bot.i + 1) break // 先に跳ぶ所がある時は、縁のための減速はまだしない
+  for (let jj = 0, j = SQ[0], dd = 0; jj < Math.min(SQ.length, 30); j = SQ[++jj]) {
+    const q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
+    if ((q.kind === 'jump' || q.kind === 'lip') && (jj > 1 || q.kind === 'jump')) break // 先に跳ぶ所がある時は、縁のための減速はまだしない
     if (q.kind === 'hang' && hangAt == null && dd < 16) hangAt = { d: dd, q }
     if (q.nitro && dd < 26) nitroNeed = true
     if (q.kind === 'lip' && (q.vNeed || 0) > 15.5 && dd < 40) nitroLip = q.vNeed
   }
   if (hangAt) { vT = Math.min(vT, hangAt.d < 7 ? 1.2 : 3.5) }
-  if (nitroNeed) vT = Math.max(vT, 18)
+  if (nitroNeed) vT = Math.max(vT, 21) // ニトロの所はブレーキを使わない（最高 20m/s）
   if (nitroLip) vT = Math.max(vT, nitroLip) // ジャンプ台で要る速さまでだけニトロ（出しすぎると跳びすぎる）
   if (bot.skill === 'bad') { vT = narrow ? 6 : turnAhead ? 7 : 14 }
   vT *= bot.vMul
@@ -125,10 +136,10 @@ export function botInput(bot, b) {
     } else if (air) {
       // 空中: 着地する面の傾きに合わせる（少しだけ前輪寄り）
       let ls = 0
-      for (let j = bot.i; j < Math.min(path.length, bot.i + 14); j++) if (path[j].kind !== 'jump' && path[j].kind !== 'lip' && path[j].w) { ls = path[j].slope || 0; if (path[j].p[1] < b.p[1] - 0.3) break }
+      for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 14); j = SQ[++jj]) if (path[j].kind !== 'jump' && path[j].kind !== 'lip' && path[j].w) { ls = path[j].slope || 0; if (path[j].p[1] < b.p[1] - 0.3) break }
       const tgt = ls - 0.05
       lean = Math.max(-1, Math.min(1, (b.th - tgt) * 3.5 + b.w * 0.6))
-      thr = 0.5
+      thr = 0.5; brk = 0 // 空中ではブレーキを掛けない（掛けると前へ回って突っ込む。v16 の自由な道の切れ目は点が 1 つなので、跳んだ後の先の段で速さを落とそうとしていた）
     } else {
       // 地面: 車体が坂から浮きすぎ・突っ込みすぎを直す
       const d = b.th - slope
@@ -146,16 +157,16 @@ export function botInput(bot, b) {
   bot.waiting = false
   // シーソー: ゆっくり乗る（重さで傾くのを待つ）。扉: 壊せる速さで当たる
   if (bot.skill === 'good' && !air) {
-    for (let j = bot.i, dd = 0; j < Math.min(path.length, bot.i + 16); j++) {
-      const q = path[j]; if (j > bot.i && path[j - 1].p && q.p) dd += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
+    for (let jj = 0, j = SQ[0], dd = 0; jj < Math.min(SQ.length, 16); j = SQ[++jj]) {
+      const q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
       if (q.kind === 'seesaw' && dd < 7) { const vs = 2.2; thr = sp < vs ? 1 : 0; brk = sp > vs + 0.4 ? 0.5 : 0; lean = 0 }
       if (q.door && dd < 14 && bot.phase === 0) { const vd = q.door + 1.5; if (sp < vd) { thr = 1; brk = 0 } }
     }
   }
   // 湧き水の上は止まらない・泥の手前は勢いをつける
   if (bot.skill === 'good' && !air) {
-    for (let j = bot.i, dd = 0; j < Math.min(path.length, bot.i + 14); j++) {
-      const q = path[j]; if (j > bot.i && path[j - 1].p && q.p) dd += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
+    for (let jj = 0, j = SQ[0], dd = 0; jj < Math.min(SQ.length, 14); j = SQ[++jj]) {
+      const q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2])
       if (q.kind === 'water' && dd < 6) { if (sp < 4.5) { thr = 1; brk = 0 } }
       if (q.kind === 'mud' && dd < 14 && bot.phase === 0) { if (sp < 9) { thr = 1; brk = 0 } if (lean < 0.4) lean = 0.4 }
     }
@@ -201,7 +212,7 @@ export function botInput(bot, b) {
   }
   // 上下する足場: 手前で待ち、足場が道の高さに来てから乗る。乗ったら向こうの高さまで待つ
   if (bot.skill === 'good') {
-    for (let j = bot.i; j < Math.min(path.length, bot.i + 6); j++) {
+    for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 6); j = SQ[++jj]) {
       const q = path[j]; if (q.kind !== 'lift') continue
       const st = liftPos(q.lift.mov, bot.world ? bot.world.time : 0)
       const fx = Math.cos(q.yaw), fz = -Math.sin(q.yaw)
@@ -242,6 +253,11 @@ export function botInput(bot, b) {
     const fd = (hangAt.q.p[0] - fw[0]) * hx + (hangAt.q.p[2] - fw[2]) * hz
     if (fd < 2.6) { thr = sp < 1.2 ? 0.5 : 0; brk = sp > 1.8 ? 0.4 : 0; lean = -1 }
   }
+  // ---------------- v16 の仕掛け（上手い bot だけ）
+  if (bot.skill === 'good') {
+    const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
+    if (o) { thr = o.thr; brk = o.brk; lean = o.lean; if (o.steer != null) steer = o.steer; if (o.nitroOff) nitroNeed = false; bot.stuckT = 0; bot.backT = 0; bot.waiting = true }
+  }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   const inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
@@ -276,4 +292,78 @@ function hangInput(bot, b) {
   const minWait = 0.7
   if ((safe && hg.t > minWait) || hg.t > tMax - 1.6) return { thr: 1, brk: 0, lean: Math.max(0.6, l), steer: 0, nitro: 0 }
   return { thr: 0, brk: 1, lean: l, steer: 0, nitro: 0 }
+}
+
+// v16: 歯車・溝・吊り橋・跳ね板・道を選ぶ床。返り: 入力を置き換える時だけ { thr, brk, lean, steer? }
+function v16Input(bot, b, SQ, PV, c) {
+  const path = bot.path, cur = path[bot.i], sp = c.sp, W = bot.world, T = W ? W.time : 0
+  const ahead = (n, fn) => { for (let jj = 0, dd = 0; jj < Math.min(SQ.length, n); jj++) { const j = SQ[jj], q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2]); const r = fn(q, dd, j); if (r !== undefined) return r } return null }
+  const hold = v => ({ thr: sp < v - 0.5 ? 1 : sp < v + 0.2 ? 0.35 : 0, brk: sp > v + (bot.react ? 1.8 : 0.8) ? Math.min(0.5, (sp - v) * 0.3) : 0, lean: sp > v + 0.8 ? Math.min(c.lean, -0.3) : c.lean }) // 速さを保つ（反応が遅くても行き過ぎない）
+  // 道を選ぶ床
+  const fk = cur.fork || ahead(14, q => q.fork && q.kind === 'fork' ? q.fork : undefined)
+  if (fk && W) {
+    const sh = fk.shape, m = fk.mov, f = [Math.cos(fk.yaw), 0, -Math.sin(fk.yaw)], R = [Math.sin(fk.yaw), 0, Math.cos(fk.yaw)]
+    const al = (b.p[0] - fk.p0[0]) * f[0] + (b.p[2] - fk.p0[2]) * f[2], lat = (b.p[0] - fk.mid[0]) * R[0] + (b.p[2] - fk.mid[2]) * R[2]
+    const want = bot.fork === 'mix' ? ((bot.forkN + Math.floor(T / 7)) % 2 ? 'R' : 'L') : bot.fork === 'safe' ? fk.main : bot.fork === 'hard' ? (fk.main === 'L' ? 'R' : 'L') : bot.fork
+    if (bot.forkWant == null || al < -6) bot.forkWant = want
+    const side = bot.forkWant, sg = side === 'L' ? -1 : 1
+    const onPlat = b.carryId === sh.id
+    const head = { steer: Math.max(-1, Math.min(1, -((((fk.yaw - b.psi) + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * 2.5)) } // 向きを道の向きに保つ（横には切らない）
+    // 出口の技: 切れ目なら床の後ろから助走、段ならゆっくり
+    const exitPath = side === fk.main ? path.slice(fk.iMainExit, fk.iMainExit + 4) : (fk.branchI >= 0 ? path.slice(fk.branchI, fk.branchI + 8) : [])
+    const exitJump = exitPath.find(q => q.kind === 'jump' || q.kind === 'gap'), exitStep = exitPath.find(q => q.kind === 'stepUp')
+    const at = side === 'L' ? 'lo' : 'hi'
+    const onAl = exitJump ? 0.85 : 1.3
+    if (!bot.forkOn && !(onPlat && al > onAl) && al < onAl) {
+      // 入口で待つ: 床が真ん中を通る時に着くように
+      const dEdge = -al - 0.75 // 前輪が縁に着くまで
+      const st = shuttlePos(m, T + Math.max(0, dEdge) / 2.6 + 0.35)
+      const ok = Math.abs(st.k) < fk.pw / 2 - 1.0 && st.at !== 'lo' && st.at !== 'hi'
+      if (dEdge > 1.2 && !bot.forkGo) return { ...hold(2.2), steer: null }
+      if (ok || bot.forkGo) { bot.forkGo = true; return { thr: sp < (exitJump ? 2.0 : 2.8) ? 1 : 0, brk: 0, lean: 0, ...head } }
+      return { thr: 0, brk: 1, lean: 0, ...head }
+    }
+    if ((onPlat && al > onAl) || (bot.forkOn && al < fk.gap - 0.2)) {
+      bot.forkOn = true; bot.forkGo = false
+      const st = shuttlePos(m, T), there = st.at === at && Math.abs(lat - sg * fk.amp) < 1.6
+      const stopAl = exitJump ? 0.95 : fk.gap / 2 // 切れ目の時は床の後ろで待つ（助走を取る）
+      if (there && st.left > (exitJump ? 0.6 : 1.4)) {
+        // 降りる（ここから先はふつうの道として。枝道の側なら道の線を枝道へ）
+        if (side !== fk.main && fk.branchI >= 0 && bot.i < fk.branchI) { bot.i = fk.branchI; if (bot.st) bot.st.i = fk.branchI }
+        bot.forkExit = true
+        if (exitStep) return null // 段は、ふつうの段の技（ゆっくりウィリー）
+        return { thr: 1, brk: 0, lean: exitJump && sp > 4 ? -0.3 : 0, ...head }
+      }
+      if (bot.forkExit && there) return null
+      // 床の上で止まって運ばれる（向きは保つ）。位置: 待つ所まで前後に動く
+      const e = stopAl - al
+      if (Math.abs(sp) < 0.4 && Math.abs(e) > 0.5 && st.at !== 'up' && st.at !== 'down') return { thr: e > 0 ? 0.5 : 0, brk: e < 0 ? 1 : 0, lean: 0, ...head }
+      return { thr: 0, brk: 1, lean: 0, ...head }
+    }
+    if (al > fk.gap - 0.2) { bot.forkOn = false; bot.forkExit = false; if (al > fk.gap + 4 && bot.forkWant) { bot.forkN++; bot.forkWant = null } }
+  }
+  // ウィリーの溝: 溝の 2.6m 手前から、前輪を 25〜35 度に上げたまま 3.6m/s で
+  const gv = ahead(10, (q, dd) => q.groove && dd < 2.6 ? q : undefined) || (cur.grooveRun && cur.kind === 'groove' ? cur : null)
+  if (gv && !c.air && !b.hang) {
+    const vg = ((gv.groove || gv.grooveRun) || {}).vg || 3.7
+    const th = b.th - (cur.slope || 0) * 0.6, k = 0 // 坂では坂に対する角度で。反応の遅い人は早めに戻す
+    if (bot.react && ((gv.groove || gv.grooveRun) || {}).slope > 0.05) { const H = globalThis.__hw || [0.5, 2, 0.3], ln = Math.max(-1, Math.min(1, (th - H[0]) * H[1] + b.w * H[2])); return { thr: th < 0.3 ? 1 : th < 0.5 ? (sp < vg ? 0.8 : 0.4) : 0.15, brk: sp > vg + 0.8 ? 0.3 : 0, lean: ln } } // 人の速さ: なめらかに体重で保つ
+    if (sp < vg - 0.3 && th > 0.25) return { thr: 1, brk: 0, lean: th > 0.55 - k ? 1 : 0 }
+    return { thr: th < 0.35 - k ? 1 : th < 0.55 - k ? 0.45 : 0, brk: sp > vg + 0.6 ? 0.3 : 0, lean: th > 0.65 - k ? 1 : th > 0.45 - k ? 0 : -1 }
+  }
+  // 歯車: 跳ぶ所の速さの帯の真ん中。逆らう歯車の上では全開
+  if (cur.kind === 'gear' && cur.gear.u < 0 && !c.air) return { thr: 1, brk: 0, lean: c.lean } // 逆らう歯車の上は全開
+  const g0 = cur.kind === 'gear' ? cur : ahead(24, (q, dd) => q.kind === 'gear' && dd < 18 ? q : (q.kind === 'jump' && !q.gearJump ? null : undefined))
+  if (g0 && !c.air) return hold(g0.gear.vIn || 10)
+  // 跳ね板: 決まった速さで入る
+  const kj = ahead(24, (q, dd) => q.kickJump ? q : undefined)
+  if (kj && !c.air && (cur.kind === 'kick' || ahead(24, (q, dd) => q.kind === 'kick' && dd < 16 ? true : undefined))) {
+    const near = cur.kind === 'kick' || ahead(8, (q, dd) => q.kind === 'kick' && dd < 4 ? true : undefined)
+    if (near) return { thr: sp < kj.vJump - 1.0 ? 0.6 : 0, brk: 0, lean: 0 } // 板の上ではアクセルを開けない（跳ね上がる瞬間に前が上がる）
+    return hold(kj.vJump)
+  }
+  // 揺れる吊り橋: ちょうどの速さ
+  const sw = cur.swing || ahead(30, (q, dd) => q.swing && dd < 20 ? q.swing : undefined)
+  if (sw && !c.air) { const o = hold((sw.vMin + sw.vMax) / 2); if (sp < sw.vMin + 0.3) { o.thr = 1; o.brk = 0 } return o }
+  return null
 }

@@ -7,6 +7,9 @@ import { spawnAtCp, judge, doRespawn } from '../js/run.js'
 const GAP = +(process.env.GAP || 4)
 const c = COURSES.stage1(), w = new World(c.shapes); w.winds = c.winds || []
 const P = c.path
+// 枝道（分かれ道の短い道）の点は、合流する本線の点の手前として数える（v16）
+const brNx = {}; P.forEach(q => { if (q.branch && q.nx != null) brNx[q.br] = q.nx })
+const prog = i => P[i].branch ? (brNx[P[i].br] ?? i) - 1 : i
 // 判断の出来事になる道の点
 const EV = new Set(['jump', 'lip', 'ramp', 'stepUp', 'stepDown', 'trap', 'crumble', 'crate', 'mud', 'water', 'steep', 'seesaw', 'lift', 'slide', 'spin', 'draw', 'narrow', 'bump', 'uturn', 'pad', 'landing', 'hang', 'nitro', 'can', 'room', 'whoop', 'pinch'])
 const evAt = new Array(P.length).fill(null)
@@ -27,7 +30,7 @@ for (const r of c.risers || []) evAt[r.i0] = evAt[r.i0] || 'riser'
 for (let i = 6; i < P.length; i++) if (P[i].kind === 'hang' && !evAt[i - 6]) evAt[i - 6] = '縁の手前で減速'
 for (const cn of c.cans || []) { const i = nearI(cn.p); evAt[i] = evAt[i] || 'can' }
 // 上手い bot で走って、道の点に初めて着いた時刻
-const bot = createBot(c, { skill: 'good' }); bot.world = w
+const bot = createBot(c, { skill: 'good', fork: process.env.FORK || 'safe' }); bot.world = w // 分かれ道は本線（長い道）を通る（枝道の出来事はこの表に入らないので）
 const R = { cp: 0, rest: 0 }
 let b = spawnAtCp(w, c, 0); resetBot(bot, b)
 const tAt = new Array(P.length).fill(null)
@@ -39,11 +42,12 @@ const resp = [] // 失敗して出し直した時刻（その間の空きは数�
 while (steps < 60 * 60 * 30) {
   const prev = b.p.slice(), inp = botInput(bot, b); w.tick(); stepBike(w, b, inp, []); steps++
   if (b.hang || bot.waiting) busy.push(steps * DT)
-  if (tAt[bot.i] == null) for (let k = bot.i; k >= 0 && tAt[k] == null; k--) tAt[k] = steps * DT
+  const pi = prog(bot.i)
+  if (tAt[pi] == null) for (let k = pi; k >= 0 && tAt[k] == null; k--) tAt[k] = steps * DT
   const j = judge(w, c, R, b, prev)
   if (j.finish) break
-  if (bot.i > (R._bi || 0)) { R._bi = bot.i; R._bs = steps }
-  if (!j.respawn && steps - (R._bs || 0) > 25 * 60) { j.respawn = { cp: R.rest || 0 }; R._bs = steps; R._bi = 0; stuck.push(bot.i) } // 人なら 25 秒進めなければ休憩所から
+  if (pi > (R._bi || 0)) { R._bi = pi; R._bs = steps }
+  if (!j.respawn && steps - (R._bs || 0) > 40 * 60) { j.respawn = { cp: R.rest || 0 }; R._bs = steps; R._bi = 0; stuck.push(bot.i) } // 人なら 25 秒進めなければ休憩所から
   if (j.respawn) { resp.push(steps * DT); b = doRespawn(w, c, R, j.respawn); resetBot(bot, b); faults++; bot.vMul = 0.75 + ((faults * 0.37) % 0.6) }
 }
 const evs = []; for (let i = 0; i < P.length; i++) if (evAt[i] && tAt[i] != null) evs.push({ i, t: tAt[i], k: evAt[i], zone: P[i].zone })

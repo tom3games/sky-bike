@@ -8,14 +8,14 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=15'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=15'
-import { COURSES } from './course.js?v=15'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, PAL } from './view.js?v=15'
-import { BikeView, snap } from './bikeview.js?v=15'
-import { createBot, botInput, resetBot } from './bot.js?v=15'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=15'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=15'
+import { buildGimmicks } from './gimmicks.js?v=16'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=16'
+import { COURSES } from './course.js?v=16'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=16'
+import { BikeView, snap } from './bikeview.js?v=16'
+import { createBot, botInput, resetBot } from './bot.js?v=16'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=16'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=16'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -24,7 +24,8 @@ if (isTouch) document.documentElement.classList.add('touchui')
 const Q = new URLSearchParams(location.search)
 
 // ------------------------------------------------------------ 高さで変わる霧（three の霧の部品を差し替える）
-// THREE.Fog の near を「濃さ」、far を「霧が薄くなり始める高さ」として使う。低い所ほど濃い（下の周が霧に沈む）
+// THREE.Fog の near を「濃さ」、far を「霧が薄くなり始める高さ」として使う。低い所ほど濃い（下の道が霧に沈む）。
+// v16 広い世界: 遠くまで指数で効き、最大 0.93 で止める（次の塔・来た道の影が霧の中に残る）
 THREE.ShaderChunk.fog_pars_vertex = '#ifdef USE_FOG\n varying float vFogDepth; varying vec3 vFogW;\n#endif'
 THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n vFogDepth = - mvPosition.z; vFogW = (inverse(viewMatrix) * mvPosition).xyz;\n#endif'
 THREE.ShaderChunk.fog_pars_fragment = '#ifdef USE_FOG\n uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogW;\n #ifdef FOG_EXP2\n uniform float fogDensity;\n #else\n uniform float fogNear; uniform float fogFar;\n #endif\n#endif'
@@ -32,8 +33,7 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
  #ifdef FOG_EXP2
   float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
  #else
-  float hk = exp( - max( 0.0, vFogW.y - fogFar ) * 0.05 );
-  float fogFactor = 1.0 - exp( - fogNear * fogNear * vFogDepth * vFogDepth * ( 0.4 + 1.6 * hk ) );
+  ${FOG_FACTOR}
  #endif
  gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, clamp( fogFactor, 0.0, 1.0 ) );
 #endif`
@@ -68,7 +68,8 @@ renderer.outputColorSpace = THREE.SRGBColorSpace
 renderer.toneMapping = THREE.ACESFilmicToneMapping
 renderer.toneMappingExposure = 1.0
 renderer.shadowMap.enabled = true
-renderer.shadowMap.type = THREE.PCFSoftShadowMap
+renderer.info.autoReset = false // 1 コマの合計（後処理を含む）を数える
+renderer.shadowMap.type = THREE.PCFShadowMap // PCFSoft は今の three では PCF に置き換わる（警告を出さない）
 setAniso(Math.min(8, renderer.capabilities.getMaxAnisotropy()))
 $('view').appendChild(renderer.domElement)
 const scene = new THREE.Scene()
@@ -76,7 +77,9 @@ const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 30
 const sky = buildSky(scene)
 const hemi = new THREE.HemisphereLight(0x7aa6ae, 0x2e2a24, 1.35); scene.add(hemi)
 // 区間ごとの明るさ: col 霧に混ぜる色・tint 混ぜる量・hemi 空の明るさ・dens 霧の濃さの足し
-const ZONEP = { ground: { col: 0x5a3b2c, tint: 0.2, hemi: 1.45, dens: -0.0065 }, crypt: { col: 0x141c1b, tint: 0.75, hemi: 0.32, dens: 0.007 }, ruin: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 0 }, factory: { col: 0x4a3c30, tint: 0.35, hemi: 1.15, dens: 0.002 }, bell: { col: 0x5a5040, tint: 0.3, hemi: 1.25, dens: 0.001 }, ice: { col: 0x5f7f86, tint: 0.5, hemi: 1.4, dens: 0.003 }, storm: { col: 0x34424a, tint: 0.55, hemi: 0.95, dens: 0.005 }, roof: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: -0.002 }, sky: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: -0.004 }, castle: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: -0.004 } }
+// dens は霧の濃さの倍率（1 = ふつう）
+const ZONEP = { ground: { col: 0x5a3b2c, tint: 0.2, hemi: 1.45, dens: 0.8 }, crypt: { col: 0x141c1b, tint: 0.6, hemi: 0.5, dens: 1.35 }, ruin: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 1 }, factory: { col: 0x4a3c30, tint: 0.35, hemi: 1.15, dens: 1.15 }, bell: { col: 0x5a5040, tint: 0.3, hemi: 1.25, dens: 1.05 }, ice: { col: 0x5f7f86, tint: 0.45, hemi: 1.4, dens: 1.1 }, storm: { col: 0x34424a, tint: 0.5, hemi: 0.95, dens: 1.3 }, roof: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 0.85 }, sky: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 }, castle: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 } }
+const FOG_BASE = 0.0062
 // 月の反対側から弱い青緑の補助光（影は付けない。影の側が真っ黒にならないように）
 const fill = new THREE.DirectionalLight(0x5f8f98, 0.55); fill.position.set(60, 40, 50); scene.add(fill)
 const MOON = new THREE.Vector3(-0.5, 0.55, -0.4).normalize()
@@ -85,7 +88,7 @@ moon.castShadow = true
 moon.shadow.mapSize.set(lowEnd ? 1024 : 2048, lowEnd ? 1024 : 2048)
 Object.assign(moon.shadow.camera, { left: -24, right: 24, top: 24, bottom: -24, near: 1, far: 180 })
 moon.shadow.bias = -0.0004; moon.shadow.normalBias = 0.04
-scene.fog = new THREE.Fog(0x2d474e, 0.012, 0)
+scene.fog = new THREE.Fog(0x2d474e, FOG_BASE, 0)
 // 松明の実際の光（近くの数個だけ。ほかは光る板だけ）
 const torchLights = Array.from({ length: lowEnd ? 3 : 5 }, () => { const l = new THREE.PointLight(0xff9248, 0, 11, 2); scene.add(l); return l })
 // 後処理: 描く → 物の陰（GTAO）→ にじむ光 → ACES トーンマップ → 色の調子・周辺減光・粒
@@ -154,7 +157,7 @@ function soundUpdate(dt) {
     L.engine.node.playbackRate.setTargetAtTime(0.6 + r * 0.75 + wob, c, 0.025)
     L.engine.g.gain.setTargetAtTime(on ? (0.1 + (1 - Math.min(1, r)) * 0.12) * cut : 0.0001, c, 0.04)
     if (L.engineHi && L.engineHi.node) { L.engineHi.node.playbackRate.setTargetAtTime(0.62 + r * 0.55 + wob, c, 0.025); L.engineHi.g.gain.setTargetAtTime(on ? Math.max(0.0001, (r - 0.25) * 0.24 * (0.5 + thr * 0.5)) * cut : 0.0001, c, 0.04) }
-    if (L.nitro && L.nitro.node) L.nitro.g.gain.setTargetAtTime(on && b.nitroOn ? 0.5 : 0.0001, c, b.nitroOn ? 0.03 : 0.15)
+    if (L.nitro && L.nitro.node) L.nitro.g.gain.setTargetAtTime(on && b.nitroOn ? 0.5 : 0.0001, c, b && b.nitroOn ? 0.03 : 0.15)
   }
   const y = camera.position.y
   if (L.wind && L.wind.node) L.wind.g.gain.setTargetAtTime(Math.min(0.55, 0.16 + sp / 70 + Math.max(0, y) / 160 + (b && b.airT > 0.3 ? 0.1 : 0) + (G.gim ? G.gim.gust * 0.35 : 0)), c, 0.3)
@@ -174,7 +177,7 @@ const G = {
   keys: new Set(), touch: { thr: false, brk: false, back: false, fwd: false, nit: false }, nearFire: 99, nearChain: 99, tut: null,
 }
 window.sky = G
-try { G.best = JSON.parse(localStorage.getItem('sky-best7') || '{}') } catch (e) { G.best = {} }
+try { G.best = JSON.parse(localStorage.getItem('sky-best16') || '{}') } catch (e) { G.best = {} }
 try { G.hard = localStorage.getItem('sky-hard') === '1' } catch (e) {}
 let built = null, bikeView = null
 const courseCache = {}
@@ -193,33 +196,60 @@ function loadCourse(id) {
   LM.course = Math.round(lt() - l0); l0 = lt()
   G.course = c
   G.world = new World(c.shapes); G.world.winds = c.winds || []
-  const { group, movers, M, more } = buildCourse(c, scene, c.tower ? new Set(['ground', 'ruin']) : null) // 上の区間は、準備完了の後に 1 コマに 1 区間ずつ作る
+  const wide = !!(c.towers && c.towers.length) // v16 広い世界（塔がいくつもある）
+  const spotI = wide ? titleIndex(c) : 0
+  // 最初に細かく作るのは、出発点とタイトルの場面から 110m 以内の升目だけ。残りは準備完了の後に、カメラに近い升目から 1 コマに 1 つ
+  const nowZ = wide ? (() => { const ref = [c.cps[0].p, c.path[spotI].p]; return s => ref.some(r => Math.hypot((s.min[0] + s.max[0]) / 2 - r[0], (s.min[2] + s.max[2]) / 2 - r[2]) < 110) })() : null
+  const { group, movers, M, more, laterZones, chunkMap } = buildCourse(c, scene, nowZ)
   LM.mesh = Math.round(lt() - l0); l0 = lt()
   G.gim = buildGimmicks(c, scene, M)
   LM.gim = Math.round(lt() - l0); l0 = lt()
-  const spot = c.tower ? (() => { const i = titleIndex(c); return { q: c.path[i], side: -1 } })() : null
-  // 塔の飾り（窓・ツタ・鎖・張り出しの下の岩）は、第1面では準備完了の後に作る（読み込みを速く）
-  const lateDeco = !!c.tower
-  const decor = lateDeco ? { group: null, wallFlames: [] } : buildDecor(c, scene, M); LM.decor = Math.round(lt() - l0); l0 = lt()
-  const signs = buildSigns(c, scene), chains = lateDeco ? null : buildChains(c, scene, M); LM.chains = Math.round(lt() - l0); l0 = lt()
-  const under = lateDeco ? null : buildUnderRocks(c, scene, M); LM.under = Math.round(lt() - l0); l0 = lt()
-  const floaters = buildFloaters(c, scene, M), grass = buildGrass(c, scene); LM.float = Math.round(lt() - l0); l0 = lt()
+  const spot = wide ? { q: c.path[spotI], side: -1 } : null
+  const signs = buildSigns(c, scene)
+  // 練習場（塔なし）は飾りを今まとめて作る。広い世界は準備完了の後に近い順に
+  const decor = wide ? { group: null, wallFlames: [] } : buildDecor(c, scene, M)
+  const chains = wide ? null : buildChains(c, scene, M), under = wide ? null : buildUnderRocks(c, scene, M)
+  LM.decor = Math.round(lt() - l0); l0 = lt()
+  // 塔の頭（遠くからの目印）は最初から
+  const crowns = wide ? c.towers.map(T => buildCrown(c, T, M)) : []
+  const crownG = new THREE.Group(); crownG.name = 'crowns'; for (const cr of crowns) crownG.add(cr.group); if (wide) crownG.add(buildSupportDecor(c, M)); scene.add(crownG)
+  LM.crown = Math.round(lt() - l0); l0 = lt()
   const mn = [1e9, 1e9], mx = [-1e9, -1e9]; for (const s of c.shapes) if (s.tag !== 'ground') { mn[0] = Math.min(mn[0], s.min[0]); mn[1] = Math.min(mn[1], s.min[2]); mx[0] = Math.max(mx[0], s.max[0]); mx[1] = Math.max(mx[1], s.max[2]) }
-  const ctr = c.tower ? [c.tower.cx, 0, c.tower.cz] : [(mn[0] + mx[0]) / 2, 0, (mn[1] + mx[1]) / 2], rad = Math.max(mx[0] - mn[0], mx[1] - mn[1]) / 2 + 40
-  const far = c.tower ? null : buildMountains(scene, ctr, rad, M), farLights = far ? far.userData.lights || [] : [] // 第1面の遠景は描いた背景（後から読む）
-  const lava = buildLava(scene, ctr, c.lavaY ?? -8)
-  // 上がってくる溶岩（追われて登る区間）の面。始まった時だけ見せる
-  const riser = new THREE.Mesh(new THREE.CircleGeometry(60, 40), lava.material); riser.rotation.x = -Math.PI / 2; riser.visible = false; riser.name = 'riser'; if (c.tower) riser.position.set(c.tower.cx, 0, c.tower.cz); scene.add(riser)
-  const fogL = buildFogLayers(scene, ctr, c.tower ? [[(c.lavaY ?? -8) + 6, 0.9], [-10, 0.6], [8, 0.4], [28, 0.4], [44, 0.5]] : [[-2, 0.6]])
-  const flamePts = (c.torches || []).concat(decor.wallFlames, floaters.flames)
-  const farGlow = buildFlames(scene, farLights, M)
+  const ctr = [(mn[0] + mx[0]) / 2, 0, (mn[1] + mx[1]) / 2], rad = Math.max(mx[0] - mn[0], mx[1] - mn[1]) / 2 + 40
+  const far = wide ? null : buildMountains(scene, ctr, rad, M), farLights = far ? far.userData.lights || [] : [] // 広い世界の谷の廃墟は準備完了の後に
+  const lava = buildLava(scene, ctr, c.lavaY ?? -8, wide ? rad + 700 : 115)
+  // 上がってくる溶岩（追われて登る区間）の面。追われる塔（道の点 i0 に一番近い塔）に置く。始まった時だけ見せる
+  const rT = wide && c.risers && c.risers[0] ? (() => { const q = c.path[c.risers[0].i0] || c.path[0]; return c.towers.reduce((a, T) => Math.hypot(T.cx - q.p[0], T.cz - q.p[2]) < Math.hypot(a.cx - q.p[0], a.cz - q.p[2]) ? T : a) })() : c.tower
+  const riser = new THREE.Mesh(new THREE.CircleGeometry(rT ? rT.r + 14 : 60, 48), lava.material); riser.rotation.x = -Math.PI / 2; riser.visible = false; riser.name = 'riser'; if (rT) riser.position.set(rT.cx, 0, rT.cz); scene.add(riser)
+  // 雲海の層: 溶岩の上から一番高い道まで 45m ごと
+  const topY = Math.max(...c.path.filter(q => q.p).map(q => q.p[1]))
+  const fogLayers = wide ? (() => { const L = [[(c.lavaY ?? -8) + 6, 0.9]]; for (let y = (c.lavaY ?? -8) + 40; y < topY - 10; y += 45) L.push([y, 0.55]); return L })() : [[-2, 0.6]]
+  const fogL = buildFogLayers(scene, ctr, fogLayers)
+  const flamePts = (c.torches || []).concat(decor.wallFlames)
+  const farGlow = buildFlames(scene, farLights.concat(...crowns.map(cr => cr.flames)), M)
   const flames = buildFlames(scene, flamePts, M)
-  built = { more, riser, group, signs, M, objs: [...G.gim.objs, riser, group, grass, farGlow.group, decor.group, signs, chains, under, floaters.group, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, flamePts, ctr, props: null }
+  LM.rest = Math.round(lt() - l0); l0 = lt()
+  built = { more, riser, group, signs, M, objs: [...G.gim.objs, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
   G.castleAt = c.castleAt
-  if (lateDeco) built.late = () => {
-    const d = buildDecor(c, scene, M), ch = buildChains(c, scene, M), un = buildUnderRocks(c, scene, M)
-    built.objs.push(d.group, ch, un)
-    if (d.wallFlames.length) { const fl = buildFlames(scene, d.wallFlames, M); built.objs.push(fl.group); built.flames.list.push(...fl.list); built.flamePts.push(...d.wallFlames); G._lt = 0 }
+  if (wide) {
+    // 準備完了の後の仕事（1 コマに 1 つ、今のカメラに近い物から）
+    const T_ = built.tasks
+    for (const lz of laterZones()) T_.push({ at: lz.at, run: () => more(lz.zone) })
+    for (const T of c.towers) T_.push({ at: [T.cx, (T.y0 + T.top) / 2, T.cz], run: () => {
+      const d = buildDecor(c, scene, M, T), ch = buildChains(c, null, M, T)
+      if (ch) d.group.add(ch)
+      built.decos.push(d.group); built.objs.push(d.group); if (d.grass) { built.decos.push(d.grass); built.objs.push(d.grass) }
+      if (d.wallFlames.length) { built.flames.add(d.wallFlames); built.flamePts.push(...d.wallFlames); G._lt = 0 }
+    } })
+    T_.push({ at: c.cps[0].p, run: () => {
+      const d = buildDecor(c, scene, M, null), ch = buildChains(c, scene, M), un = buildUnderRocks(c, scene, M); built.objs.push(d.group, ch, un)
+      if (ch) built.decos.push(...ch.children) // 鎖は升目ごとに、遠い所は描かない
+      // 塔と塔の間の道の縁にも、ところどころ小さな灯り（遠くから来た道・次の道が灯りの点々で読める）
+      let sd = 97; const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647), pts = []
+      for (const sh of c.shapes) if (sh.tag === 'parapet' && rr() < 0.13 && !c.towers.some(T => Math.hypot(sh.c[0] - T.cx, sh.c[2] - T.cz) < T.r + 9)) pts.push([sh.c[0], sh.c[1] + sh.h[1] + 0.12, sh.c[2], 2])
+      if (pts.length) { built.flames.add(pts); built.flamePts.push(...pts); G._lt = 0 }
+    } })
+    T_.push({ at: ctr, run: () => { const v = buildValley(c, scene, M); built.objs.push(v); built.farGlow.add(v.userData.lights || []) } })
   }
   G._lt = 0; G._near = null // 松明の光の割り当てを作り直す（前のコースの番号を使わない）
   G.steer = createSteer(c.path)
@@ -262,9 +292,15 @@ function placeProps() {
   if (fin && propsReady.gate) { const m = propsReady.gate.clone(); m.scale.setScalar(2.05); m.position.set(fin.p[0], fin.p[1] + 3.4, fin.p[2]); m.rotation.y = fin.yaw + Math.PI / 2; g.add(m) }
   scene.add(g); built.props = g; built.objs.push(g)
 }
+// タイトルの場面: 廃墟の塔のまわりの張り出しを、塔の外側の斜め後ろ・高めから（片側に塔の壁、反対に霧の谷、奥に次の塔）
+function titleTower(c) { return (c.towers && (c.towers[1] || c.towers[0])) || c.tower } // 2 本目の塔（廃墟の塔）: 霧の谷の上の高さで、遠くに次の塔が見える
 function titleIndex(c) {
-  // 廃墟の右回りの張り出し（最初の U ターンの後）。外側の斜め後ろ・高めから、右に塔・左に霧の谷・下に登ってきた周
-  const p = c.path
+  const p = c.path, T = titleTower(c)
+  if (T && c.towers && c.towers.length) {
+    const ids = []
+    p.forEach((q, i) => { if (q.p && !q.branch && q.kind === 'orbit' && Math.abs(Math.hypot(q.p[0] - T.cx, q.p[2] - T.cz) - T.rm) < 1.5 && q.p[1] > T.y0 - 1) ids.push(i) })
+    if (ids.length) return ids[Math.floor(ids.length * 0.45)]
+  }
   const m0 = (c.marks || []).find(m => m.name.includes('木の橋')), from = m0 ? m0.i0 : 0
   let i = p.findIndex((q, k) => k >= from && q.kind === 'uturn'); if (i < 0) return 40
   while (i < p.length && p[i].kind !== 'orbit') i++
@@ -484,7 +520,7 @@ function finish() {
   Snd.play('finish', { vol: 0.7 })
   const id = G.course.id, prev = G.best[id]
   const nb = !prev || G.time < prev.time
-  if (nb) { G.best[id] = { time: G.time, faults: G.faults, hard: !!G.R.hard, rec: pack(G.rec.inp), ev: G.rec.ev }; try { localStorage.setItem('sky-best7', JSON.stringify(G.best)) } catch (e) {} }
+  if (nb) { G.best[id] = { time: G.time, faults: G.faults, hard: !!G.R.hard, rec: pack(G.rec.inp), ev: G.rec.ev }; try { localStorage.setItem('sky-best16', JSON.stringify(G.best)) } catch (e) {} }
   const m = MEDAL[id], mi = G.time <= m[0] && G.faults === 0 ? 0 : G.time <= m[1] ? 1 : G.time <= m[2] ? 2 : 3
   $('rCourse').textContent = t(CNAME[id])
   $('rTime').textContent = fmt(G.time); $('rFaults').textContent = G.faults; $('rBest').textContent = fmt(G.best[id].time) + (nb && prev ? '  ' + t('newBest') : '')
@@ -538,6 +574,12 @@ function updateCamera(dt, alpha) {
   // 曲がる外側にカメラを置く（左へ曲がる道なら右）。まっすぐな所では前の側を保つ
   const cv = pathAhead(si, 18)
   if (Math.abs(cv) > 0.012) G.camSideT = cv > 0 ? 1 : -1
+  // v16: 塔のそばでは、カメラを塔と反対の側に置く（塔の壁に寄って画面の半分が壁になるのを防ぐ）
+  for (const T of G.course.towers || []) {
+    if (Math.hypot(bp.x - T.cx, bp.z - T.cz) > T.r + 9 || bp.y < T.y0 - 6 || bp.y > (T.top2 ?? T.top) + 4) continue
+    const side = s => { const a2 = G.camYaw + Math.PI + s * 0.62; return Math.hypot(bp.x + Math.cos(a2) * 6.4 - T.cx, bp.z - Math.sin(a2) * 6.4 - T.cz) }
+    G.camSideT = side(1) >= side(-1) ? 1 : -1
+  }
   G.camSide += ((G.camSideT ?? 1) - G.camSide) * Math.min(1, dt * 1.2)
   let ang = 0.62 + (air ? Math.min(0.3, b.airT * 0.4) : 0)
   G.camAng = G.camAng == null ? ang : G.camAng + (ang - G.camAng) * Math.min(1, dt * 1.8)
@@ -566,10 +608,9 @@ function updateCamera(dt, alpha) {
   if (isNaN(G.camPos.x)) { G.camPos.copy(_v); G.camTgt.copy(_t) }
   G.camPos.lerp(_v, Math.min(1, dt * 6)); G.camTgt.lerp(_t, Math.min(1, dt * 9))
   camera.position.copy(G.camPos)
-  if (G.shake > 0) { camera.position.x += (Math.random() - 0.5) * G.shake * 0.3; camera.position.y += (Math.random() - 0.5) * G.shake * 0.3; G.shake = Math.max(0, G.shake - dt * 2.2) }
+  G.shake = 0 // 画面の揺れは入れない（本人の決まり: 揺れ・視野角の変化・速さの演出なし）
   camera.lookAt(G.camTgt)
-  const sp = Math.abs(b.speed)
-  G.fov += (56 + Math.min(12, Math.max(0, sp - 8) * 0.6) - G.fov) * Math.min(1, dt * 3)
+  G.fov = 56
   camera.fov = G.fov + (innerWidth < innerHeight ? 16 : 0); camera.updateProjectionMatrix()
   aimLights(bp)
 }
@@ -582,10 +623,10 @@ function aimLights(p) {
   // 区間ごとの霧の色・濃さ・空の明るさ（墓所は暗く松明だけ、工場は錆の煙、鐘楼は暖かく、氷と嵐は青白い）。今いる道の点の区間へゆっくり寄せる
   const zq = c.path[(G.steer && G.bike ? G.steer.i : G.titleI) || 0], zp = ZONEP[(zq && zq.zone) || 'ruin'] || ZONEP.ruin
   const zk = Math.min(1, 0.03 + (G._zdt || 0) * 1.5); G._zdt = 0
-  G.zl = G.zl || { tint: 0, hemi: 1.35, dens: 0, col: new THREE.Color(fogBase) }
+  G.zl = G.zl || { tint: 0, hemi: 1.35, dens: 1, col: new THREE.Color(fogBase) }
   G.zl.col.lerp(_c1.setHex(zp.col), zk); G.zl.tint += (zp.tint - G.zl.tint) * zk; G.zl.hemi += (zp.hemi - G.zl.hemi) * zk; G.zl.dens += (zp.dens - G.zl.dens) * zk
   scene.fog.color.copy(fogBase).lerp(_c1.setHex(0x5a3b2c), lava * 0.55).lerp(G.zl.col, G.zl.tint)
-  scene.fog.near = 0.0125 + G.zl.dens - Math.max(0, y - 200) * 0.00004
+  scene.fog.near = FOG_BASE * G.zl.dens * (1 - Math.min(0.3, Math.max(0, y - 150) / 700)) // 高い所ほど澄む
   scene.fog.far = y - 9
   hemi.intensity = G.zl.hemi
   scene.environmentIntensity = 0.8 * Math.min(1, G.zl.hemi / 1.35) // 暗い区間（墓所）は空の照り返しも弱く。松明の灯りだけで道を読む
@@ -722,11 +763,11 @@ function frame(now) {
   dust.update(dt)
   const tm = now / 1000
   if (built) {
-    if (built.late && window.__skyReady) { const f = built.late; built.late = null; f() }
-    else if (built.more && window.__skyReady && !built.moreDone) { if (!built.more()) built.moreDone = true }
-    // 高さが離れた区間のメッシュは描かない（霧で見えない所）
-    { const cy = camera.position.y; for (const m of built.group.children) { const yr = m.userData.yr; if (yr) m.visible = cy > yr[0] - 90 && cy < yr[1] + 140 } }
-    if (built.movers.length) updateMovers(built.movers, G.world)
+    // 準備完了の後の仕事を 1 コマに 1 つ（今のカメラに一番近い物から）
+    if (built.tasks.length && window.__skyReady) runTask()
+    // 近い升目は細かく、遠い升目は軽い影に。塔の飾りは塔から 320m 以内だけ
+    if (!G.lodAll && (G._lodN = (G._lodN || 0) + 1) % 6 === 0) lod()
+    if (built.movers.length) updateMovers(built.movers, G.world, G.lodAll ? null : camera.position)
     { let ry = null; const R = G.R; if (R && R.rise && G.course.risers) G.course.risers.forEach((rs, k) => { const t0 = R.rise[k]; if (t0 != null && t0 >= 0) ry = riserY(rs, G.world.time - t0) }); built.riser.visible = ry != null; if (ry != null) built.riser.position.y = ry }
     if (G.gim && G.world) for (const e of G.gim.update(G.world, G.state === 'play' ? G.bike : null, Math.min(dt, 0.05), tm, G.R, camera.position)) {
       const d = Math.hypot(camera.position.x - e.p[0], camera.position.y - e.p[1], camera.position.z - e.p[2]), v = Math.max(0, 1 - d / 45)
@@ -736,9 +777,9 @@ function frame(now) {
       if (e.t === 'rockFall') Snd.play('rockfall', { vol: v * 0.9 })
       if (e.t === 'rockHit') { Snd.play('rockbreak', { vol: v }); if (d < 14) G.shake = Math.max(G.shake, 0.08 * v) }
     }
-    updateFlames(built.flames, tm)
+    updateFlames(built.flames, tm); updateFlames(built.farGlow, tm)
     built.lava.material.uniforms.time.value = tm
-    for (const m of built.fogL.mats) { m.uniforms.time.value = tm; m.uniforms.camY.value = camera.position.y }
+    built.fogL.update(camera.position, tm)
   }
   sky.material.uniforms.time.value = tm
   grade.uniforms.time.value = tm % 100
@@ -747,7 +788,22 @@ function frame(now) {
   else if (G.state !== 'debug') titleCam(tm)
   ash.update(Math.min(dt, 0.05), camera.position, tm)
   soundUpdate(dt)
+  renderer.info.reset()
   if (G.noPost) renderer.render(scene, camera); else composer.render(dt)
+}
+function runTask() {
+  const T = built.tasks, cp = camera.position
+  let bi = 0, bd = 1e18
+  T.forEach((t, i) => { const d = (t.at[0] - cp.x) ** 2 + (t.at[1] - cp.y) ** 2 + (t.at[2] - cp.z) ** 2; if (d < bd) { bd = d; bi = i } })
+  const t = T.splice(bi, 1)[0]; t.run()
+  lod()
+}
+function lod() {
+  if (!built || !built.chunkMap) return
+  const cp = camera.position
+  if (G.lodAll) { for (const ch of built.chunkMap.values()) { for (const m of ch.det) m.visible = true; if (ch.far) ch.far.visible = !ch.built } for (const d of built.decos) d.visible = true; return }
+  updateLOD(built.chunkMap.values(), cp)
+  for (const d of built.decos) { const c = d.userData.ctr; d.visible = !c || Math.hypot(c[0] - cp.x, c[1] - cp.y, c[2] - cp.z) < 320 }
 }
 function advance(dt) {
   G.acc += dt * (G.ff || 1)
@@ -760,10 +816,14 @@ function advance(dt) {
 function titleShot() { return titleIndex(G.course) }
 function titleCam(tm) {
   if (!G.course) return
-  const p = G.course.path, i = G.titleI ?? (G.titleI = titleShot()), q = p[i], a = p[Math.min(p.length - 1, i + 16)]
-  const yaw = q.yaw, hx = Math.cos(yaw), hz = -Math.sin(yaw), rx = Math.sin(yaw), rz = Math.cos(yaw)
+  const p = G.course.path, i = G.titleI ?? (G.titleI = titleShot()), q = p[i]
+  // 塔が画面の右に来る向きから見る（左はメニュー）。道の進む向きで塔が左になるなら、道を逆向きに見る
+  const TT = titleTower(G.course)
+  const back = TT && G.course.towers && G.course.towers.length ? (q.p[0] - TT.cx) * Math.sin(q.yaw) + (q.p[2] - TT.cz) * Math.cos(q.yaw) > 0 : false
+  const a = p[Math.max(0, Math.min(p.length - 1, i + (back ? -16 : 16)))]
+  const yaw = q.yaw + (back ? Math.PI : 0), hx = Math.cos(yaw), hz = -Math.sin(yaw), rx = Math.sin(yaw), rz = Math.cos(yaw)
   const sway = Math.sin(tm * 0.12) * 0.5
-  const side = -1 // 右回りの区間なので、塔は右、カメラは外側（左）
+  const side = -1 // カメラは塔の外側（左）
   camera.position.set(q.p[0] - hx * 7.5 + rx * side * (5.5 + sway), q.p[1] + 5.8, q.p[2] - hz * 7.5 + rz * side * (5.5 + sway))
   camera.lookAt(a.p[0] + rx * side * 3.5, a.p[1] - 0.9, a.p[2] + rz * side * 3.5)
   camera.fov = innerWidth < innerHeight ? 72 : 56; camera.updateProjectionMatrix()
@@ -779,7 +839,7 @@ function titleCam(tm) {
     camera.updateMatrixWorld()
     const cands = []
     for (const [sx, sy, dist] of [[-0.6, 0.05, 46], [-0.55, 0.1, 52], [-0.65, 0.0, 58], [-0.5, 0.12, 64], [-0.7, 0.05, 70], [-0.45, 0.15, 76]]) { const d = new THREE.Vector3(sx, sy, 0.5).unproject(camera).sub(camera.position).normalize(); cands.push(camera.position.clone().addScaledVector(d, dist).toArray()) }
-    const tis = buildTitleIsland(G.course, scene, built.M, cands)
+    const tis = buildTitleIsland(G.course, scene, built.M, cands, titleTower(G.course))
     built.tis = tis.group || true; if (tis.group) built.objs.push(tis.group)
     if (tis.chains.length) { const ch = buildChains({ decor: tis.chains.map(q => ({ kind: 'chain', ...q })), plats: [], shapes: [], path: [] }, scene, built.M); if (ch) built.objs.push(ch) }
     if (tis.flames.length) { const fl = buildFlames(scene, tis.flames, built.M); built.objs.push(fl.group); built.flames.list.push(...fl.list); built.flamePts.push(...tis.flames) }
@@ -823,6 +883,6 @@ async function boot() {
   loadEnv(); loadProps(); loadBackdrop()
 }
 G.startRun = startRun
-G.api = { buildAll: () => { if (built && built.late) { const f = built.late; built.late = null; f() } while (built && built.more && built.more()); if (built) built.moreDone = true }, closest: (s, x, y, z) => { const o = closest(s, x, y, z, { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); return { d: o.d } }, advance, loadCourse, DT, stepBike, hashBike, createBike, World, BIKE, basis, wheelCenter, scene, camera, renderer, three: THREE, get built() { return built }, get bikeView() { return bikeView }, fixedStep, spawnAt, retryCp, placeBike, toast, setLang: l => { lang = l; applyLang() } }
+G.api = { buildAll: () => { while (built && built.tasks && built.tasks.length) runTask() }, lodAll: on => { G.lodAll = on; lod() }, closest: (s, x, y, z) => { const o = closest(s, x, y, z, { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); return { d: o.d } }, advance, loadCourse, DT, stepBike, hashBike, createBike, World, BIKE, basis, wheelCenter, scene, camera, renderer, three: THREE, get built() { return built }, get bikeView() { return bikeView }, fixedStep, spawnAt, retryCp, placeBike, toast, setLang: l => { lang = l; applyLang() } }
 requestAnimationFrame(frame)
 boot()

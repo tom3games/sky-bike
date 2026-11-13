@@ -1,7 +1,8 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=15'
+import { createBike, stepBike, resetFallen } from './physics.js?v=16'
+import { nextI } from './steer.js?v=16'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -35,14 +36,16 @@ function nearI(course, p, from) {
   return bi
 }
 // 出し直してよい道の点か: すぐ先 16 m に跳ぶ所・抜ける床・崩れる板が無く、真下が動かない床で、急な坂でない
-const NOSPAWN = new Set(['jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'landing'])
-const NOAHEAD = new Set(['jump', 'lip', 'trap', 'crumble'])
+const NOSPAWN = new Set(['jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'landing', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove'])
+const NOAHEAD = new Set(['jump', 'lip', 'trap', 'crumble', 'kick', 'fork'])
 export function goodSpot(world, course, i) {
   const P = course.path, q = P[i]
-  if (!q || !q.p || !q.w || q.branch || NOSPAWN.has(q.kind) || Math.abs(q.slope || 0) > 0.25) return false
-  // 後ろ 3 m（後輪の下）とすぐ先 16 m に跳ぶ所・抜ける床・崩れる板が無い。シーソーは 8 m 先まで無い（傾いたままの端に当たる）
-  for (let k = Math.max(0, i - 3); k < Math.min(P.length, i + 16); k++) if (NOAHEAD.has(P[k].kind) || ((P[k].kind === 'seesaw' || P[k].kind === 'draw' || P[k].kind === 'hang') && k < i + 8)) return false
-  for (let k = Math.max(0, i - 3); k < Math.min(P.length, i + 4); k++) if (P[k].door) return false // 扉に重ねて出さない
+  if (!q || !q.p || !q.w || NOSPAWN.has(q.kind) || Math.abs(q.slope || 0) > 0.25) return false
+  // 後ろ 3 m（後輪の下）とすぐ先 16 m に跳ぶ所・抜ける床・崩れる板が無い。シーソーは 8 m 先まで無い（傾いたままの端に当たる）。枝道は合流の nx をたどる
+  const ahead = []; for (let k = i, n = 0; k >= 0 && n < 16; n++) { ahead.push(k); k = nextI(P, k) }
+  for (let k = Math.max(0, i - 3); k < i; k++) if (!P[k].branch === !q.branch && P[k].br === q.br) ahead.push(k)
+  for (const k of ahead) if (NOAHEAD.has(P[k].kind) || ((P[k].kind === 'seesaw' || P[k].kind === 'draw' || P[k].kind === 'hang') && Math.abs(ahead.indexOf(k)) < 8)) return false
+  for (const k of ahead.slice(0, 4)) if (P[k].door) return false // 扉に重ねて出さない
   // 前輪・真ん中・後輪の 3 か所の真下が、道の高さの動かない床
   const a = P[Math.max(0, i - 1)].p || q.p, z = P[Math.min(P.length - 1, i + 1)].p || q.p
   let dx = z[0] - a[0], dz = z[2] - a[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L
@@ -109,7 +112,7 @@ export function judge(world, course, R, b, prevP) {
   R.safeT = (R.safeT || 0) + 1
   if (!b.crashed && b.g[0] && b.g[1] && R.safeT >= 15 && R.onI != null) {
     const q = course.path[R.onI]
-    if (q && q.p && q.w && !['jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap'].includes(q.kind) && Math.abs(b.th - (q.slope || 0)) < 0.35 && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.2) {
+    if (q && q.p && q.w && !['jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove'].includes(q.kind) && Math.abs(b.th - (q.slope || 0)) < 0.35 && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.2) {
       R.safe = R.safe || []; R.safe.push({ p: q.p.slice(), yaw: q.yaw, t: world.time, i: R.onI, nitro: b.nitro }); if (R.safe.length > 24) R.safe.shift(); R.safeT = 0
     }
   }

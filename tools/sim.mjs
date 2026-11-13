@@ -11,6 +11,7 @@ export function runSim(cid, skill, o = {}) {
   let b = spawnAtCp(w, c, 0); resetBot(bot, b)
   const maxSteps = (o.maxSec || 400) * 60
   const perCp = {}
+  const brNx = {}; c.path.forEach(q => { if (q.branch && q.nx != null) brNx[q.br] = q.nx })
   while (steps < maxSteps) {
     const prev = b.p.slice()
     const inp = o.inputs ? o.inputs[steps] || { thr: 0, brk: 0, lean: 0, steer: 0 } : botInput(bot, b)
@@ -25,9 +26,10 @@ export function runSim(cid, skill, o = {}) {
     const j = judge(w, c, R, b, prev)
     if (j.gate != null && perCp[j.gate] == null) perCp[j.gate] = +(steps * DT).toFixed(1)
     if (j.finish) return { cid, skill, time: steps * DT, faults, finished: true, log, perCp, hash: hashBike(b), inputs, maxY, nets }
-    // 人なら 25 秒進めなければ R で休憩所からやり直す
-    if (bot.i > (o._bi || 0)) { o._bi = bot.i; o._bs = steps }
-    if (!j.respawn && !j.finish && steps - (o._bs || 0) > 25 * 60) { j.respawn = { cp: R.rest || 0 }; log.push({ s: steps, cp: R.cp, why: 'retry', at: b.p.map(v => +v.toFixed(1)), from: lastGround }); o._bs = steps; o._bi = 0 }
+    // 人なら 40 秒（分かれ道の床を待つ分）進めなければ R で休憩所からやり直す
+    const pi = c.path[bot.i].branch ? (brNx[c.path[bot.i].br] ?? bot.i) - 1 : bot.i // 枝道の点は合流する本線の点の手前として数える
+    if (pi > (o._bi || 0)) { o._bi = pi; o._bs = steps }
+    if (!j.respawn && !j.finish && steps - (o._bs || 0) > 40 * 60) { j.respawn = { cp: R.rest || 0 }; log.push({ s: steps, cp: R.cp, why: 'retry', at: b.p.map(v => +v.toFixed(1)), from: lastGround }); o._bs = steps; o._bi = 0 }
     if (j.respawn) {
       if (j.respawn.fell) log.push({ s: steps, cp: R.cp, why: j.net ? 'net' : 'fall', at: b.p.map(v => +v.toFixed(1)), from: lastGround })
       else if (j.respawn.safe) log.push({ s: steps, cp: R.cp, why: 'back', at: b.p.map(v => +v.toFixed(1)), from: lastGround, crashed: b.crashed && b.crashed.why })

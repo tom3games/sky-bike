@@ -4,3 +4,4 @@ node_modules
 art/prompts/
 snd/machine.wav
 assets/cards/
+tools/_*.mjs

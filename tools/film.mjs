@@ -5,7 +5,7 @@ import { chromium } from 'playwright'
 import { MUTE_LAUNCH, muteContext } from '../mute.mjs'
 import { execSync } from 'node:child_process'
 import { mkdirSync } from 'node:fs'
-process.chdir('/Users/tomoki/Desktop/claudecode/sky-bike')
+process.chdir(new URL('..', import.meta.url).pathname)
 const TAG = process.argv[2] || 'now', ONLY = process.argv[3] ? process.argv[3].split(',') : null
 const PORT = process.env.PORT = process.env.PORT || '6211'
 await import('../server.mjs')
@@ -24,7 +24,7 @@ const zones = await page.evaluate(corr => {
   }
   c.cps.forEach((q, i) => { if (q.rest && !seen[q.zone]) { seen[q.zone] = 1; out.push([q.zone, i]) } }); return out
 }, !!process.env.CORR)
-const dir = '/private/tmp/claude-501/-Users-tomoki-Desktop-tmk-hub/869cecbe-b380-424b-abbe-4c03ee5b4373/scratchpad/film/' + TAG; mkdirSync(dir, { recursive: true })
+const dir = (process.env.OUTDIR || 'shots/film') + '/' + TAG; mkdirSync(dir, { recursive: true })
 for (const [zone, cpi] of zones) {
   if (ONLY && !ONLY.includes(zone)) continue
   await page.evaluate(cpi => { const G = window.sky; G.R.cp = cpi; G.R.rest = cpi; G.api.spawnAt(cpi); G.running = true }, cpi)

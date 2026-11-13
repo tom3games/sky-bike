@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK } from './physics.js?v=15'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=16'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -150,7 +150,7 @@ export function buildGimmicks(course, scene, M) {
   const canGeo = new THREE.BoxGeometry(0.26, 0.36, 0.14), capGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10)
   const canMat = new THREE.MeshStandardMaterial({ color: 0x9a2a1e, roughness: 0.45, metalness: 0.6 }), ringMat = new THREE.MeshBasicMaterial({ color: 0x5fb8ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
   const cans = (course.cans || []).map(cn => {
-    const g = new THREE.Group(); g.position.set(cn.p[0], cn.p[1] + 0.45, cn.p[2])
+    const g = new THREE.Group(); g.name = 'pickup'; g.position.set(cn.p[0], cn.p[1] + 0.45, cn.p[2]) // 拾う物（当たりなし。ghostwall は数えない）
     const body = new THREE.Mesh(canGeo, canMat); body.castShadow = true; g.add(body)
     const cap = new THREE.Mesh(capGeo, M.gold || canMat); cap.position.set(0.07, 0.21, 0); g.add(cap)
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 6, 32), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.4; g.add(ring)
@@ -162,6 +162,7 @@ export function buildGimmicks(course, scene, M) {
     const ax = [d.b[0] - d.a[0], d.b[1] - d.a[1], d.b[2] - d.a[2]], L = Math.hypot(...ax), n = Math.max(2, Math.round(L / 0.45))
     for (let k = 0; k < n; k++) { const u = (k + 0.5) / n, st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11 + rnd() * 0.06, 0), M.rock || canMat); st.position.set(d.a[0] + ax[0] * u + d.n[0] * 0.05, d.a[1] + ax[1] * u - 0.05, d.a[2] + ax[2] * u + d.n[2] * 0.05); st.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); st.castShadow = true; group.add(st) }
   }
+  const v16 = buildV16(course, group, M, chainMat, unitCyl)
   const tmpC = new THREE.Color(), dim = new THREE.Color(0xd8c896), bright = new THREE.Color(0xfff0b4)
   return {
     group, objs: [group, spray.obj, pebbles.obj, dustP.obj, streak.obj],
@@ -239,7 +240,107 @@ export function buildGimmicks(course, scene, M) {
         for (let i = 0; i < P.count; i++) { const x = b[i * 3], y = b[i * 3 + 1], k = x / 1.25; P.setZ(i, Math.sin(tm * 4.2 + x * 3.1 + fl.phase) * 0.12 * k + Math.sin(tm * 2.3 + y * 4 + fl.phase) * 0.05 * k); P.setY(i, y - k * k * 0.12) }
         P.needsUpdate = true; fl.geo.computeVertexNormals()
       }
+      v16.update(world, bike, dt, tm, camPos, out)
       return out
+    },
+  }
+}
+
+// ============================================================ v16 の仕掛けの見た目（当たりは physics.js。歯は歯車の円の外の側面だけで、上の面より下）
+function buildV16(course, group, M, chainMat, unitCyl) {
+  const d16 = (course.decor || [])
+  const iron = M.iron || chainMat, rust = M.rust || chainMat, girder = M.girder || chainMat, edge = M.edgesteel || iron
+  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _d = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0)
+  const span = (m, a, b, r) => { _a.set(a[0], a[1], a[2]); _b.set(b[0], b[1], b[2]); _d.subVectors(_b, _a); const L = _d.length() || 1e-3; m.position.copy(_a); m.scale.set(r, L, r); m.quaternion.setFromUnitVectors(_up, _d.normalize()) }
+  const rod = (r, mat = chainMat) => { const m = new THREE.Mesh(unitCyl, mat); m.castShadow = true; m.userData.r = r; group.add(m); return m }
+  const snd = () => (typeof Snd !== 'undefined' ? Snd : null)
+  // ---- 歯車: 側面の歯（上の面より 0.12 下まで）・上の面の放射状の帯（面に貼るだけ）・中心の軸。円板と一緒に回す
+  const gears = d16.filter(d => d.kind === 'gear').map(d => {
+    const g = new THREE.Group(); g.position.set(d.c[0], d.c[1], d.c[2]); group.add(g)
+    // 円板の上の面と下の面（当たりの円柱と同じ。側面はコースのメッシュ）
+    const topG = new THREE.CircleGeometry(d.R, 64); topG.rotateX(-Math.PI / 2)
+    { const uv = topG.attributes.uv, P = topG.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / 2.4, P.getZ(i) / 2.4) }
+    const top = new THREE.Mesh(topG, M.grate || rust); top.receiveShadow = true; g.add(top)
+    const bot = new THREE.Mesh(topG, rust); bot.rotation.x = Math.PI; bot.position.y = -d.thick; g.add(bot)
+    const nT = Math.max(16, Math.round(d.R * 2 * Math.PI / 0.42)), th = Math.min(0.55, d.thick - 0.14)
+    const tg = new THREE.BoxGeometry(0.24, th, 0.22), tm = new THREE.InstancedMesh(tg, iron, nT); tm.castShadow = true
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), ps = new THREE.Vector3()
+    for (let k = 0; k < nT; k++) { const a = k / nT * Math.PI * 2; ps.set(Math.cos(a) * (d.R + 0.1), -0.14 - th / 2, -Math.sin(a) * (d.R + 0.1)); q.setFromAxisAngle(_up, a); m4.compose(ps, q, sc); tm.setMatrixAt(k, m4) }
+    g.add(tm)
+    // 上の面の帯（6 本の太い帯と輪。面から 5mm 上。回っているのが見える）
+    const bandMat = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.5, metalness: 0.7 })
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, b = new THREE.Mesh(new THREE.BoxGeometry(d.R * 0.82, 0.01, 0.34), bandMat); b.position.set(Math.cos(a) * d.R * 0.5, 0.005, -Math.sin(a) * d.R * 0.5); b.rotation.y = a; b.receiveShadow = true; g.add(b) }
+    const ring = new THREE.Mesh(new THREE.RingGeometry(d.R - 0.32, d.R - 0.14, 48), bandMat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.006; g.add(ring)
+    const hub = new THREE.Mesh(new THREE.CircleGeometry(0.62, 24), edge); hub.rotation.x = -Math.PI / 2; hub.position.y = 0.007; g.add(hub)
+    return { d, g }
+  })
+  // ---- 揺れる吊り橋: 板の両端の下の鎖（板と一緒に動く）・柱の上から垂れる主の鎖（道の幅の外）と吊り鎖
+  const bridges = d16.filter(d => d.kind === 'swingBridge').map(d => {
+    const br = d.br, n = br.planks.length, edgeL = [], edgeR = [], hang = []
+    for (let i = 0; i < n - 1; i++) { edgeL.push(rod(0.03)); edgeR.push(rod(0.03)) }
+    const mainL = [], mainR = []; const NS = 12
+    for (let i = 0; i < NS; i++) { mainL.push(rod(0.045)); mainR.push(rod(0.045)) }
+    for (let i = 2; i < n - 2; i += 4) hang.push({ i, L: rod(0.02), R: rod(0.02) })
+    return { br, edgeL, edgeR, mainL, mainR, hang }
+  })
+  // ---- 倒れる煙突: 鉄の帯（面から 2cm）と、上の口の暗い穴。煙突の形と一緒に動かす
+  const chims = d16.filter(d => d.kind === 'chimney').map(d => {
+    const g = new THREE.Group(); g.matrixAutoUpdate = false; group.add(g)
+    const sootMat = new THREE.MeshStandardMaterial({ color: 0x0c0b0a, roughness: 1 })
+    for (let k = 1; k < 5; k++) { const x = -d.L / 2 + d.L * k / 5, b = new THREE.Mesh(new THREE.BoxGeometry(0.16, d.T + 0.04, d.W + 0.04), rust); b.position.set(x, 0, 0); b.castShadow = true; g.add(b) }
+    const hole = new THREE.Mesh(new THREE.PlaneGeometry(d.T * 0.7, d.W * 0.7), sootMat); hole.position.set(d.L / 2 + 0.01, 0, 0); hole.rotation.y = Math.PI / 2; g.add(hole)
+    const lip = new THREE.Mesh(new THREE.BoxGeometry(0.3, d.T + 0.12, d.W + 0.12), M.castle || rust); lip.position.set(d.L / 2 - 0.15, 0, 0); g.add(lip)
+    return { d, g, was: null }
+  })
+  // ---- 跳ね板: 板の下のバネ（穴の底から板の裏まで伸び縮み）
+  const kicks = d16.filter(d => d.kind === 'kick').map(d => {
+    const sh = d.shape, springs = []
+    for (const a of [-0.3, 0.3]) for (const l of [-0.33, 0.33]) springs.push({ a, l, m: rod(0.12, edge) })
+    return { d, sh, springs, was: null }
+  })
+  // ---- 道を選ぶ床: 床の両脇の鎖止め（見た目の金具。床より下）
+  const forks = d16.filter(d => d.kind === 'forkPlat').map(d => ({ d, was: null }))
+  const _m = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3()
+  let gearSnd = 0
+  return {
+    update(world, bike, dt, tm, camPos, out) {
+      const T = world.time, S = snd()
+      for (const { d, g } of gears) g.rotation.y = d.rate * T
+      // 歯車の近くでは機械のうなり（録音のループ。近いほど大きい）
+      if (S && gears.length) { let dm = 1e9; for (const { d } of gears) dm = Math.min(dm, Math.hypot(camPos.x - d.c[0], camPos.y - d.c[1], camPos.z - d.c[2])); const v = Math.max(0, 1 - dm / 30) * 0.35; if (v > 0.01 && !gearSnd) { S.loop('gear16', 'snd/machine.mp3', v, 0.6); gearSnd = 1 } else if (v <= 0.01 && gearSnd) { S.loop('gear16', null); gearSnd = 0 } else if (gearSnd && S.loops.gear16 && S.loops.gear16.g) S.loops.gear16.g.gain.value = v }
+      for (const b of bridges) {
+        const br = b.br, P = br.planks, R = br.R
+        const edgeAt = (sh, sg, dy) => [sh.c[0] + sh.ax[0][0] * 0 + sh.ax[2][0] * sg * (sh.h[2] - 0.08) - sh.ax[1][0] * (sh.h[1] + dy), sh.c[1] + sh.ax[2][1] * sg * (sh.h[2] - 0.08) - sh.ax[1][1] * (sh.h[1] + dy), sh.c[2] + sh.ax[2][2] * sg * (sh.h[2] - 0.08) - sh.ax[1][2] * (sh.h[1] + dy)]
+        for (let i = 0; i < P.length - 1; i++) { span(b.edgeL[i], edgeAt(P[i], -1, 0.05), edgeAt(P[i + 1], -1, 0.05), 0.03); span(b.edgeR[i], edgeAt(P[i], 1, 0.05), edgeAt(P[i + 1], 1, 0.05), 0.03) }
+        // 主の鎖: 柱の上（道の幅の外 1m）から、橋の真ん中で道より 1.3m 上まで垂れる。横揺れに合わせて少し揺れる
+        const top = 2.5, low = 1.3, off = br.W / 2 + 1.0
+        for (const [arr, sg] of [[b.mainL, -1], [b.mainR, 1]]) {
+          let prev = null
+          for (let i = 0; i <= arr.length; i++) {
+            const u = i / arr.length, s0 = u * br.L, st = bridgePose(br, s0, T), sagY = top - (top - low) * Math.sin(Math.PI * u)
+            const p = [br.p0[0] + br.f[0] * s0 + R[0] * (sg * off + st.lat * 0.5), br.p0[1] + sagY, br.p0[2] + br.f[2] * s0 + R[2] * (sg * off + st.lat * 0.5)]
+            if (prev) span(arr[i - 1], prev, p, 0.045); prev = p
+          }
+        }
+        for (const h of b.hang) { const sh = P[h.i], u = h.i / P.length, s0 = u * br.L, st = bridgePose(br, s0, T), y = br.p0[1] + top - (top - low) * Math.sin(Math.PI * u)
+          for (const [m, sg] of [[h.L, -1], [h.R, 1]]) { const lo = [sh.c[0] + R[0] * sg * (br.W / 2 + 0.45), sh.c[1] - 0.05, sh.c[2] + R[2] * sg * (br.W / 2 + 0.45)], hi = [br.p0[0] + br.f[0] * s0 + R[0] * (sg * off + st.lat * 0.5), y, br.p0[2] + br.f[2] * s0 + R[2] * (sg * off + st.lat * 0.5)]; span(m, lo, hi, 0.02) } }
+        // 乗った時・大きくあおられた時のきしみ（録音）
+        if (S) { const on = br.on; if (on && !b.wasOn) S.play('chain', { vol: 0.6 }); b.wasOn = on; const big = br.tJolt && br.tOn != null && T - br.tOn > br.tJolt; if (big && !b.wasBig) { S.play('creak', { vol: 0.9 }); S.play('chain', { vol: 0.8, rate: 0.8 }) } b.wasBig = big }
+      }
+      for (const c of chims) {
+        const s = c.d.shape; _m.makeBasis(_x.set(...s.ax[0]), _y.set(...s.ax[1]), _z.set(...s.ax[2])); _m.setPosition(s.c[0], s.c[1], s.c[2]); c.g.matrix.copy(_m); c.g.matrixWorldNeedsUpdate = true
+        const st = s.mov.trig == null ? 'up' : (s.mov.aNow > s.mov.aEnd + 1e-3 ? (s.mov.wNow < 0 ? 'fall' : 'rise') : 'down')
+        if (S && st !== c.was) { const v = Math.max(0, 1 - Math.hypot(camPos.x - s.c[0], camPos.y - s.c[1], camPos.z - s.c[2]) / 50); if (st === 'fall') { S.play('crack', { vol: v }); S.play('rumble', { vol: v * 0.9 }) } if (st === 'down') S.play('rockbreak', { vol: v * 0.8 }); if (st === 'rise') S.play('rumble', { vol: v * 0.4, rate: 0.8 }) }
+        c.was = st
+      }
+      for (const k of kicks) {
+        const s = k.sh, f = s.ax[0], rt = s.ax[2], c0 = s.base.c
+        for (const sp of k.springs) { const x = sp.a * s.h[0] * 2, z = sp.l * s.h[2] * 2, top = [s.c[0] + f[0] * x + rt[0] * z, s.c[1] - s.h[1], s.c[2] + f[2] * x + rt[2] * z], bot = [c0[0] + f[0] * x + rt[0] * z, c0[1] - 0.73, c0[2] + f[2] * x + rt[2] * z]; span(sp.m, bot, top, 0.12) }
+        const st = s.mov.trig != null
+        if (S && st && !k.was) { S.play('spring', { vol: 1 }); S.play('clank', { vol: 0.7, rate: 0.9 }) }
+        k.was = st
+      }
+      for (const fk of forks) { const st = shuttlePos(fk.d.fork.mov, T).at, moving = st === 'up' || st === 'down'; if (S && moving !== fk.was && fk.was != null) { const p = fk.d.fork.mid, v = Math.max(0, 1 - Math.hypot(camPos.x - p[0], camPos.y - p[1], camPos.z - p[2]) / 40); if (v > 0) S.play(moving ? 'chain' : 'clank', { vol: v * 0.7 }) } fk.was = moving }
     },
   }
 }
