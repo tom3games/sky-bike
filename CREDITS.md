@@ -1,0 +1,40 @@
+- snd/engine.mp3: racing car engine sound loops / domasx2 / CC0
+- snd/wind.mp3: Wind / IgnasD / CC0
+- snd/birds.mp3: File:Réveil_des_oiseaux.ogg (5-23秒) / Joseph Sardin / CC0
+- snd/land1.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/land2.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/land3.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/crash1.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/crash2.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/clank1.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/clank2.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/spring.mp3: 100 CC0 SFX / rubberduck / CC0
+- snd/gate.mp3: Bell dings/chimes / PWL / CC0
+- snd/finish.mp3: 85 Short music jingles / Kenney / CC0
+- snd/swish.mp3: Swishes Sound Pack / artisticdude / CC0
+- snd/machine.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/crack1.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/crack2.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/creak.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- assets/tex/rust_coarse_01・metal_plate_02・castle_brick_07・cobblestone_floor_08・weathered_planks・aerial_rocks_02・snow_02・medieval_blocks_02・rock_boulder_dry（色・法線・ラフネス）: Poly Haven / CC0 / https://polyhaven.com/textures
+- assets/moonless_golf_1k.hdr: Poly Haven / CC0 / https://polyhaven.com/a/moonless_golf
+- assets/models/Barrel_01・gothic_statue・large_iron_gate: Poly Haven / CC0 / https://polyhaven.com/models
+- assets/models/Rider.glb: Quaternius「Ultimate Modular Men」Swat（アニメを外した）/ CC0 / https://quaternius.com
+- snd/creak_a.mp3: 50 RPG sound effects / Kenney / CC0
+- snd/creak_b.mp3: 50 RPG sound effects / Kenney / CC0
+- snd/creak_c.mp3: 50 RPG sound effects / Kenney / CC0
+- snd/chain_a.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/chain_b.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/rumble_a.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/rumble_b.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/rumble_c.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- assets/pano.webp（遠景の絵）: このゲームのために描いたオリジナル
+- snd/water.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/splash1.mp3: 100 CC0 SFX / rubberduck / CC0
+- snd/splash2.mp3: 100 CC0 SFX / rubberduck / CC0
+- snd/save.mp3: Bell dings/chimes / PWL / CC0
+- snd/rockfall.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/rockbreak.mp3: 75 CC0 breaking / falling / hit sfx / rubberduck / CC0
+- snd/ballhit.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/cloth.mp3: 50 RPG sound effects / Kenney / CC0
+- snd/pebbles.mp3: 100 CC0 SFX #2 / rubberduck / CC0

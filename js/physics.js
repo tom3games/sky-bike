@@ -1,0 +1,896 @@
+// SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
+// 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
+// ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
+
+export const DT = 1 / 60, SUB = 8, H = DT / SUB
+// ハンドルの切れる量の上限 = STEER_DK / 速さ²（速いほど少し）。v11 で 20 → 32（全開でも塔のまわりの道を曲がれる）
+export const STEER_DK = 32
+const PI = 3.141592653589793, TAU = 6.283185307179586, HALF_PI = 1.5707963267948966
+
+// ------------------------------------------------------------ 決定的な三角関数
+export function dsin(x) {
+  x = x - TAU * Math.round(x / TAU)
+  if (x > HALF_PI) x = PI - x; else if (x < -HALF_PI) x = -PI - x
+  const x2 = x * x
+  return x * (1 + x2 * (-1 / 6 + x2 * (1 / 120 + x2 * (-1 / 5040 + x2 * (1 / 362880 + x2 * (-1 / 39916800 + x2 * (1 / 6227020800 + x2 * (-1 / 1307674368000))))))))
+}
+export const dcos = x => dsin(x + HALF_PI)
+function datanUnit(x) { // |x| <= 1
+  let off = 0
+  if (x > 0.41421356237309503) { off = PI / 4; x = (x - 1) / (x + 1) }
+  else if (x < -0.41421356237309503) { off = -PI / 4; x = (x + 1) / (1 - x) }
+  const x2 = x * x
+  let s = 0, p = x
+  for (let k = 0; k < 14; k++) { s += p / (2 * k + 1) * (k & 1 ? -1 : 1); p *= x2 }
+  return off + s
+}
+export function datan2(y, x) {
+  if (x === 0 && y === 0) return 0
+  const ax = x < 0 ? -x : x, ay = y < 0 ? -y : y
+  let a = ay <= ax ? datanUnit(ay / ax) : HALF_PI - datanUnit(ax / ay)
+  if (x < 0) a = PI - a
+  return y < 0 ? -a : a
+}
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v
+
+// ------------------------------------------------------------ 形
+// box: c 中心, h 半分の大きさ [前後, 上下, 左右], yaw/pitch/roll（度ではなくラジアン）
+export function makeBox(o) {
+  const cy = dcos(o.yaw || 0), sy = dsin(o.yaw || 0), cp = dcos(o.pitch || 0), sp = dsin(o.pitch || 0), cr = dcos(o.roll || 0), sr = dsin(o.roll || 0)
+  const f = [cy * cp, sp, -sy * cp]
+  const u0 = [-cy * sp, cp, sy * sp]
+  const r0 = [sy, 0, cy]
+  const up = [u0[0] * cr + r0[0] * sr, u0[1] * cr + r0[1] * sr, u0[2] * cr + r0[2] * sr]
+  const rt = [r0[0] * cr - u0[0] * sr, r0[1] * cr - u0[1] * sr, r0[2] * cr - u0[2] * sr]
+  const s = { type: 'box', c: o.c.slice(), h: o.h.slice(), ax: [f, up, rt], mat: o.mat || 'rock', mu: o.mu ?? 1.05, tag: o.tag || '', base: { c: o.c.slice(), yaw: o.yaw || 0, pitch: o.pitch || 0, roll: o.roll || 0 }, mov: o.mov || null }
+  s.bb = [0, 1, 2].map(k => Math.abs(f[k]) * s.h[0] + Math.abs(up[k]) * s.h[1] + Math.abs(rt[k]) * s.h[2])
+  s.min = [s.c[0] - s.bb[0], s.c[1] - s.bb[1], s.c[2] - s.bb[2]]
+  s.max = [s.c[0] + s.bb[0], s.c[1] + s.bb[1], s.c[2] + s.bb[2]]
+  return s
+}
+export function makeCyl(o) {
+  const a = o.a, b = o.b, d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]]
+  const L = Math.sqrt(d[0] * d[0] + d[1] * d[1] + d[2] * d[2])
+  const s = { type: 'cyl', a: a.slice(), b: b.slice(), d: [d[0] / L, d[1] / L, d[2] / L], L, r: o.r, mat: o.mat || 'metal', mu: o.mu ?? 0.95, tag: o.tag || '' }
+  s.min = [0, 1, 2].map(k => Math.min(a[k], b[k]) - o.r); s.max = [0, 1, 2].map(k => Math.max(a[k], b[k]) + o.r)
+  return s
+}
+// arc: 中心 (cx,cz) の周りの、内側 r1・外側 r2 の板。角度 phi0→phi1（左回り＝上から見て反時計）、
+//      上面の高さ y0（phi0 の所）から 1 ラジアンにつき b 上がる。厚さ thick
+export function makeArc(o) {
+  const s = { type: 'arc', cx: o.cx, cz: o.cz, r1: o.r1, r2: o.r2, phi0: o.phi0, phi1: o.phi1, y0: o.y0, b: o.b || 0, thick: o.thick || 0.8, mat: o.mat || 'stone', mu: o.mu ?? 1.05, tag: o.tag || '' }
+  const mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9]
+  for (let i = 0; i <= 24; i++) {
+    const ph = s.phi0 + (s.phi1 - s.phi0) * i / 24
+    for (const r of [s.r1, s.r2]) {
+      const x = s.cx + r * dcos(ph), z = s.cz - r * dsin(ph), y = s.y0 + s.b * (ph - s.phi0)
+      mn[0] = Math.min(mn[0], x); mx[0] = Math.max(mx[0], x); mn[2] = Math.min(mn[2], z); mx[2] = Math.max(mx[2], z)
+      mn[1] = Math.min(mn[1], y - s.thick * 1.2); mx[1] = Math.max(mx[1], y)
+    }
+  }
+  const pad = s.r2 * (1 - dcos((s.phi1 - s.phi0) / 48)) + 0.05
+  s.min = [mn[0] - pad, mn[1] - 0.05, mn[2] - pad]; s.max = [mx[0] + pad, mx[1] + 0.05, mx[2] + pad]
+  return s
+}
+
+// closest(sh, p) → out: q（形の表面の一番近い点）, n（q から p へ。中なら外向き）, d（符号つき距離。中は負）, feat（0中 1面 2辺 3角）
+const OUT = { q: [0, 0, 0], n: [0, 1, 0], d: 0, feat: 1 }
+function closestBox(s, px, py, pz, o) {
+  const dx = px - s.c[0], dy = py - s.c[1], dz = pz - s.c[2]
+  const A = s.ax, h = s.h
+  const l = [dx * A[0][0] + dy * A[0][1] + dz * A[0][2], dx * A[1][0] + dy * A[1][1] + dz * A[1][2], dx * A[2][0] + dy * A[2][1] + dz * A[2][2]]
+  if (l[0] <= h[0] && l[0] >= -h[0] && l[1] <= h[1] && l[1] >= -h[1] && l[2] <= h[2] && l[2] >= -h[2]) {
+    let k = 0, best = h[0] - Math.abs(l[0])
+    for (let i = 1; i < 3; i++) { const g = h[i] - Math.abs(l[i]); if (g < best) { best = g; k = i } }
+    const sg = l[k] >= 0 ? 1 : -1
+    o.n[0] = A[k][0] * sg; o.n[1] = A[k][1] * sg; o.n[2] = A[k][2] * sg
+    o.q[0] = px + o.n[0] * best; o.q[1] = py + o.n[1] * best; o.q[2] = pz + o.n[2] * best
+    o.d = -best; o.feat = 0
+    return o
+  }
+  let feat = 0
+  for (let i = 0; i < 3; i++) { if (l[i] > h[i]) { l[i] = h[i]; feat++ } else if (l[i] < -h[i]) { l[i] = -h[i]; feat++ } }
+  const qx = s.c[0] + A[0][0] * l[0] + A[1][0] * l[1] + A[2][0] * l[2]
+  const qy = s.c[1] + A[0][1] * l[0] + A[1][1] * l[1] + A[2][1] * l[2]
+  const qz = s.c[2] + A[0][2] * l[0] + A[1][2] * l[1] + A[2][2] * l[2]
+  const vx = px - qx, vy = py - qy, vz = pz - qz, d = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1e-9
+  o.q[0] = qx; o.q[1] = qy; o.q[2] = qz; o.n[0] = vx / d; o.n[1] = vy / d; o.n[2] = vz / d; o.d = d; o.feat = feat
+  return o
+}
+function perp(d) { // d に垂直な単位ベクトル
+  const x = Math.abs(d[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]
+  const c = [d[1] * x[2] - d[2] * x[1], d[2] * x[0] - d[0] * x[2], d[0] * x[1] - d[1] * x[0]]
+  const L = Math.sqrt(c[0] * c[0] + c[1] * c[1] + c[2] * c[2]); return [c[0] / L, c[1] / L, c[2] / L]
+}
+function closestCyl(s, px, py, pz, o) {
+  const ax = px - s.a[0], ay = py - s.a[1], az = pz - s.a[2], D = s.d
+  const t = ax * D[0] + ay * D[1] + az * D[2]
+  let wx = ax - D[0] * t, wy = ay - D[1] * t, wz = az - D[2] * t
+  let rho = Math.sqrt(wx * wx + wy * wy + wz * wz)
+  if (rho < 1e-9) { const p = perp(D); wx = p[0]; wy = p[1]; wz = p[2]; rho = 0 } else { wx /= rho; wy /= rho; wz /= rho }
+  if (t >= 0 && t <= s.L && rho <= s.r) {
+    const gs = s.r - rho, ga = t, gb = s.L - t
+    if (gs <= ga && gs <= gb) { o.n[0] = wx; o.n[1] = wy; o.n[2] = wz; o.d = -gs }
+    else if (ga <= gb) { o.n[0] = -D[0]; o.n[1] = -D[1]; o.n[2] = -D[2]; o.d = -ga }
+    else { o.n[0] = D[0]; o.n[1] = D[1]; o.n[2] = D[2]; o.d = -gb }
+    o.q[0] = px - o.n[0] * o.d; o.q[1] = py - o.n[1] * o.d; o.q[2] = pz - o.n[2] * o.d; o.feat = 0
+    return o
+  }
+  let feat = 0
+  const tc = t < 0 ? (feat++, 0) : t > s.L ? (feat++, s.L) : t
+  const rc = rho > s.r ? (feat++, s.r) : rho
+  const qx = s.a[0] + D[0] * tc + wx * rc, qy = s.a[1] + D[1] * tc + wy * rc, qz = s.a[2] + D[2] * tc + wz * rc
+  const vx = px - qx, vy = py - qy, vz = pz - qz, d = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1e-9
+  o.q[0] = qx; o.q[1] = qy; o.q[2] = qz; o.n[0] = vx / d; o.n[1] = vy / d; o.n[2] = vz / d; o.d = d; o.feat = feat
+  return o
+}
+// arc の座標: 角度 ph, 半径 r, 上面からの高さ hh（上が正）
+export function arcPoint(s, ph, r, hh) {
+  const g = Math.sqrt(1 + (s.b / r) * (s.b / r))
+  return [s.cx + r * dcos(ph), s.y0 + s.b * (ph - s.phi0) + hh * g, s.cz - r * dsin(ph)]
+}
+function closestArc(s, px, py, pz, o) {
+  const dx = px - s.cx, dz = pz - s.cz
+  let r = Math.sqrt(dx * dx + dz * dz); if (r < 1e-6) r = 1e-6
+  let ph = datan2(-dz, dx)
+  const mid = (s.phi0 + s.phi1) / 2
+  ph += TAU * Math.round((mid - ph) / TAU)
+  const g = Math.sqrt(1 + (s.b / r) * (s.b / r))
+  const hh = (py - (s.y0 + s.b * (ph - s.phi0))) / g
+  const sl = (ph - s.phi0) * r, sL = (s.phi1 - s.phi0) * r
+  if (sl >= 0 && sl <= sL && r >= s.r1 && r <= s.r2 && hh <= 0 && hh >= -s.thick) {
+    const gaps = [sl, sL - sl, r - s.r1, s.r2 - r, -hh, s.thick + hh]
+    let k = 0; for (let i = 1; i < 6; i++) if (gaps[i] < gaps[k]) k = i
+    const best = gaps[k], cph = dcos(ph), sph = dsin(ph)
+    let n
+    if (k === 0) n = [sph, 0, cph]            // phi0 側の端（φ が減る向き）
+    else if (k === 1) n = [-sph, 0, -cph]     // phi1 側の端（φ が増える向き）
+    else if (k === 2) n = [-cph, 0, sph]      // 内側
+    else if (k === 3) n = [cph, 0, -sph]      // 外側
+    else { const gx = -s.b * dz / (r * r), gz = s.b * dx / (r * r), L = Math.sqrt(gx * gx + 1 + gz * gz); n = k === 4 ? [gx / L, 1 / L, gz / L] : [-gx / L, -1 / L, -gz / L] }
+    o.n[0] = n[0]; o.n[1] = n[1]; o.n[2] = n[2]; o.d = -best
+    o.q[0] = px + n[0] * best; o.q[1] = py + n[1] * best; o.q[2] = pz + n[2] * best; o.feat = 0
+    return o
+  }
+  // 上の面の真上（角度と半径は板の中）: 坂の傾きのとおりの向き（v13 まではまっすぐ上で、急な坂でも滑らなかった）
+  if (sl >= 0 && sl <= sL && r >= s.r1 && r <= s.r2 && hh > 0) {
+    const gx = -s.b * dz / (r * r), gz = s.b * dx / (r * r), L = Math.sqrt(gx * gx + 1 + gz * gz)
+    o.n[0] = gx / L; o.n[1] = 1 / L; o.n[2] = gz / L; o.d = hh
+    o.q[0] = px - o.n[0] * hh; o.q[1] = py - o.n[1] * hh; o.q[2] = pz - o.n[2] * hh; o.feat = 1
+    return o
+  }
+  let feat = 0
+  const phc = ph < s.phi0 ? (feat++, s.phi0) : ph > s.phi1 ? (feat++, s.phi1) : ph
+  const rc = r < s.r1 ? (feat++, s.r1) : r > s.r2 ? (feat++, s.r2) : r
+  const hc = hh > 0 ? (feat++, 0) : hh < -s.thick ? (feat++, -s.thick) : hh
+  const q = arcPoint(s, phc, rc, hc)
+  const vx = px - q[0], vy = py - q[1], vz = pz - q[2], d = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1e-9
+  o.q[0] = q[0]; o.q[1] = q[1]; o.q[2] = q[2]; o.n[0] = vx / d; o.n[1] = vy / d; o.n[2] = vz / d; o.d = d; o.feat = feat
+  return o
+}
+export function makeSph(o) {
+  const s = { type: 'sph', c: o.c.slice(), r: o.r, mat: o.mat || 'iron', mu: o.mu ?? 0.6, tag: o.tag || '', base: { c: o.c.slice() }, mov: o.mov || null, knock: o.knock || 0 }
+  s.min = s.c.map(v => v - o.r); s.max = s.c.map(v => v + o.r)
+  return s
+}
+function closestSph(s, px, py, pz, o) {
+  const vx = px - s.c[0], vy = py - s.c[1], vz = pz - s.c[2], L = Math.sqrt(vx * vx + vy * vy + vz * vz) || 1e-9
+  o.n[0] = vx / L; o.n[1] = vy / L; o.n[2] = vz / L; o.d = L - s.r
+  o.q[0] = s.c[0] + o.n[0] * s.r; o.q[1] = s.c[1] + o.n[1] * s.r; o.q[2] = s.c[2] + o.n[2] * s.r; o.feat = o.d < 0 ? 0 : 1
+  return o
+}
+export function closest(s, px, py, pz, o = OUT) {
+  return s.type === 'box' ? closestBox(s, px, py, pz, o) : s.type === 'cyl' ? closestCyl(s, px, py, pz, o) : s.type === 'sph' ? closestSph(s, px, py, pz, o) : closestArc(s, px, py, pz, o)
+}
+// 点 q が形 s の「面の中ほど」に乗っているか（辺や角でない）。埋もれていれば 2
+const T2 = { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }
+export function surfaceKind(s, q) {
+  closest(s, q[0], q[1], q[2], T2)
+  if (T2.d < -0.003) return 2
+  if (T2.d > 0.003) return 0
+  // 境界に乗っている軸の数を数える
+  let on = 0
+  if (s.type === 'sph') return 1
+  if (s.type === 'box') {
+    const dx = q[0] - s.c[0], dy = q[1] - s.c[1], dz = q[2] - s.c[2]
+    for (let i = 0; i < 3; i++) { const l = dx * s.ax[i][0] + dy * s.ax[i][1] + dz * s.ax[i][2]; if (Math.abs(l) > s.h[i] - 0.002) on++ }
+  } else if (s.type === 'cyl') {
+    const ax = q[0] - s.a[0], ay = q[1] - s.a[1], az = q[2] - s.a[2], D = s.d
+    const t = ax * D[0] + ay * D[1] + az * D[2]
+    const wx = ax - D[0] * t, wy = ay - D[1] * t, wz = az - D[2] * t, rho = Math.sqrt(wx * wx + wy * wy + wz * wz)
+    if (t < 0.002 || t > s.L - 0.002) on++; if (rho > s.r - 0.002) on++
+  } else {
+    const dx = q[0] - s.cx, dz = q[2] - s.cz, r = Math.sqrt(dx * dx + dz * dz)
+    let ph = datan2(-dz, dx); ph += TAU * Math.round(((s.phi0 + s.phi1) / 2 - ph) / TAU)
+    const g = Math.sqrt(1 + (s.b / r) * (s.b / r)), hh = (q[1] - (s.y0 + s.b * (ph - s.phi0))) / g
+    if ((ph - s.phi0) * r < 0.002 || (s.phi1 - ph) * r < 0.002) on++
+    if (r < s.r1 + 0.002 || r > s.r2 - 0.002) on++
+    if (hh > -0.002 || hh < -s.thick + 0.002) on++
+  }
+  return on <= 1 ? 1 : 0
+}
+
+// 上下する足場: 下で dwell 秒止まる → move 秒で上がる → 上で dwell 秒止まる → 下がる。k は -amp..amp
+export function liftPos(m, t) {
+  const P = 2 * (m.dwell + m.move), ph = t - P * Math.floor(t / P)
+  if (ph < m.dwell) return { k: -m.amp, v: 0, at: 'lo', left: m.dwell - ph }
+  if (ph < m.dwell + m.move) { const u = (ph - m.dwell) / m.move; return { k: -m.amp * dcos(PI * u), v: m.amp * PI / m.move * dsin(PI * u), at: 'up' } }
+  if (ph < 2 * m.dwell + m.move) return { k: m.amp, v: 0, at: 'hi', left: 2 * m.dwell + m.move - ph }
+  const u = (ph - 2 * m.dwell - m.move) / m.move; return { k: m.amp * dcos(PI * u), v: -m.amp * PI / m.move * dsin(PI * u), at: 'down' }
+}
+
+// 振り子: 支点から長さ L、横へ振れる角 a = amp·sin(w t + ph)。x は横のずれ、y は支点からの下がり
+export function pendState(m, t) {
+  const a = m.amp * dsin(m.w * t + (m.ph || 0)), da = m.amp * m.w * dcos(m.w * t + (m.ph || 0)), sa = dsin(a), ca = dcos(a)
+  return { a, x: m.L * sa, y: m.L * ca, vx: m.L * ca * da, vy: -m.L * sa * da }
+}
+// 跳ね橋: 下りて dwell 秒 → move 秒で上がる → 上で dwell 秒 → 下がる。a は 0（下）..up（上がった角）
+export function hingeAng(m, t) {
+  const st = liftPos({ dwell: m.dwell, move: m.move, amp: 1 }, t + (m.ph || 0))
+  return { a: m.up * (st.k + 1) / 2, w: m.up * st.v / 2, at: st.at, left: st.left }
+}
+// 落石: 周期 T。warn 秒の予兆（まだ見えない）→ fall 秒で hd だけ落ちる → 砕けて消える
+export function dropState(m, t) {
+  const T = m.T, ph = t + (m.ph || 0) - T * Math.floor((t + (m.ph || 0)) / T)
+  if (ph < m.fall) { const u = ph / m.fall; return { y: m.hd * (1 - u * u), v: -2 * m.hd * u / m.fall, hidden: false, warn: 0, ph } }
+  const left = T - ph
+  return { y: m.hd, v: 0, hidden: true, warn: left < m.warn ? 1 - left / m.warn : 0, ph }
+}
+
+// 塔のまわりの道を外へ流れる水の速さ（道の板の中心から外向き）
+function flowRad(sh, q) { const dx = q[0] - sh.cx, dz = q[2] - sh.cz, L = Math.sqrt(dx * dx + dz * dz) || 1; return [dx / L * sh.flowR, 0, dz / L * sh.flowR] }
+// 壊せる扉・柵: 速さ breakV 以上でぶつかると壊れる（遅いと、ただの壁）
+function smash(world, b, con, velAt, ev) {
+  const sh = world.shapes[con.id]; if (!sh.breakV || sh.gone || b.ghost) return false
+  const v = velAt(con.q), n = con.n || con.nw, vn = -(v[0] * n[0] + v[1] * n[1] + v[2] * n[2])
+  if (vn < sh.breakV) return false
+  sh.gone = true; sh.goneAt = world.time
+  b.v[0] *= 0.85; b.v[2] *= 0.85
+  if (ev) ev.push({ t: 'break', id: sh.id, v: vn })
+  return true
+}
+// シーソーの板の姿勢（支点のまわりに ang だけ回す）
+function seesawPose(s) {
+  const m = s.mov, B0 = s.base, a = m.ang || 0, nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw, pitch: B0.pitch + a, roll: B0.roll })
+  const H0 = m.pivot, d0 = [B0.c[0] - H0[0], B0.c[1] - H0[1], B0.c[2] - H0[2]], R0 = m.right, ca = dcos(a), sa = dsin(a)
+  const kd = R0[0] * d0[0] + R0[1] * d0[1] + R0[2] * d0[2], cr = [R0[1] * d0[2] - R0[2] * d0[1], R0[2] * d0[0] - R0[0] * d0[2], R0[0] * d0[1] - R0[1] * d0[0]]
+  s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa + R0[k] * kd * (1 - ca)); s.ax = nb.ax
+}
+// 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } }
+// 乗ると一緒に運ばれる動く床の種類
+const CARRY = new Set(['lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge'])
+// 止まってブレーキを押し続けて下がり始めるまでの時間（動く床の上では長押し）
+function revHold(b) { return b.onMov ? 1e9 : 0.45 } // 動く床の上では下がらない（ブレーキは床と一緒に止まっているだけ）
+// 塔のまわりの道に沿って流れる水（flowT: 左回りの向きを正とする速さ）
+function flowTan(sh, q) { const dx = q[0] - sh.cx, dz = q[2] - sh.cz, L = Math.sqrt(dx * dx + dz * dz) || 1; return [dz / L * sh.flowT, 0, -dx / L * sh.flowT] }
+// 突風の強さ 0..1（周期の 3 割ほどだけ強く吹く。ほかは凪）
+export function gustK(g, t) { const v = dsin(t * g.w + g.ph); return v > 0.55 ? ((v - 0.55) / 0.45) : 0 }
+
+// ------------------------------------------------------------ 世界（形の一覧と格子）
+const CELL = 4
+const key = (i, j, k) => (i + 1024) * 4194304 + (j + 1024) * 2048 + (k + 1024)
+export class World {
+  constructor(shapes) {
+    this.shapes = shapes
+    this.grid = new Map()
+    this.stamp = new Int32Array(shapes.length); this.st = 0
+    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.time = 0
+    shapes.forEach((s, id) => {
+      s.id = id
+      if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
+      else if (s.mov) {
+        // 動く足場: 動く範囲を全部含む箱で当たりの候補に入れる
+        const R = s.type === 'sph' ? s.r : s.type === 'arc' ? 0 : Math.sqrt(s.h[0] * s.h[0] + s.h[1] * s.h[1] + s.h[2] * s.h[2])
+        const m = s.mov, ex = m.type === 'slide' || m.type === 'lift' ? [Math.abs(m.axis[0]) * m.amp, Math.abs(m.axis[1]) * m.amp, Math.abs(m.axis[2]) * m.amp]
+          : m.type === 'pend' ? [m.L, m.L, m.L] : m.type === 'hinge' || m.type === 'seesaw' ? [R * 2, R * 2, R * 2] : m.type === 'drop' ? [0, m.hd, 0] : [0, 0, 0]
+        if (s.type !== 'arc') { s.min = [0, 1, 2].map(k => s.base.c[k] - R - ex[k]); s.max = [0, 1, 2].map(k => s.base.c[k] + R + ex[k]) }
+        s.touch = 0; s.gone = false
+        if (m.type === 'trap') { s.tc = s.type === 'arc' ? arcPoint(s, (s.phi0 + s.phi1) / 2, (s.r1 + s.r2) / 2, 0) : s.c.slice(); this.traps.push(s) }
+        this.moving.push(s); this.big.push(id); return
+      }
+      const a = s.min.map(v => Math.floor(v / CELL)), b = s.max.map(v => Math.floor(v / CELL))
+      if ((b[0] - a[0] + 1) * (b[1] - a[1] + 1) * (b[2] - a[2] + 1) > 4000) { this.big.push(id); return }
+      for (let i = a[0]; i <= b[0]; i++) for (let j = a[1]; j <= b[1]; j++) for (let k = a[2]; k <= b[2]; k++) {
+        const K = key(i, j, k); let L = this.grid.get(K); if (!L) this.grid.set(K, L = []); L.push(id)
+      }
+    })
+    this.buf = []
+    this.setTime(0)
+  }
+  // 時刻 t（秒）の位置に動く足場を置く。決まった式なので、同じ時刻なら同じ位置
+  setTime(t) {
+    this.time = t
+    for (const s of this.moving) {
+      const m = s.mov, B0 = s.base
+      if (m.type === 'slide') { const k = m.amp * dsin(t * m.w + (m.ph || 0)); s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
+      else if (m.type === 'lift') { const k = liftPos(m, t).k; s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
+      else if (m.type === 'spin' && s.type === 'box') { const nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw + m.rate * t, pitch: B0.pitch, roll: B0.roll }); s.ax = nb.ax }
+      else if (m.type === 'pend') { const st = pendState(m, t); s.c = [m.pivot[0] + m.across[0] * st.x, m.pivot[1] - st.y, m.pivot[2] + m.across[2] * st.x]; if (s.type === 'sph') { s.min = s.c.map(v => v - s.r); s.max = s.c.map(v => v + s.r) } }
+      else if (m.type === 'hinge') { const a = hingeAng(m, t).a, nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw, pitch: B0.pitch + a, roll: B0.roll }); const H0 = m.hinge, d0 = [B0.c[0] - H0[0], B0.c[1] - H0[1], B0.c[2] - H0[2]], R0 = m.right, ca = dcos(a), sa = dsin(a)
+        // 蝶番の軸（右向き）のまわりに a だけ回す（ロドリゲスの式）
+        const kd = R0[0] * d0[0] + R0[1] * d0[1] + R0[2] * d0[2], cr = [R0[1] * d0[2] - R0[2] * d0[1], R0[2] * d0[0] - R0[0] * d0[2], R0[0] * d0[1] - R0[1] * d0[0]]
+        s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa * m.sgn + R0[k] * kd * (1 - ca)); s.ax = nb.ax }
+      else if (m.type === 'seesaw') { if (t === 0) { m.ang = m.ang0 || 0; m.w = 0 } seesawPose(s) }
+      else if (m.type === 'brk') { if (s.gone && t - s.goneAt > m.back) s.gone = false; if (t === 0) s.gone = false }
+      else if (m.type === 'drop') { const st = dropState(m, t); s.c = [B0.c[0], B0.c[1] + st.y, B0.c[2]]; s.gone = st.hidden; s.min = s.c.map(v => v - s.r); s.max = s.c.map(v => v + s.r) }
+      else if (m.type === 'trap') { if (t === 0) { s.gone = false; s.warnT = null } }
+      else if (m.type === 'crumble') { if (t === 0) { s.gone = false; s.touch = 0; s.goneAt = -1e9 } }
+      if (m.type === 'crumble') { if (s.gone && t - s.goneAt > m.back) { s.gone = false; s.touch = 0 } else if (!s.gone && s.touch > 0 && s.lastTouch !== undefined && t - s.lastTouch > 1.5) s.touch = 0 }
+    }
+  }
+  tick() {
+    // シーソー: 前の 1 コマにバイクから受けた回す力で、8 回に分けて傾ける（重さで傾く。乗っていなければゆっくり元へ戻る）
+    for (const s of this.moving) { const m = s.mov; if (m.type !== 'seesaw') continue
+      const tq = m.tqN ? m.tqSum / m.tqN : 0; m.tqSum = 0; m.tqN = 0
+      for (let k = 0; k < SUB; k++) {
+        m.w += (tq + (m.ang0 - m.ang) * m.k - m.w * m.damp) / m.I * H; m.ang += m.w * H
+        if (m.ang < m.min) { m.ang = m.min; if (m.w < 0) m.w = 0 } if (m.ang > m.max) { m.ang = m.max; if (m.w > 0) m.w = 0 }
+      } }
+    this.setTime(this.time + DT)
+  }
+  // 動く足場の、点 q での速さ
+  shapeVel(s, q) {
+    const m = s.mov; if (!m) return null
+    if (m.type === 'slide') { const k = m.amp * m.w * dcos(this.time * m.w + (m.ph || 0)); return [m.axis[0] * k, m.axis[1] * k, m.axis[2] * k] }
+    if (m.type === 'lift') { const k = liftPos(m, this.time).v; return [m.axis[0] * k, m.axis[1] * k, m.axis[2] * k] }
+    if (m.type === 'pend') { const st = pendState(m, this.time); return [m.across[0] * st.vx, -st.vy, m.across[2] * st.vx] }
+    if (m.type === 'hinge') { const w = hingeAng(m, this.time).w * m.sgn, R0 = m.right, r = [q[0] - m.hinge[0], q[1] - m.hinge[1], q[2] - m.hinge[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
+    if (m.type === 'drop') { return [0, dropState(m, this.time).v, 0] }
+    if (m.type === 'seesaw') { const w = m.w || 0, R0 = m.right, r = [q[0] - m.pivot[0], q[1] - m.pivot[1], q[2] - m.pivot[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
+    if (m.type === 'spin') { const dx = q[0] - s.c[0], dz = q[2] - s.c[2]; return [m.rate * dz, 0, -m.rate * dx] }
+    return null
+  }
+  near(x, y, z, rad) {
+    const out = this.buf; out.length = 0; this.st++
+    for (const id of this.big) { const s = this.shapes[id]; if (s.gone) continue; if (x + rad < s.min[0] || x - rad > s.max[0] || y + rad < s.min[1] || y - rad > s.max[1] || z + rad < s.min[2] || z - rad > s.max[2]) continue; this.stamp[id] = this.st; out.push(id) }
+    const i0 = Math.floor((x - rad) / CELL), i1 = Math.floor((x + rad) / CELL)
+    const j0 = Math.floor((y - rad) / CELL), j1 = Math.floor((y + rad) / CELL)
+    const k0 = Math.floor((z - rad) / CELL), k1 = Math.floor((z + rad) / CELL)
+    for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) for (let k = k0; k <= k1; k++) {
+      const L = this.grid.get(key(i, j, k)); if (!L) continue
+      for (const id of L) {
+        if (this.stamp[id] === this.st) continue; this.stamp[id] = this.st
+        const s = this.shapes[id]
+        if (x + rad < s.min[0] || x - rad > s.max[0] || y + rad < s.min[1] || y - rad > s.max[1] || z + rad < s.min[2] || z - rad > s.max[2]) continue
+        out.push(id)
+      }
+    }
+    return out
+  }
+  // 埋もれた辺（他の形の面の中ほどに乗っている辺）を当たりから外す
+  ghost(q, selfId, ids) {
+    for (const id of ids) {
+      if (id === selfId) continue
+      const s = this.shapes[id]
+      if (q[0] < s.min[0] - 0.01 || q[0] > s.max[0] + 0.01 || q[1] < s.min[1] - 0.01 || q[1] > s.max[1] + 0.01 || q[2] < s.min[2] - 0.01 || q[2] > s.max[2] + 0.01) continue
+      if (surfaceKind(s, q)) return true
+    }
+    return false
+  }
+  // 球の接触を集める（ドーナツの車輪は rim 点の球として呼ぶ）。返り: 一番深い接触
+  sphere(px, py, pz, r, ids, res) {
+    let best = null
+    for (const id of ids) {
+      const s = this.shapes[id]
+      closest(s, px, py, pz, OUT)
+      const depth = r - OUT.d
+      if (depth <= 0) continue
+      if (OUT.feat >= 2) { const q = OUT.q.slice(), n = OUT.n.slice(), d = OUT.d; if (this.ghost(q, id, ids)) continue; OUT.q = q; OUT.n = n; OUT.d = d }
+      if (!best || depth > best.depth) best = { depth, n: OUT.n.slice(), q: OUT.q.slice(), id, mu: s.mu }
+    }
+    return best
+  }
+  // ドーナツ（車輪の円 中心 c・軸 a・半径 R、太さ rt）の接触。一番深い接触の点と、深さで重みを付けた向き
+  // filt = { ax, min, side }: side=false なら n·ax >= min の接触（下から支える）だけ、true ならそれ以外（横・前から当たる）だけ
+  torus(c, a, R, rt, ids, filt) {
+    let best = null, nx = 0, ny = 0, nz = 0
+    for (const id of ids) {
+      const s = this.shapes[id]
+      closest(s, c[0], c[1], c[2], OUT)
+      // 押し返す向き: 形の上で車輪の中心に一番近い点 → 中心（円と箱の当たりの向き。深く沈んでも横向きに化けない）
+      const n0 = OUT.d > 1e-6 ? [OUT.n[0], OUT.n[1], OUT.n[2]] : OUT.n.slice()
+      let mx = c[0], my = c[1], mz = c[2]
+      for (let it = 0; it < 2; it++) {
+        const vx = c[0] - OUT.q[0], vy = c[1] - OUT.q[1], vz = c[2] - OUT.q[2]
+        const k = vx * a[0] + vy * a[1] + vz * a[2]
+        const px = vx - a[0] * k, py = vy - a[1] * k, pz = vz - a[2] * k
+        const L = Math.sqrt(px * px + py * py + pz * pz)
+        if (L < 1e-6) { mx = c[0]; my = c[1]; mz = c[2] } else { mx = c[0] - px * R / L; my = c[1] - py * R / L; mz = c[2] - pz * R / L }
+        closest(s, mx, my, mz, OUT)
+      }
+      const depth = rt - OUT.d
+      if (depth <= 0) continue
+      const q = OUT.q.slice(), feat = OUT.feat
+      // 車輪の横（軸の向き）から当たる時は、タイヤの縁の球の向きで押す（沈んだ分を確実に戻す）
+      const na = n0[0] * a[0] + n0[1] * a[1] + n0[2] * a[2]
+      const n = (na > 0.4 || na < -0.4) ? OUT.n.slice() : n0
+      if (filt) { const d = n[0] * filt.ax[0] + n[1] * filt.ax[1] + n[2] * filt.ax[2]; if ((d >= filt.min) === filt.side) continue }
+      if (feat >= 2 && this.ghost(q, id, ids)) continue
+      const wgt = depth * depth
+      nx += n[0] * wgt; ny += n[1] * wgt; nz += n[2] * wgt
+      if (!best || depth > best.depth) best = { depth, n, q, id, mu: s.mu, feat, rim: [mx, my, mz] }
+    }
+    if (best) { const L = Math.sqrt(nx * nx + ny * ny + nz * nz); if (L > 1e-9) best.nw = [nx / L, ny / L, nz / L]; else best.nw = best.n }
+    return best
+  }
+  // 上から下への光線（検査とカメラ用）。球を少しずつ進める
+  rayDown(x, z, yTop, yBot = -500) {
+    // 符号つき距離が負（形の中）になった所と、その直前の外の点の間を二分法で詰める
+    let best = -Infinity, bid = -1
+    // 縦の列の格子だけ見る（全部の形を調べない）
+    this.st++
+    const cand = []
+    for (const id of this.big) { const s = this.shapes[id]; if (!s.gone) cand.push(s) }
+    const i = Math.floor(x / CELL), k = Math.floor(z / CELL), j0 = Math.floor(Math.max(yBot, -60) / CELL), j1 = Math.floor(Math.min(yTop, 2000) / CELL)
+    for (let j = j0; j <= j1; j++) { const L = this.grid.get(key(i, j, k)); if (!L) continue; for (const id of L) { if (this.stamp[id] === this.st) continue; this.stamp[id] = this.st; cand.push(this.shapes[id]) } }
+    for (const s of cand) {
+      if (x < s.min[0] || x > s.max[0] || z < s.min[2] || z > s.max[2]) continue
+      let y = Math.min(yTop, s.max[1] + 0.1), prev = y
+      const end = Math.max(yBot, s.min[1] - 0.1)
+      while (y > end) {
+        closest(s, x, y, z, OUT)
+        if (OUT.d < 0) {
+          let hi = prev, lo = y
+          for (let i = 0; i < 40; i++) { const m = (hi + lo) / 2; closest(s, x, m, z, OUT); if (OUT.d < 0) lo = m; else hi = m }
+          if (hi > best) { best = hi; bid = s.id }
+          break
+        }
+        prev = y
+        y -= Math.min(0.25, Math.max(OUT.d * 0.9, 0.002))
+      }
+    }
+    return { y: best, id: bid }
+  }
+  // 任意の向きの光線（カメラの壁よけ）
+  ray(o, dir, maxT, ids) {
+    let t = 0
+    while (t < maxT) {
+      const x = o[0] + dir[0] * t, y = o[1] + dir[1] * t, z = o[2] + dir[2] * t
+      let m = Infinity
+      for (const id of ids) { closest(this.shapes[id], x, y, z, OUT); if (OUT.d < m) m = OUT.d }
+      if (m < 0.02) return t
+      t += Math.max(m * 0.8, 0.02)
+    }
+    return maxT
+  }
+}
+
+// ------------------------------------------------------------ バイク
+export const BIKE = {
+  m: 180, Ip: 60, g: 9.81,
+  R: 0.25, rt: 0.11,                       // 車輪の円の半径とタイヤの太さ（外径 0.36）
+  rear: [-0.70, -0.50], front: [0.72, -0.50], // 伸び切った時の車輪の中心（重心から。前, 上）
+  travel: 0.28, rake: 0.42,                 // ストロークと前のフォークの寝かせ（ラジアン）
+  ks: 9000, cs: 1300, pre: 250,             // サスペンション
+  kr: 70000, cr: 4500,                     // 底づき後の硬い当たり
+  drive: 1150, power: 24000, vmax: 40,
+  lean: 0.18, leanTorqueGround: 70, leanTorqueAir: 300,
+  frame: [[-0.35, -0.16, 0.13], [0, -0.22, 0.13], [0.36, -0.12, 0.13]],
+  rider: [[-0.10, 0.22, 0.17, 0.22], [-0.02, 0.52, 0.17, 0.25], [0.02, 0.86, 0.15, 0.28]], // [前, 上, 半径, 重心で前へ動く量]
+  hardLand: 9.5,
+  vtop: 13, vfade: 2, // v12: 最高速度（11m/s から効きが弱まり 13m/s で止まる）。ジャンプ台の踏み切りでは launchV で v11 と同じ飛び出しの速さに戻す
+  wheelieEase: 0.47,
+}
+
+const v3 = (x, y, z) => [x, y, z]
+export function createBike(spawn) {
+  return {
+    p: spawn.p.slice(), v: [0, 0, 0], th: 0, w: 0, psi: spawn.yaw || 0, psiRate: 0,
+    delta: 0, lean: 0, s: [0, 0], sv: [0, 0], g: [false, false], cn: [null, null], side: [null, null],
+    pre: 0, tBack: 9, hopCool: 0, crashed: null, steps: 0, frame: [0, 0], wheelRot: [0, 0], scrape: 0,
+    impact: 0, landV: 0, airT: 0, speed: 0,
+  }
+}
+export function basis(b) {
+  const cy = dcos(b.psi), sy = dsin(b.psi), cp = dcos(b.th), sp = dsin(b.th)
+  const h = [cy, 0, -sy], R = [sy, 0, cy]
+  const f = [cy * cp, sp, -sy * cp], u = [-cy * sp, cp, sy * sp]
+  return { h, R, f, u }
+}
+const bodyPt = (b, B, x, y) => [b.p[0] + B.f[0] * x + B.u[0] * y, b.p[1] + B.f[1] * x + B.u[1] * y, b.p[2] + B.f[2] * x + B.u[2] * y]
+// 車輪の中心（圧縮 s）。i=0 後ろ, 1 前
+export function wheelCenter(b, B, i, s) {
+  const P = BIKE, sh = -b.lean * P.lean
+  const base = i ? P.front : P.rear
+  const c = bodyPt(b, B, base[0] + sh, base[1])
+  const ax = i ? axisF(B) : axisR(B)
+  return [c[0] + ax[0] * s, c[1] + ax[1] * s, c[2] + ax[2] * s]
+}
+function axisR(B) { const c = 0.98006657784124, s = 0.19866933079506 /* 0.2rad */; return [B.u[0] * c - B.f[0] * s, B.u[1] * c - B.f[1] * s, B.u[2] * c - B.f[2] * s] }
+function axisF(B) { const c = dcos(BIKE.rake), s = dsin(BIKE.rake); return [B.u[0] * c - B.f[0] * s, B.u[1] * c - B.f[1] * s, B.u[2] * c - B.f[2] * s] }
+export function riderPts(b, B) { return BIKE.rider.map(([x, y, r, k]) => ({ c: bodyPt(b, B, x + b.lean * k, y), r })) }
+export function framePts(b, B) { return BIKE.frame.map(([x, y, r]) => ({ c: bodyPt(b, B, x, y), r })) }
+
+// 入力 inp = { thr 0..1, brk 0..1, lean -1(後ろ)..1(前), steer -1(左)..1(右) }
+export function stepBike(world, b, inp, ev) {
+  // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
+  if (!b.ghost && world.traps.length) for (const s of world.traps) {
+    if (s.gone) { if (world.time - s.goneAt > 12) { s.gone = false; s.warnT = null } continue }
+    const dx = s.tc[0] - b.p[0], dy = s.tc[1] - b.p[1], dz = s.tc[2] - b.p[2], d = Math.sqrt(dx * dx + dz * dz)
+    if (s.warnT == null && d < s.mov.trig && Math.abs(dy) < 3) { s.warnT = world.time; if (ev) ev.push({ t: 'trapwarn', p: s.tc.slice() }) }
+    if (s.warnT != null && world.time - s.warnT > s.mov.warn) { s.gone = true; s.goneAt = world.time; if (ev) ev.push({ t: 'trapfall', p: s.tc.slice() }) }
+  }
+  for (let k = 0; k < SUB; k++) sub(world, b, inp, ev)
+  b.steps++
+}
+const ZERO = { thr: 0, brk: 0, lean: 0, steer: 0 }
+function sub(world, b, inpIn, ev) {
+  const P = BIKE, inp = b.crashed ? ZERO : inpIn
+  // 体の動き（重心の前後とハンドル）はなめらかに
+  const lt = clamp(inp.lean, -1, 1)
+  b.lean += clamp(lt - b.lean, -6 * H, 6 * H)
+  const sp = b.speed
+  const dmax = Math.min(0.6, STEER_DK / Math.max(1, sp * sp))
+  b.delta += clamp(-inp.steer * dmax - b.delta, -3 * H, 3 * H) // 右へ切る = psi を減らす（キーを短く押せば少しだけ切れる）
+
+  const B = basis(b)
+  let fx = 0, fy = -P.m * P.g, fz = 0, tau = 0
+  const addF = (F, at, tag) => {
+    fx += F[0]; fy += F[1]; fz += F[2]
+    const rx = at[0] - b.p[0], ry = at[1] - b.p[1], rz = at[2] - b.p[2]
+    const tx = ry * F[2] - rz * F[1], ty = rz * F[0] - rx * F[2], tz = rx * F[1] - ry * F[0]
+    const tq = tx * B.R[0] + ty * B.R[1] + tz * B.R[2]
+    tau += tq
+    if (globalThis.__dbgF) globalThis.__dbgF(tag, F, tq)
+  }
+  // 点の速さ（ピッチの回転とヨーの回転を含む）
+  const W = [B.R[0] * b.w, B.R[1] * b.w + b.psiRate, B.R[2] * b.w]
+  const velAt0 = q => { const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2]; return [b.v[0] + W[1] * rz - W[2] * ry, b.v[1] + W[2] * rx - W[0] * rz, b.v[2] + W[0] * ry - W[1] * rx] }
+  // 動く足場の上では、足場に対する速さで摩擦と当たりを計算する
+  let curId = -1
+  // 動く床に乗っている間は、床の座標系で動かす: 位置に床の動きを毎刻み足し（下の積分の後）、b.v は床に対する速さとして扱う
+  { const pick = i => { const cn = b.cn[i]; if (!cn) return -1; const sh = world.shapes[cn.id]; return sh && sh.mov && CARRY.has(sh.mov.type) && !sh.gone ? cn.id : -1 }
+    const nc = !b.crashed && (b.g[0] || b.g[1]) ? Math.max(pick(0), pick(1)) : -1
+    if (nc !== (b.carryId ?? -1)) {
+      if (b.carryId >= 0) { const u = world.shapeVel(world.shapes[b.carryId], b.p) || [0, 0, 0]; b.v[0] += u[0]; b.v[1] += u[1]; b.v[2] += u[2] } // 床を離れる時: 床の速さを持って出る
+      if (nc >= 0) { const u = world.shapeVel(world.shapes[nc], b.p) || [0, 0, 0]; b.v[0] -= u[0]; b.v[1] -= u[1]; b.v[2] -= u[2] } // 乗った時: 床に対する速さにする
+      b.carryId = nc
+    } }
+  const velAt = q => { const v = velAt0(q); if (curId < 0 || curId === b.carryId) return v; const sh = world.shapes[curId]; const u = sh.mov ? world.shapeVel(sh, q) : sh.flow || (sh.flowR ? flowRad(sh, q) : sh.flowT ? flowTan(sh, q) : null); return u ? [v[0] - u[0], v[1] - u[1], v[2] - u[2]] : v } // 湧き水の流れの上は、水と一緒に動く面として扱う
+  const ids = world.near(b.p[0], b.p[1], b.p[2], 2.4)
+  // 深く沈んだ接触は、沈む向きの速さをその場で打ち消す（強い着地でも面の奥へ入り込ませない）
+  const stopSink = (q, n, depth) => {
+    if (depth < 0.05) return
+    const vq = velAt(q), vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+    if (vn >= 0) return
+    const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2]
+    const cx = ry * n[2] - rz * n[1], cy = rz * n[0] - rx * n[2], cz = rx * n[1] - ry * n[0]
+    const rn = cx * B.R[0] + cy * B.R[1] + cz * B.R[2]
+    const j = -vn / (1 / P.m + rn * rn / P.Ip) * Math.min(1, (depth - 0.05) / 0.04 + 0.25)
+    b.v[0] += n[0] * j / P.m; b.v[1] += n[1] * j / P.m; b.v[2] += n[2] * j / P.m
+    b.w += rn * j / P.Ip
+  }
+
+  // ---- 車輪
+  // 接触は2種類に分ける。下から支える接触（向きがサスの軸に近い）はサスペンションで受け、
+  // 横や前から当たる接触（段の面・道の横の面）はタイヤの硬さで受ける
+  const wheelForce = (i, con, N, ax) => {
+    const n = con.nw || con.n, q = con.q
+    curId = con.id
+    const vq = velAt(q)
+    let t = [B.f[0] - n[0] * (B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]), 0, 0]
+    t[1] = B.f[1] - n[1] * (B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]); t[2] = B.f[2] - n[2] * (B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2])
+    let tl = Math.sqrt(t[0] * t[0] + t[1] * t[1] + t[2] * t[2])
+    if (tl < 1e-4) t = B.h.slice(), tl = 1
+    t = [t[0] / tl, t[1] / tl, t[2] / tl]
+    const lat = [n[1] * t[2] - n[2] * t[1], n[2] * t[0] - n[0] * t[2], n[0] * t[1] - n[1] * t[0]]
+    const vt = vq[0] * t[0] + vq[1] * t[1] + vq[2] * t[2]
+    const vl = vq[0] * lat[0] + vq[1] * lat[1] + vq[2] * lat[2]
+    const lim = con.mu * N
+    let Ft = 0
+    if (i === 0) {
+      // 低いギア: 段の角や壁を後輪で登る時（接地の向きが立っている時）は力が増える
+      const nR = Math.abs(n[0] * B.R[0] + n[1] * B.R[1] + n[2] * B.R[2]), nF = n[0] * B.f[0] + n[1] * B.f[1] + n[2] * B.f[2]
+      const climb = n[1] < 0.9 && nR < 0.5 && nF < 0 ? 1 + 0.9 * Math.min(1, (0.9 - n[1]) / 0.5) : 1
+      if (inp.thr > 0) {
+        let fd = inp.thr * Math.min(P.drive * climb, P.power / Math.max(1, vt))
+        // 最高速度で絞った分を「最高速度がなかったら出ていた速さ」として覚えておく（ジャンプ台の踏み切りで戻す）
+        const vx = b.vx || 0, fdFree = inp.thr * Math.min(P.drive * climb, P.power / Math.max(1, vt + vx))
+        fd *= clamp((P.vtop - vt) / P.vfade, 0, 1)
+        // ウィリーの上限（v12）: 後輪だけで 34 度を超えたら、アクセルの押す力を弱めて 35〜45 度あたりで止まるようにする（後ろへ宙返りしない）
+        b.vxAcc = (b.vxAcc || 0) + Math.max(0, Math.min(fdFree, lim) - Math.min(fd, lim))
+        if (b.creep && b.standOn) fd *= clamp((1.2 - vt) * 2, 0, 1) * 0.6 // ゆっくり進むウィリーは歩く速さまで
+        Ft += fd
+        // ウィリーで 26 度を超えたら、アクセルで後ろへ起き上がる回す力を弱める（前へ進む力はそのまま）。後ろへ回っていく速さが遅くなり、保てる角度の幅が少し広がる
+        if (!b.g[1] && b.th > 0.45) { const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2], F = [t[0] * fd, t[1] * fd, t[2] * fd]; tau -= P.wheelieEase * ((ry * F[2] - rz * F[1]) * B.R[0] + (rz * F[0] - rx * F[2]) * B.R[1] + (rx * F[1] - ry * F[0]) * B.R[2]) }
+      }
+      if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
+    }
+    // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
+    const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -Math.min(0.5, 0.034 * spd) ? 0 : 0.6 + 0.35 * Math.min(1, spd / 15)) // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
+    // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
+    if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
+    if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.75) * lim * inp.brk
+    Ft -= vt * 6 + (vt > 0 ? 1 : -1) * 0.012 * N // 転がり
+    if (b.carryId >= 0 && con.id === b.carryId && inp.thr <= 0.05 && inp.brk <= 0.05) Ft -= clamp(vt * 900, -0.6 * lim, 0.6 * lim) // 動く床の上で何もしない時は、床と一緒に止まる（転がって取り残されない）
+    { const sh = world.shapes[con.id]; if (sh.mud) Ft -= clamp(vt, -3, 3) * sh.mud } // 泥: 車輪が沈んで重い
+    let Fl = -clamp(vl * 2600, -lim, lim)
+    const tot = Math.sqrt(Ft * Ft + Fl * Fl)
+    if (tot > lim) { Ft *= lim / tot; Fl *= lim / tot }
+    const Fw = [n[0] * N + t[0] * Ft + lat[0] * Fl, n[1] * N + t[1] * Ft + lat[1] * Fl, n[2] * N + t[2] * Ft + lat[2] * Fl]
+    addF(Fw, q, 'w' + i + (con.side ? 's' : ''))
+    { const sh = world.shapes[con.id], m = sh.mov; if (m && m.type === 'seesaw' && !b.ghost) { const r = [q[0] - m.pivot[0], q[1] - m.pivot[1], q[2] - m.pivot[2]]; m.tqSum = (m.tqSum || 0) - ((r[1] * Fw[2] - r[2] * Fw[1]) * m.right[0] + (r[2] * Fw[0] - r[0] * Fw[2]) * m.right[1] + (r[0] * Fw[1] - r[1] * Fw[0]) * m.right[2]); m.tqN = (m.tqN || 0) + 0.5 } }
+    return vt
+  }
+  for (let i = 0; i < 2; i++) {
+    const ax = i ? axisF(B) : axisR(B)
+    const SUP = { ax, min: 0.35, side: false }, SIDE = { ax, min: 0.35, side: true }
+    const c0 = wheelCenter(b, B, i, 0)
+    const cAt = s => [c0[0] + ax[0] * s, c0[1] + ax[1] * s, c0[2] + ax[2] * s]
+    let con = world.torus(c0, B.R, P.R, P.rt, ids, SUP), s = 0, bottom = 0
+    if (con) {
+      const top = world.torus(cAt(P.travel), B.R, P.R, P.rt, ids, SUP)
+      if (top) { s = P.travel; con = top; bottom = top.depth }
+      else {
+        let lo = 0, hi = P.travel
+        for (let it = 0; it < 8; it++) { const m = (lo + hi) / 2; if (world.torus(cAt(m), B.R, P.R, P.rt, ids, SUP)) lo = m; else hi = m }
+        s = hi
+        con = world.torus(cAt(Math.max(0, hi - 0.004)), B.R, P.R, P.rt, ids, SUP) || con
+      }
+    }
+    if (con && smash(world, b, con, velAt0, ev)) con = null // 速くぶつかった扉は、車輪が触れた瞬間に壊れる
+    const side = world.torus(cAt(s), B.R, P.R, P.rt, ids, SIDE)
+    const svRaw = (s - b.s[i]) / H
+    b.sv[i] = clamp(svRaw, -6, 6)
+    b.s[i] = s; b.g[i] = !!con; b.cn[i] = con || side; b.side[i] = side
+    if (globalThis.__dbg) globalThis.__dbg(i, s, bottom, con, c0, side)
+    let vt = 0
+    if (con) {
+      curId = con.id
+      const n = con.nw, vq = velAt(con.q)
+      const vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+      const cosA = Math.max(0.5, n[0] * ax[0] + n[1] * ax[1] + n[2] * ax[2])
+      // 減衰は速い動きで弱まる（実際のサスと同じ。角に当たった瞬間に車体が蹴られすぎない）
+      const sv = b.sv[i], asv = Math.abs(sv), damp = P.cs * (asv < 1.2 ? sv : Math.sign(sv) * (1.2 + (asv - 1.2) * 0.15))
+      let N = Math.max(0, P.pre + P.ks * s + damp) / cosA
+      if (bottom > 0) {
+        N += Math.min(16000, Math.max(0, P.kr * bottom - P.cr * vn))
+        // 6cm を超えて沈む分は上限なしで押し返す（見た目で地面にめり込ませない）
+        if (bottom > 0.06) N += 200000 * (bottom - 0.06) + Math.max(0, -vn) * 3000
+        if (-vn > P.hardLand && !b.crashed && ev && !(b.thudT > 0)) { ev.push({ t: 'thud', v: -vn }); b.thudT = 0.3 } // 強い着地でも転ばない（揺れと音だけ）
+      }
+      if (-vn > b.impact) b.impact = -vn
+      vt = wheelForce(i, con, Math.min(N, 400000), ax)
+      if (bottom > 0) stopSink(con.q, con.nw, bottom)
+    }
+    let sideHit = side
+    if (side && smash(world, b, side, velAt0, ev)) sideHit = null
+    if (sideHit) {
+      curId = side.id
+      const n = side.n, vq = velAt(side.q)
+      const vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+      let N = Math.min(16000, Math.max(0, P.kr * side.depth - P.cr * vn))
+      if (side.depth > 0.06) N += 200000 * (side.depth - 0.06) + Math.max(0, -vn) * 3000
+      if (side.depth > 0.05) { stopSink(side.q, n, side.depth); if (side.depth > 0.07 && n[1] < 0.3) { const k = (side.depth - 0.07) * 0.5; b.p[0] += n[0] * k; b.p[1] += n[1] * k; b.p[2] += n[2] * k } }
+      if (-vn > 13 && !b.crashed && ev && !(b.thudT > 0)) { ev.push({ t: 'thud', v: -vn }); b.thudT = 0.3 }
+      const v2 = wheelForce(i, side, N, ax)
+      stopSink(side.q, side.n, side.depth)
+      if (!con) vt = v2
+    }
+    b.wheelRot[i] += vt * H / (P.R + P.rt)
+    if (i === 0) b.vtRel = (con || side) ? vt : null
+  }
+  // ---- 最高速度がなかった時の速さとの差 vx（v11 と同じ走りをした時の速さ - 今の速さ）。アクセルを離す・ブレーキで消える
+  { const v = Math.max(0, b.speed), vx = b.vx || 0
+    let d = (b.vxAcc || 0) / P.m * H - 0.35 * ((v + vx) * (v + vx) - v * v) / P.m * H
+    b.vxAcc = 0
+    if (inp.brk > 0 || inp.ab > 0 || inp.thr <= 0) d -= vx * 12 * H // 減速した時は、最高速度がなくても同じだけ遅くなっていたので消す
+    b.vx = Math.max(0, vx + d) }
+  // ---- ジャンプ台の踏み切り: 台（launch の付いた形）から両輪が離れた瞬間に、v11 と同じ飛び出しの速さに戻す（飛ぶ距離を変えない）
+  { const onL = [0, 1].some(i => b.cn[i] && world.shapes[b.cn[i].id].launch)
+    if (onL) b.launchT = 0.25; else b.launchT = Math.max(0, (b.launchT || 0) - H) // 台の端の継ぎ目に一瞬触れても、台から跳んだと見なす
+    if (b.launchT > 0 && !b.g[0] && !b.g[1]) { b.launchT = 0; const v = Math.sqrt(b.v[0] * b.v[0] + b.v[1] * b.v[1] + b.v[2] * b.v[2]), k = (v + (b.vx || 0)) / Math.max(1e-6, v); b.vx = 0; b.v[0] *= k; b.v[1] *= k; b.v[2] *= k; if (ev && k > 1.001) ev.push({ t: 'launch', v, to: v * k }) }
+}
+  // ---- 止まってブレーキを押し続けた時間（下がるかどうか）
+  // 動く床の上か（床の速さに対する速さで止まっているかを見る。床の上では、止まっているブレーキは床と一緒に運ばれるだけ。下がるのは長押しした時だけ）
+  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; b.onMov = !!((sh0 && sh0.mov && sh0.mov.type !== 'crumble' && sh0.mov.type !== 'brk') || (sh1 && sh1.mov && sh1.mov.type !== 'crumble' && sh1.mov.type !== 'brk')) }
+  const vr = b.vtRel != null ? b.vtRel : b.speed
+  if (inp.brk > 0 && inp.thr <= 0 && inp.lean <= 0.3 && b.g[0] && b.g[1] && vr < 0.6 && (b.revT > 0 || Math.abs(vr) < 0.6)) b.revT = (b.revT || 0) + H; else b.revT = 0
+  // ---- 崩れる足場: 乗っている時間がたまると落ちる（ゴーストは崩さない）
+  if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
+  // ---- 風（決まった強弱で吹く）
+  for (const wd of world.winds) {
+    if (b.p[0] < wd.min[0] || b.p[0] > wd.max[0] || b.p[1] < wd.min[1] || b.p[1] > wd.max[1] || b.p[2] < wd.min[2] || b.p[2] > wd.max[2]) continue
+    const k = P.m * (wd.pulse ? gustK(wd, world.time) : 0.55 + 0.45 * dsin(world.time * wd.w + wd.ph))
+    fx += wd.f[0] * k; fy += wd.f[1] * k; fz += wd.f[2] * k
+  }
+  // ---- 車体の下（こする）と人（当たると転倒）
+  b.scrape = 0
+  for (const fp of framePts(b, B)) {
+    const con = world.sphere(fp.c[0], fp.c[1], fp.c[2], fp.r, ids)
+    if (!con) continue
+    if (smash(world, b, con, velAt0, ev)) continue
+    curId = con.id
+    const vq = velAt(con.q), n = con.n, vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+    const N = Math.max(0, P.kr * con.depth - P.cr * vn)
+    const vt = [vq[0] - n[0] * vn, vq[1] - n[1] * vn, vq[2] - n[2] * vn], vtl = Math.sqrt(vt[0] * vt[0] + vt[1] * vt[1] + vt[2] * vt[2]) || 1
+    const Ff = Math.min(0.5 * N, vtl * 3000)
+    addF([n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff], con.q, 'frame')
+    b.scrape = Math.max(b.scrape, con.depth)
+    stopSink(con.q, n, con.depth + 0.03)
+    if (-vn > P.hardLand * 0.8 && !b.crashed && ev && !(b.thudT > 0)) { ev.push({ t: 'thud', v: -vn }); b.thudT = 0.3 }
+  }
+  // ---- 弾き飛ばす物（振り子の鉄球・落石）: 人・車体・車輪のどこかに当たったら、当たった向きへ強く押し出す（転ばせない）
+  b.knockT = Math.max(0, (b.knockT || 0) - H)
+  if (!b.crashed && !(b.knockT > 0)) {
+    const pts = riderPts(b, B).concat(framePts(b, B), [{ c: wheelCenter(b, B, 0, b.s[0]), r: P.R + P.rt }, { c: wheelCenter(b, B, 1, b.s[1]), r: P.R + P.rt }])
+    for (const id of ids) {
+      const sh = world.shapes[id]; if (!sh.knock || sh.gone) continue
+      let hit = null
+      for (const pt of pts) { closest(sh, pt.c[0], pt.c[1], pt.c[2], OUT); if (OUT.d < pt.r) { hit = { n: OUT.n.slice(), q: OUT.q.slice() }; break } }
+      if (!hit) continue
+      const vs = world.shapeVel(sh, hit.q) || [0, 0, 0]
+      let nx = hit.n[0], nz = hit.n[2]; const L = Math.sqrt(nx * nx + nz * nz) || 1; nx /= L; nz /= L
+      const vn = b.v[0] * nx + b.v[2] * nz
+      const k = sh.knock
+      b.v[0] += nx * (k - Math.min(0, vn)) + vs[0] * 0.9; b.v[2] += nz * (k - Math.min(0, vn)) + vs[2] * 0.9; b.v[1] = Math.max(b.v[1], 0) + k * 0.3 + Math.max(0, vs[1]) * 0.5
+      b.knockT = 0.5
+      if (ev) ev.push({ t: 'knock', v: Math.sqrt(vs[0] * vs[0] + vs[2] * vs[2]) + k, tag: sh.tag })
+      break
+    }
+  }
+  if (!b.crashed) {
+    const rp = riderPts(b, B)
+    for (let k = 0; k < rp.length; k++) {
+      const con = world.sphere(rp[k].c[0], rp[k].c[1], rp[k].c[2], rp[k].r, ids)
+      if (con && con.depth > 0.01 && !world.shapes[con.id].knock && !smash(world, b, con, velAt0, ev)) { crash(b, k === 2 ? 'head' : 'body', 0, ev); break }
+    }
+  } else {
+    // 転倒後は人の当たりも柔らかく入れる（車体が地面に沈まないように）
+    for (const fp of riderPts(b, B)) {
+      const con = world.sphere(fp.c[0], fp.c[1], fp.c[2], fp.r, ids); if (!con) continue
+      curId = con.id
+      const vq = velAt(con.q), n = con.n, vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+      const N = Math.max(0, 60000 * con.depth - 2500 * vn)
+      const vt = [vq[0] - n[0] * vn, vq[1] - n[1] * vn, vq[2] - n[2] * vn], vtl = Math.sqrt(vt[0] * vt[0] + vt[1] * vt[1] + vt[2] * vt[2]) || 1
+      const Ff = Math.min(0.6 * N, vtl * 2000)
+      addF([n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff], con.q)
+    }
+  }
+  // ---- 空気
+  const vv = Math.sqrt(b.v[0] * b.v[0] + b.v[1] * b.v[1] + b.v[2] * b.v[2])
+  fx -= b.v[0] * vv * 0.35; fy -= b.v[1] * vv * 0.35; fz -= b.v[2] * vv * 0.35
+  // ---- 重心の前後で回す力
+  const air = !b.g[0] && !b.g[1]
+  tau -= b.lean * (air ? P.leanTorqueAir : P.leanTorqueGround) * (b.crashed ? 0 : 1) // 後ろ重心(-1)で前が上がる
+  // ---- ウィリーの上がり始め（v12）: 後ろ体重＋アクセルで、前輪を素早く浮かせる。26 度から先は今まで通り（後ろへ回る速さは変えない）
+  if (!b.crashed && b.g[0] && inp.lean < -0.6 && inp.thr > 0.5 && b.th < 0.42 && !b.creep) {
+    const wT = b.th < 0.22 ? 1.7 : 1.7 - (b.th - 0.22) / 0.2 * 1.0 // 上がり始めは速く、26 度に近づくほど今までの速さへ
+    if (b.w < wT) tau += (wT - b.w) * 1400
+    b.popT = 1.0
+  }
+  // 素早く上げた勢いが、30 度から先の後ろへ回る速さに残らないように（今までの約 73 度/秒に合わせる）
+  b.popT = Math.max(0, (b.popT || 0) - H)
+  if (b.popT > 0 && !b.crashed && b.th > 0.3 && b.th < 1.2 && b.w > 1.2) tau -= (b.w - 1.2) * 1200
+  // 後ろへ回りすぎ（後輪で立って、地面から約 78 度を超えた）は転倒（v13 で戻した）
+  if (!b.crashed && b.g[0] && !b.g[1] && b.cn[0] && b.cn[0].feat !== 2 && b.cn[0].feat !== 3) { const n = b.cn[0].nw || b.cn[0].n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]; if (rel > 0.98 && b.th > 1.2) crash(b, 'back', 0, ev) }
+  // ---- 前に転ばない補助: 前輪だけが着いていて、車体が地面へ突っ込む向きに傾いたら、前へ回るのを止める。
+  //      前体重とブレーキを同時に押している時（ジャックナイフの技）は、約 40 度まで前へ傾けてよい（そこから先は止める）
+  if (!b.crashed && b.g[1] && !b.g[0] && b.cn[1]) {
+    const n = b.cn[1].nw || b.cn[1].n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する前の傾き（負＝突っ込む）
+    // ブレーキだけの浮きは速さの分だけ（遅くなると戻る）。前体重＋ブレーキは、遅い時は約 37 度で保つ（ジャックナイフ）が、速い時（4m/s 超）は守らない（前へ回って転ぶ）
+    const lim = inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, Math.min(0.56, 0.036 * Math.abs(b.speed) + 0.04))
+    b.noseT = rel < -0.94 && b.w < 0.3 ? (b.noseT || 0) + H : 0
+    if (b.noseT > 0.12) crash(b, 'front', 0, ev) // 前輪だけで、地面から 70 度より前へ傾いたまま（前へ回っていく）
+    if (rel < lim) { tau += (lim - rel) * 9000; if (b.w < 0) tau -= b.w * 1400 }
+    else if (rel < lim + 0.15 && b.w < -1.5) tau -= (b.w + 1.5) * 900 // 限界の手前で、前へ回る勢いを弱めておく（速い時の急ブレーキで回り切らない）
+  }
+  // ---- 止まったままのウィリー（トライアルのスタンディングウィリー）: 速さがほぼ 0・アクセルなしで後ろ体重なら、
+  //      前輪を約 33 度まで持ち上げてそこで保つ。前体重＋ブレーキなら、前輪で立って約 33 度まで前へ傾けて保つ。
+  //      ここを超えて後ろへ回るのは、アクセルを足して押し続けた時だけ
+  // 止まったまま体重を 0.35 秒押し続けた時だけ（走りながらの技の邪魔をしない）
+  // 後ろ体重をはっきり（-0.6 より強く）押してブレーキなし、または前体重をはっきり押してブレーキ。走りながらの技やバックの邪魔をしない
+  // ゆっくり進むウィリー: 後ろ体重をはっきり押してアクセルを足すと、歩く速さ（1.2m/s まで）で前輪を約 33 度に上げたまま進める（高い段に前輪を掛ける時）
+  const creep = !b.crashed && inp.thr > 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && b.speed > -0.3 && b.speed < 1.8 && b.g[0]
+  b.creep = creep
+  const standing = creep || (!b.crashed && Math.abs(b.speed) < 0.9 && ((inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6) || (inp.brk > 0.3 && inp.lean > 0.6)))
+  b.standT = standing ? (b.standT || 0) + H : 0
+  if (standing && (b.standT > 0.35 || b.standOn || creep)) {
+    let con = null, tgt = 0
+    if (b.g[0] && inp.lean < -0.6) { con = b.cn[0]; tgt = 0.6 * Math.min(1, -inp.lean) }
+    else if (b.g[1] && inp.lean > 0.6) { con = b.cn[1]; tgt = -0.58 * Math.min(1, inp.lean) }
+    b.standOn = !!con
+    if (con) {
+      const n = con.nw || con.n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する傾き（正＝前が上）
+      tau += (tgt - rel) * 7000 - b.w * 650
+    }
+  } else b.standOn = false
+  b.standAgo = b.standOn ? 0 : (b.standAgo ?? 9) + H // ウィリーで立てていた直後は、前体重に移しても跳ねない（段に前輪を掛けたまま）
+  // ---- 高い段によじ登る: 前輪が段の上に掛かり、後輪が段の面に当たっている時、前体重＋アクセルで後輪を引き上げる
+  //      （人が前へ体を投げ出して、後輪で段の面を駆け上がる動き）。濡れてすべる段では弱い
+  b.hook = false
+  b.hookT = Math.max(0, (b.hookT || 0) - H)
+  if (!b.crashed && inp.lean > 0.3 && inp.thr > 0.2 && b.g[1] && b.cn[1]) {
+    const rc = wheelCenter(b, B, 0, b.s[0]), top = b.cn[1].q[1]
+    let face = false
+    if (b.cn[0]) { const sn = b.cn[0].nw || b.cn[0].n; face = sn[1] < 0.6 && -(sn[0] * B.h[0] + sn[2] * B.h[2]) > 0.5 }
+    if (face && top - (rc[1] - P.R - P.rt) > 0.3) { b.hookT = 0.25; b.hookMu = Math.min(world.shapes[b.cn[0].id].mu, world.shapes[b.cn[1].id].mu) }
+    // 後輪の中心が段の角より上に出るまで引き上げる（途中で面から少し離れても続ける）
+    if (b.hookT > 0 && rc[1] < top + 0.3) {
+      const k = clamp((b.hookMu - 0.35) / 0.7, 0, 1)
+      const vq = velAt0(rc), F = clamp((1.1 - vq[1]) * 2600, 0, P.m * P.g * 1.05) * inp.thr * k
+      addF([B.h[0] * F * 0.25, F, B.h[2] * F * 0.25], rc, 'hook')
+      b.hook = F > 0
+    }
+  }
+  // ---- 跳ねる（後ろに乗ってから素早く前へ）
+  if (!b.crashed) {
+    if (b.g[0] && b.g[1] && inp.lean < -0.6) { b.pre = Math.min(1, b.pre + H / 0.22); b.tBack = 0 }
+    else { b.tBack += H; if (inp.lean > -0.6) b.pre = Math.max(0, b.pre - H * 0.8) }
+    b.hopCool = Math.max(0, b.hopCool - H)
+    if (inp.lean > 0.3 && b.tBack < 0.3 && b.pre > 0.3 && b.g[0] && b.g[1] && b.hopCool <= 0 && !(b.standAgo < 0.5)) {
+      const dv = 2.5 * b.pre
+      b.v[0] += B.u[0] * dv; b.v[1] += B.u[1] * dv; b.v[2] += B.u[2] * dv; b.pre = 0; b.hopCool = 0.5
+      if (ev) ev.push({ t: 'hop', dv })
+    }
+  }
+  // ---- 積分
+  b.v[0] += fx / P.m * H; b.v[1] += fy / P.m * H; b.v[2] += fz / P.m * H
+  const vl2 = Math.sqrt(b.v[0] * b.v[0] + b.v[1] * b.v[1] + b.v[2] * b.v[2])
+  if (vl2 > P.vmax + 6) { const k = (P.vmax + 6) / vl2; b.v[0] *= k; b.v[1] *= k; b.v[2] *= k }
+  b.w += tau / P.Ip * H
+  if (air) b.w *= 1 - 0.35 * H
+  b.w = clamp(b.w, -14, 14)
+  b.p[0] += b.v[0] * H; b.p[1] += b.v[1] * H; b.p[2] += b.v[2] * H
+  if (b.carryId >= 0) { const sh = world.shapes[b.carryId], u = world.shapeVel(sh, b.p) || [0, 0, 0]; b.p[0] += u[0] * H; b.p[1] += u[1] * H; b.p[2] += u[2] * H; if (sh.mov.type === 'spin') { const a = sh.mov.rate * H, ca = dcos(a), sa = dsin(a), vx = b.v[0], vz = b.v[2]; b.psi += a; b.v[0] = vx * ca + vz * sa; b.v[2] = -vx * sa + vz * ca } } // 回る床の上では、床に対する速さの向きも一緒に回す
+  b.th += b.w * H
+  b.speed = b.v[0] * B.h[0] + b.v[2] * B.h[2]
+  // ---- 向き（ヨー）。前輪だけ接地＝前輪を軸に（ジャックナイフ）、後輪だけ＝後輪を軸に
+  let rate = 0, pivot = null
+  const st = b.crashed ? 0 : -inp.steer
+  if (b.g[0] && b.g[1]) rate = b.speed * dsin(b.delta) / dcos(b.delta) / (P.front[0] - P.rear[0])
+  else if (b.g[1] && !b.g[0]) { rate = st * 2.3; pivot = b.cn[1].q }
+  else if (b.g[0] && !b.g[1]) { rate = st * 1.2 + b.speed * dsin(b.delta) / dcos(b.delta) / 1.42 * 0.5; pivot = b.cn[0].q }
+  else rate = st * 0.5
+  // 横風は接地中も前輪をあおって向きを変える（タイヤは横には滑らないが、ハンドルが取られる）
+  if (!b.crashed && (b.g[0] || b.g[1])) for (const wd of world.winds) {
+    if (b.p[0] < wd.min[0] || b.p[0] > wd.max[0] || b.p[1] < wd.min[1] || b.p[1] > wd.max[1] || b.p[2] < wd.min[2] || b.p[2] > wd.max[2]) continue
+    const k = wd.pulse ? gustK(wd, world.time) : 0.55 + 0.45 * dsin(world.time * wd.w + wd.ph)
+    const lat = (wd.f[0] * B.R[0] + wd.f[2] * B.R[2]) * k // 右向きの風は正
+    rate -= lat * 0.21
+  }
+  // 横に傾いた面では、前輪が下り側へ取られる
+  if (!b.crashed && b.g[1] && b.cn[1]) {
+    const n = b.cn[1].nw || b.cn[1].n, side = n[0] * B.R[0] + n[1] * B.R[1] + n[2] * B.R[2]
+    if (side > 0.24 || side < -0.24) rate -= (side - Math.sign(side) * 0.2) * 0.6 * Math.min(1, Math.abs(b.speed) / 3)
+  }
+  // 横から当たっている車輪を、その面へ押し込む向きには回さない（ハンドルで壁にめり込ませない）
+  if (rate !== 0) {
+    const pv = pivot || b.p
+    for (let i = 0; i < 2; i++) {
+      const sd = b.side[i]; if (!sd || sd.depth < 0.005) continue
+      const n = sd.n, q = sd.q
+      // ヨーで q が動く速さ = rate * (Y × (q - pivot))
+      const dx = q[0] - pv[0], dz = q[2] - pv[2]
+      const vx = rate * dz, vz = -rate * dx
+      if (vx * n[0] + vz * n[2] < 0) { rate = 0; break }
+    }
+  }
+  b.psiRate = rate
+  const dpsi = rate * H
+  if (dpsi !== 0) {
+    b.psi += dpsi
+    if (pivot) {
+      const c = dcos(dpsi), s = dsin(dpsi)
+      const rx = b.p[0] - pivot[0], rz = b.p[2] - pivot[2]
+      b.p[0] = pivot[0] + rx * c + rz * s; b.p[2] = pivot[2] - rx * s + rz * c
+      const vx = b.v[0], vz = b.v[2]; b.v[0] = vx * c + vz * s; b.v[2] = -vx * s + vz * c
+    }
+  }
+  if (air) b.airT += H; else { if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact }); b.airT = 0 }
+  if (b.crashed) b.crashed.t += H
+  if (b.thudT > 0) b.thudT -= H
+}
+function crash(b, why, v, ev) {
+  b.crashed = { why, v, t: 0, at: b.p.slice() }
+  if (ev) ev.push({ t: 'crash', why, v })
+}
+
+// 状態の指紋（同じ入力なら同じ結果か、を比べる）
+export function hashBike(b) {
+  const a = new Float64Array([...b.p, ...b.v, b.th, b.w, b.psi, b.delta, b.lean, ...b.s])
+  const u = new Uint32Array(a.buffer); let h = 2166136261
+  for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619) >>> 0 }
+  return h.toString(16)
+}

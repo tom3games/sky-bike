@@ -1,0 +1,6 @@
+shots/
+node_modules
+.DS_Store
+art/prompts/
+snd/machine.wav
+assets/cards/

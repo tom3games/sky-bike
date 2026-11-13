@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<script id="ghMove">if(location.hostname==='tom3games.github.io'&&!/[?&]stay=1/.test(location.search)){location.replace('https://tom3games.com/play/sky-bike/'+location.search+location.hash)}</script>
+<link rel="canonical" href="https://tom3games.com/play/sky-bike/">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>SKY BIKE｜崩れた塔をバイクで登る3Dトライアル</title>
+<meta name="description" content="溶岩の底から雲の上の城まで、崩れた塔の外周をトライアルバイクで登る3Dの高難度バイクアクション。操作はアクセル・ブレーキ・体重の前後の4つだけ。落ちたら下の周から登り直し。ブラウザで遊べる。">
+<meta property="og:type" content="website">
+<meta property="og:title" content="SKY BIKE">
+<meta property="og:description" content="奈落の底から雲の上の城まで、崩れた塔をトライアルバイクで登る。振り子の鉄球、湧き水、跳ね橋、落石。落ちたら下の周から。">
+<meta property="og:image" content="https://tom3games.com/play/sky-bike/og.png?v=14">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://tom3games.com/play/sky-bike/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#1b2326">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css?v=14">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="view"></div>
+<div id="flash"></div>
+
+<section id="loading" class="screen">
+  <div class="ld">
+    <svg class="ld-fire" viewBox="0 0 24 40" aria-hidden="true"><path d="M12 2 C17 12 20 20 12 30 C4 20 7 12 12 2Z" fill="#c27a40"/><path d="M12 12 C15 18 15 23 12 27 C9 23 9 18 12 12Z" fill="#f0c890"/><path d="M9 31 h6 l-1 8 h-4z" fill="#3c3a38"/></svg>
+    <p class="ld-txt" data-t="loading">塔へ向かう</p>
+    <div class="ld-bar"><i id="ldFill"></i></div>
+  </div>
+</section>
+
+<section id="title" class="screen" hidden>
+  <div class="t-left">
+    <p class="t-kicker" data-t="kicker">奈落の底から、雲の上の城まで。</p>
+    <h1 class="logo"><span class="en">SKY BIKE</span><span class="sub" data-t="logo_sub">崩れた塔を、雲の上まで</span></h1>
+    <nav class="t-menu">
+      <button class="course main" data-course="stage1"><b data-t="c_stage1">登る</b><small id="bestStage1"></small></button>
+      <button class="course" data-course="practice"><b data-t="c_practice">練習場</b><small id="bestPractice"></small></button>
+    </nav>
+  </div>
+  <div class="t-foot">
+    <button id="howBtn" class="link" data-t="how">遊び方</button>
+    <button id="langBtn" class="link">English</button>
+    <button id="hardBtn" class="link">ハードコア 切</button>
+    <button id="muteBtn" class="link" data-t="sound_on">音 あり</button>
+  </div>
+</section>
+
+<section id="how" class="screen" hidden>
+  <div class="panel">
+    <h2 data-t="how">遊び方</h2>
+    <p class="how-lead" data-t="how_lead"></p>
+    <table class="keys">
+      <tr><th data-t="k_thr">アクセル</th><td>↑ / W</td><td>RT</td></tr>
+      <tr><th data-t="k_brk">ブレーキ</th><td>↓ / S</td><td>LT</td></tr>
+      <tr><th data-t="k_back">後ろ体重</th><td>← / A</td><td>L ←</td></tr>
+      <tr><th data-t="k_fwd">前体重</th><td>→ / D</td><td>L →</td></tr>
+      <tr><th data-t="k_cp">休憩所からやり直す</th><td>R</td><td>B</td></tr>
+      <tr><th data-t="k_pause">一時停止</th><td>Esc</td><td>START</td></tr>
+    </table>
+    <ul class="tips"><li data-t="tip1"></li><li data-t="tip2"></li><li data-t="tip3"></li><li data-t="tip4"></li><li data-t="tip5"></li><li data-t="tip6"></li><li data-t="tip7"></li><li data-t="tip8"></li><li data-t="tip9"></li></ul>
+    <p class="credit" data-t="credit"></p>
+    <button id="howClose" class="go" data-t="back">もどる</button>
+  </div>
+</section>
+
+<div id="hud" hidden>
+  <div class="watch"><span id="tm">0:00.00</span><span class="faults"><i data-t="faults">フォルト</i><b id="ft">0</b></span></div>
+  <div class="alt" aria-hidden="true">
+    <div class="alt-track"><div class="alt-best" id="altBest"></div><div class="alt-me" id="altMe"><span id="altNum">0m</span></div></div>
+  </div>
+  <div id="toast"></div>
+  <div id="why"></div>
+  <div id="tut"><span id="tutKey"></span><span id="tutTxt"></span></div>
+  <div id="keysMini"></div>
+  <div class="tbar">
+    <button id="bCp" class="ic" aria-label="休憩所からやり直す"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.2-5.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 3.5v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button id="bMenu" class="ic" aria-label="一時停止"><svg viewBox="0 0 24 24"><path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+  </div>
+</div>
+
+<div id="touch" hidden>
+  <div class="tl">
+    <button class="tb lean" data-k="fwd" aria-label="前体重"><svg id="tb-fwd" viewBox="0 0 48 48" aria-hidden="true"><g transform="translate(48 0) scale(-1 1)"><g transform="translate(0 6) scale(0.86) translate(4 4)"><g transform="rotate(20 24 34)"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="33" r="6.5" stroke-width="3.6"/><circle cx="37" cy="33" r="6.5" stroke-width="3.6"/><path d="M11 33 L22 30 M37 33 L32 20 L36 18" stroke-width="2.6"/></g><path d="M17 27 L31 21 L33 26 L26 31 L19 31 Z" fill="currentColor"/><path d="M15 25 L24 22.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="25" cy="12" r="3" fill="currentColor"/><path d="M25 15 L23 21 L28 23" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></g></g><path d="M33 7 Q20 4 12 15" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M9 9 L11.5 16.5 L18.5 14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>前</span></button>
+    <button class="tb lean" data-k="back" aria-label="後ろ体重"><svg id="tb-back" viewBox="0 0 48 48" aria-hidden="true"><g transform="translate(48 0) scale(-1 1)"><g transform="translate(0 6) scale(0.86) translate(4 4)"><g transform="rotate(-24 24 34)"><g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="33" r="6.5" stroke-width="3.6"/><circle cx="37" cy="33" r="6.5" stroke-width="3.6"/><path d="M11 33 L22 30 M37 33 L32 20 L36 18" stroke-width="2.6"/></g><path d="M17 27 L31 21 L33 26 L26 31 L19 31 Z" fill="currentColor"/><path d="M15 25 L24 22.5" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><circle cx="25" cy="12" r="3" fill="currentColor"/><path d="M25 15 L23 21 L28 23" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></g></g></g><path d="M15 7 Q28 4 36 15" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/><path d="M39 9 L36.5 16.5 L29.5 14" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/></svg><span>後ろ</span></button>
+  </div>
+  <div class="tr">
+    <button class="tb small" data-k="brk" aria-label="ブレーキ"><svg id="tb-brk" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 9 V37" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M13 27 L24 38 L35 27" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>ブレーキ</span></button>
+    <button class="tb big" data-k="thr" aria-label="アクセル"><svg id="tb-thr" viewBox="0 0 48 48" aria-hidden="true"><path d="M24 39 V11" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><path d="M13 21 L24 10 L35 21" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg><span>アクセル</span></button>
+  </div>
+</div>
+
+<section id="result" class="screen" hidden>
+  <div class="panel tablet">
+    <p class="tk-head" id="rCourse"></p>
+    <p class="tk-title" data-t="arrived">到着</p>
+    <div class="tk-row"><span data-t="time">時間</span><b id="rTime">0:00.00</b></div>
+    <div class="tk-row"><span data-t="faults">フォルト</span><b id="rFaults">0</b></div>
+    <div class="tk-row"><span data-t="best">自己ベスト</span><b id="rBest">—</b></div>
+    <div class="stamp" id="rMedal">金</div>
+    <div class="tk-btns">
+      <button id="rRetry" class="go" data-t="retry">もう一回</button>
+      <button id="rNext" class="go2" data-t="next">登る</button>
+      <a id="rShare" class="go2" target="_blank" rel="noopener"><span data-t="share">Xでポスト</span></a>
+      <button id="rMenu" class="link" data-t="menu">メニュー</button>
+    </div>
+  </div>
+</section>
+
+<section id="pause" class="screen" hidden>
+  <div class="panel small">
+    <h2 data-t="paused">一時停止</h2>
+    <button id="pResume" class="go" data-t="resume">続ける</button>
+    <button id="pRestart" class="go2" data-t="restart">最初から</button>
+    <button id="pHow" class="go2" data-t="how">遊び方</button>
+    <button id="pMenu" class="link" data-t="menu">メニュー</button>
+  </div>
+</section>
+
+<script>
+(function(){
+  var opt={passive:false};
+  ['gesturestart','gesturechange','gestureend'].forEach(function(n){document.addEventListener(n,function(e){e.preventDefault()},opt)});
+  document.addEventListener('touchmove',function(e){if(e.touches&&e.touches.length>1)e.preventDefault()},opt);
+  var last=0;document.addEventListener('touchend',function(e){var n=Date.now();if(n-last<300&&!(e.target.closest&&e.target.closest('button,a')))e.preventDefault();last=n},opt);
+  document.addEventListener('dblclick',function(e){e.preventDefault()},opt);
+  window.addEventListener('wheel',function(e){if(e.ctrlKey)e.preventDefault()},opt);
+  window.addEventListener('keydown',function(e){if((e.ctrlKey||e.metaKey)&&['+','-','=','0',';'].indexOf(e.key)>=0)e.preventDefault()});
+})();
+(function(){
+  var errs=[];window.__skyErr=errs;
+  window.addEventListener('error',function(e){errs.push((e.message||'error')+' @'+(e.filename||'')+':'+(e.lineno||''))});
+  window.addEventListener('unhandledrejection',function(e){errs.push('reject: '+(e.reason&&e.reason.message||e.reason))});
+  setTimeout(function(){
+    if(window.__skyReady||(window.__jsUp&&!errs.length)) return;
+    var d=document.createElement('div');d.id='boot-err';
+    d.textContent='起動できませんでした / failed to start\n'+(errs.join('\n')||'(no error captured)')+'\n'+navigator.userAgent;
+    document.body.appendChild(d);
+  },12000);
+})();
+</script>
+<script src="js/sfx.js?v=14"></script>
+<script src="support.js?v=1" defer></script>
+<script type="module" src="js/game.js?v=14"></script>
+</body>
+</html>
