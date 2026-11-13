@@ -275,9 +275,10 @@ export class World {
     this.shapes = shapes
     this.grid = new Map()
     this.stamp = new Int32Array(shapes.length); this.st = 0
-    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.time = 0
+    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.hangs = []; this.time = 0
     shapes.forEach((s, id) => {
       s.id = id
+      if (s.hang) this.hangs.push(s)
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
         // 動く足場: 動く範囲を全部含む箱で当たりの候補に入れる
@@ -469,7 +470,8 @@ export const BIKE = {
   frame: [[-0.35, -0.16, 0.13], [0, -0.22, 0.13], [0.36, -0.12, 0.13]],
   rider: [[-0.10, 0.22, 0.17, 0.22], [-0.02, 0.52, 0.17, 0.25], [0.02, 0.86, 0.15, 0.28]], // [前, 上, 半径, 重心で前へ動く量]
   hardLand: 9.5,
-  vtop: 13, vfade: 2, // v12: 最高速度（11m/s から効きが弱まり 13m/s で止まる）。ジャンプ台の踏み切りでは launchV で v11 と同じ飛び出しの速さに戻す
+  nitroTop: 20, nitroDrive: 2.1, nitroPower: 2.2, nitroThrust: 700, nitroUse: 0.4, // v15 ニトロ: 押している間は最高速度 20m/s・押す力 2 倍。満タンで 2.5 秒
+  vtop: 13.5, vfade: 2, // v15: 13 → 13.5（本人「ほんの少しだけ上げて」）。 // v12: 最高速度（11m/s から効きが弱まり 13m/s で止まる）。ジャンプ台の踏み切りでは launchV で v11 と同じ飛び出しの速さに戻す
   wheelieEase: 0.47,
 }
 
@@ -479,7 +481,7 @@ export function createBike(spawn) {
     p: spawn.p.slice(), v: [0, 0, 0], th: 0, w: 0, psi: spawn.yaw || 0, psiRate: 0,
     delta: 0, lean: 0, s: [0, 0], sv: [0, 0], g: [false, false], cn: [null, null], side: [null, null],
     pre: 0, tBack: 9, hopCool: 0, crashed: null, steps: 0, frame: [0, 0], wheelRot: [0, 0], scrape: 0,
-    impact: 0, landV: 0, airT: 0, speed: 0,
+    impact: 0, landV: 0, airT: 0, speed: 0, nitro: 1, nitroOn: false,
   }
 }
 export function basis(b) {
@@ -511,7 +513,17 @@ export function stepBike(world, b, inp, ev) {
     if (s.warnT == null && d < s.mov.trig && Math.abs(dy) < 3) { s.warnT = world.time; if (ev) ev.push({ t: 'trapwarn', p: s.tc.slice() }) }
     if (s.warnT != null && world.time - s.warnT > s.mov.warn) { s.gone = true; s.goneAt = world.time; if (ev) ev.push({ t: 'trapfall', p: s.tc.slice() }) }
   }
+  // ニトロ: アクセルと一緒に押している間だけ。曲がりの手前の自動の減速が入った時・空になった時は切れる
+  { const on = !b.crashed && !!inp.nitro && inp.thr > 0.5 && !(inp.ab > 0) && !(inp.brk > 0) && b.nitro > 0
+    if (on && !b.nitroOn && ev) ev.push({ t: 'nitro' })
+    if (!on && b.nitroOn && ev) ev.push({ t: 'nitroOff', empty: b.nitro <= 0 })
+    b.nitroOn = on
+    if (on) b.nitro = Math.max(0, b.nitro - BIKE.nitroUse * DT)
+    else if (inp.nitro && inp.thr > 0.5 && b.nitro <= 0 && ev && !b._nEmptyT) { ev.push({ t: 'nitroEmpty' }); b._nEmptyT = 40 }
+    if (b._nEmptyT) b._nEmptyT-- }
+  if (b.hang) { hangStep(world, b, inp, ev); b.steps++; return }
   for (let k = 0; k < SUB; k++) sub(world, b, inp, ev)
+  if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
   b.steps++
 }
 const ZERO = { thr: 0, brk: 0, lean: 0, steer: 0 }
@@ -584,10 +596,14 @@ function sub(world, b, inpIn, ev) {
       const nR = Math.abs(n[0] * B.R[0] + n[1] * B.R[1] + n[2] * B.R[2]), nF = n[0] * B.f[0] + n[1] * B.f[1] + n[2] * B.f[2]
       const climb = n[1] < 0.9 && nR < 0.5 && nF < 0 ? 1 + 0.9 * Math.min(1, (0.9 - n[1]) / 0.5) : 1
       if (inp.thr > 0) {
-        let fd = inp.thr * Math.min(P.drive * climb, P.power / Math.max(1, vt))
+        const nk = b.nitroOn ? 1 : 0
+        const drv = P.drive * climb, pwr = P.power, top = nk ? P.nitroTop : P.vtop
+        let fd = inp.thr * Math.min(drv, pwr / Math.max(1, vt))
         // 最高速度で絞った分を「最高速度がなかったら出ていた速さ」として覚えておく（ジャンプ台の踏み切りで戻す）
-        const vx = b.vx || 0, fdFree = inp.thr * Math.min(P.drive * climb, P.power / Math.max(1, vt + vx))
-        fd *= clamp((P.vtop - vt) / P.vfade, 0, 1)
+        const vx = b.vx || 0, fdFree = nk ? 0 : inp.thr * Math.min(drv, pwr / Math.max(1, vt + vx))
+        fd *= clamp((top - vt) / P.vfade, 0, 1)
+        // ニトロ中: 増えた分の押す力は車体の重心を押す（車輪の接地点で押すと前輪が上がって後ろへ回るので、回す力にしない）。タイヤの滑らない範囲で
+        if (nk) { const fx2 = inp.thr * Math.min(drv * P.nitroDrive, pwr * P.nitroPower / Math.max(1, vt)) * clamp((top - vt) / P.vfade, 0, 1), ex = Math.max(0, Math.min(fx2 - fd, lim * 1.1 - fd)); if (ex > 0) addF([t[0] * ex, t[1] * ex, t[2] * ex], b.p, 'nitro') }
         // ウィリーの上限（v12）: 後輪だけで 34 度を超えたら、アクセルの押す力を弱めて 35〜45 度あたりで止まるようにする（後ろへ宙返りしない）
         b.vxAcc = (b.vxAcc || 0) + Math.max(0, Math.min(fdFree, lim) - Math.min(fd, lim))
         if (b.creep && b.standOn) fd *= clamp((1.2 - vt) * 2, 0, 1) * 0.6 // ゆっくり進むウィリーは歩く速さまで
@@ -598,10 +614,10 @@ function sub(world, b, inpIn, ev) {
       if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
     }
     // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
-    const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -Math.min(0.5, 0.034 * spd) ? 0 : 0.6 + 0.35 * Math.min(1, spd / 15)) // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
+    const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -Math.max(0.2, Math.min(0.5, 0.034 * spd)) ? 0 : 0.85 + 0.15 * Math.min(1, spd / 15)) // v15: 前輪をしっかり効かせる（遅い時に前が少し沈んだだけで前ブレーキが抜けていた） // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
     // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
-    if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.75) * lim * inp.brk
+    if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
     Ft -= vt * 6 + (vt > 0 ? 1 : -1) * 0.012 * N // 転がり
     if (b.carryId >= 0 && con.id === b.carryId && inp.thr <= 0.05 && inp.brk <= 0.05) Ft -= clamp(vt * 900, -0.6 * lim, 0.6 * lim) // 動く床の上で何もしない時は、床と一緒に止まる（転がって取り残されない）
     { const sh = world.shapes[con.id]; if (sh.mud) Ft -= clamp(vt, -3, 3) * sh.mud } // 泥: 車輪が沈んで重い
@@ -695,6 +711,8 @@ function sub(world, b, inpIn, ev) {
     const k = P.m * (wd.pulse ? gustK(wd, world.time) : 0.55 + 0.45 * dsin(world.time * wd.w + wd.ph))
     fx += wd.f[0] * k; fy += wd.f[1] * k; fz += wd.f[2] * k
   }
+  // ---- ニトロの噴射（空中でも少し押す。谷越えの最後のひと伸び）
+  if (b.nitroOn && !b.g[0] && !b.g[1]) { fx += B.h[0] * P.nitroThrust; fz += B.h[2] * P.nitroThrust }
   // ---- 車体の下（こする）と人（当たると転倒）
   b.scrape = 0
   for (const fp of framePts(b, B)) {
@@ -893,4 +911,89 @@ export function hashBike(b) {
   const u = new Uint32Array(a.buffer); let h = 2166136261
   for (let i = 0; i < u.length; i++) { h ^= u[i]; h = Math.imul(h, 16777619) >>> 0 }
   return h.toString(16)
+}
+
+// ============================================================ 縁に前輪を引っ掛けて耐える（v15）
+// 高い縁（1.5m 以上・shape.hang = { a, b, n（縁から手前へ出る水平の向き）, max（耐えられる秒数） }）の角に、前輪が下から・横から近づいたら引っ掛かる。
+// 引っ掛かっている間は、前輪を縁の角に乗せ、車体は壁沿いにほぼ立つ。
+//   ・体の釣り合い x（-1 後ろ〜+1 前）は放っておくと倒れていく。体重の前後で直す。風・鉄球の風圧で揺さぶられる。|x| > 1 で落ちる（前は転倒、後ろは下へ落ちる）
+//   ・ブレーキを離すと前輪が少しずつずり落ちる（slip が 0.5 で落ちる）
+//   ・耐えられる時間には限りがある（縁が欠けていく）。残り 2 秒で小石がこぼれる
+//   ・前体重＋アクセルで後輪で壁を駆け上がり、上へ乗る（0.8 秒）
+const HANG_TH = 1.36 // 引っ掛かった時の車体の傾き（約 78 度）
+function hangEdge(sh, p) {
+  const H = sh.hang, ax = [H.b[0] - H.a[0], H.b[1] - H.a[1], H.b[2] - H.a[2]], L2 = ax[0] * ax[0] + ax[1] * ax[1] + ax[2] * ax[2]
+  const u = clamp(((p[0] - H.a[0]) * ax[0] + (p[1] - H.a[1]) * ax[1] + (p[2] - H.a[2]) * ax[2]) / L2, 0.05, 0.95)
+  return { e: [H.a[0] + ax[0] * u, H.a[1] + ax[1] * u, H.a[2] + ax[2] * u], u }
+}
+function hangCatch(world, b, inp, ev) {
+  const B = basis(b), fc = wheelCenter(b, B, 1, b.s[1]), rc = wheelCenter(b, B, 0, b.s[0])
+  for (const sh of world.hangs) {
+    if (sh.gone) continue
+    const H = sh.hang, { e } = hangEdge(sh, fc)
+    const dh = (fc[0] - e[0]) * H.n[0] + (fc[2] - e[2]) * H.n[2], dv = fc[1] - e[1]
+    const into = -(B.h[0] * H.n[0] + B.h[2] * H.n[2])
+    if (into < 0.6 || dh < -0.12 || dh > 0.62 || dv < -0.5 || dv > 0.32 || rc[1] > e[1] - 0.15) continue
+    const lat = Math.abs((fc[0] - e[0]) * H.n[2] - (fc[2] - e[2]) * H.n[0]); if (lat > 3) continue
+    b.hang = { id: sh.id, t: 0, x: clamp((b.w || 0) * -0.15, -0.3, 0.3), xv: 0, slip: 0, climb: 0, psi: Math.atan2(H.n[2], -H.n[0]) + 0, warned: false }
+    // 壁に向く向き（-n の向き）
+    b.hang.psi = Math.atan2(H.n[2], -H.n[0])
+    b.v = [0, 0, 0]; b.w = 0; b.psiRate = 0
+    if (ev) ev.push({ t: 'hang', p: e.slice() })
+    hangPose(world, b)
+    return
+  }
+}
+function hangPose(world, b) {
+  const sh = world.shapes[b.hang.id], H = sh.hang, hg = b.hang
+  b.psi = hg.psi; b.th = HANG_TH + hg.x * 0.2 - hg.slip * 0.25; b.lean = clamp(b.lean, -1, 1)
+  const B = basis(b), { e } = hangEdge(sh, b.p)
+  // 前輪の中心は縁の角の少し手前・上（ずり落ちた分だけ下がって手前へ）
+  const r = BIKE.R + BIKE.rt, fc = [e[0] + H.n[0] * (r * 0.62 + hg.slip * 0.25), e[1] + r * 0.78 - hg.slip * 0.5, e[2] + H.n[2] * (r * 0.62 + hg.slip * 0.25)]
+  const w0 = wheelCenter(b, B, 1, 0)
+  b.p = [b.p[0] + fc[0] - w0[0], b.p[1] + fc[1] - w0[1], b.p[2] + fc[2] - w0[2]]
+  b.s = [0, 0.04]; b.g = [false, true]; b.cn = [null, { id: sh.id, q: e.slice(), n: [0, 1, 0], nw: [0, 1, 0], depth: 0, mu: 1 }]; b.side = [null, null]
+  b.speed = 0; b.airT = 0
+}
+function hangStep(world, b, inp, ev) {
+  const hg = b.hang, sh = world.shapes[hg.id], H = sh.hang
+  hg.t += DT
+  b.lean += clamp(clamp(inp.lean, -1, 1) - b.lean, -6 * DT, 6 * DT)
+  // 揺さぶり: 決まった揺れ（時刻の式）＋風の強さ＋近くを通る鉄球の風圧
+  let dist = 0.55 * dsin(world.time * 2.3 + hg.id) + 0.35 * dsin(world.time * 3.7 + 1.3)
+  for (const wd of world.winds) if (b.p[0] > wd.min[0] - 2 && b.p[0] < wd.max[0] + 2 && b.p[2] > wd.min[2] - 2 && b.p[2] < wd.max[2] + 2 && b.p[1] > wd.min[1] - 3 && b.p[1] < wd.max[1] + 3) dist += (wd.pulse ? gustK(wd, world.time) : 0.5) * 2.2 * (wd.f[0] * H.n[0] + wd.f[2] * H.n[2] >= 0 ? -1 : 1)
+  for (const s2 of world.moving) if (s2.knock && !s2.gone && s2.c) { const d = Math.hypot(s2.c[0] - b.p[0], s2.c[1] - b.p[1], s2.c[2] - b.p[2]); if (d < 3.5) dist += (3.5 - d) * 0.9 * Math.sign(dsin(world.time * 5 + s2.id)) }
+  // 体の釣り合い（放っておくと倒れる）。前体重で前へ、後ろ体重で後ろへ
+  hg.xv += (2.2 * hg.x + 2.6 * b.lean + dist * 0.6 - 1.6 * hg.xv) * DT
+  hg.x += hg.xv * DT
+  // ブレーキを離すと、前輪がずり落ちる
+  if (inp.brk > 0.5) hg.slip = Math.max(0, hg.slip - 0.05 * DT); else hg.slip += 0.28 * DT
+  // 登る: 前体重＋アクセル（釣り合いがとれている時）
+  if (inp.lean > 0.5 && inp.thr > 0.5 && Math.abs(hg.x) < 0.75 && hg.slip < 0.35) { hg.climb += DT / 0.8; hg.xv *= 0.85; hg.x *= 1 - 3 * DT } // 登り始めたら、体は壁に寄って安定する else hg.climb = Math.max(0, hg.climb - DT * 0.8)
+  const max = H.max || 8
+  if (!hg.warned && hg.t > max - 2) { hg.warned = true; if (ev) ev.push({ t: 'hangWarn', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }) }
+  const exit = why => {
+    const n = H.n, { e } = hangEdge(sh, b.p)
+    b.hang = null
+    if (why === 'up') {
+      // 縁の上へ: 角から 0.9m 奥に、少し前上がりで置いて前へ進ませる
+      const yaw = hg.psi; b.psi = yaw; b.th = 0.12; b.w = 0; b.lean = 0.3
+      const B2 = basis(b), w0 = wheelCenter(b, B2, 0, 0.08), back = [e[0] - n[0] * 0.25, e[1] + BIKE.R + BIKE.rt, e[2] - n[2] * 0.25]
+      b.p = [b.p[0] + back[0] - w0[0], b.p[1] + back[1] - w0[1] + 0.02, b.p[2] + back[2] - w0[2]]
+      b.v = [-n[0] * 2.0, 0.6, -n[2] * 2.0]; b.s = [0.08, 0.06]
+      if (ev) ev.push({ t: 'hangUp' })
+      return
+    }
+    if (why === 'front') { crash(b, 'front', 0, ev); b.v = [-n[0] * 1.5, 0.5, -n[2] * 1.5]; if (ev) ev.push({ t: 'hangFall', why }); return }
+    // 後ろへ・ずり落ちた・縁が欠けた: 壁から少し離れて下へ落ちる
+    b.v = [n[0] * 1.2, -0.5, n[2] * 1.2]; b.w = -1.2; b.g = [false, false]; b.cn = [null, null]
+    b.p = [b.p[0] + n[0] * 0.25, b.p[1] - 0.15, b.p[2] + n[2] * 0.25]
+    if (ev) ev.push({ t: 'hangFall', why })
+  }
+  if (hg.climb >= 1) return exit('up')
+  if (hg.x > 1) return exit('front')
+  if (hg.x < -1) return exit('back')
+  if (hg.slip > 0.5) return exit('slip')
+  if (hg.t > max) { if (ev) ev.push({ t: 'hangBreak', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }); return exit('edge') }
+  hangPose(world, b)
 }

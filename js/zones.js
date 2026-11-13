@@ -4,6 +4,8 @@
 // 時間を読むだけの仕掛け（動く床・鉄球）は、必ず 1〜4 と組み合わせる。
 // ctx = { B, orbit, ogap, ostep, otorch, outer, excursion, W, RM, DEG }
 
+// 直線の道の切れ目（4m を超える。下りながら跳ぶ）
+function xgap(B, len, dy) { const w = B.last ? B.last.w : 3; B.kicker(1.6, 11 * Math.PI / 180, { w: w - 0.4, mat: 'plank', thick: 0.5 }); B.path[B.path.length - 1].vNeed = 9; B.gap(len, dy, 'jump'); B.path[B.path.length - 1].vJump = 9 } // 小さな踏み切り台から跳ぶ
 // 塔のまわりの道で木箱の段（ostep + 短い円弧）
 function ocrates(x, heights, gapAng = 0.16, o = {}) {
   for (const h of heights) { x.ostep(h); x.orbit(gapAng, 0, { mat: 'crate', kind: 'crate', mu: o.mu }) }
@@ -16,7 +18,7 @@ function ochannel(x, ang, rise, u = 2.0) {
   return s
 }
 
-// 周を重ねて登る（抜ける床・溝・崩れる敷石が 2 本に 1 本。半周ごとに松明、真ん中に旗）
+// 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
@@ -24,6 +26,57 @@ export function laps(x, n, name) {
     orbit(0.52, 1.05)
     if (k % 3 === 2) otorch()
     if (k === n * 6) B.cp(name + 'の途中', { w: W, rest: true })
+  }
+}
+
+// ================= v15 回廊の作り直し: 短く切った形を、前と同じ物を続けずに並べる。どれも歩く人では越えられない（速さ・ウィリー・よじ登り・体当たり）
+// 形: drop（4m 超の切れ目を下りながら跳ぶ）/ hop（ジャンプ台で 4.6m を跳ぶ。速すぎると着地の先の壁）/ gal（屋根と窓のある塔の中の通路。入口の扉を破り、中は崩れる床）
+//     steep（38 度・10m の坂を勢いで登る）/ nsteep（41 度。ニトロでしか登れない。手前に燃料の缶）/ hang（1.6m の縁に前輪を掛けて耐え、上を通る物を待って登る）
+//     whoop（丸太の連続）/ pinch（外が開けた細い道）/ wide（広い張り出し）
+export function gauntlet(x, name, seq, o = {}) {
+  const { B, orbit, orbitRaw, ogap, otorch, gallery, W, DEG } = x
+  B.cp(name + 'の入口', { w: W, rest: true }) // 長い回廊の前に旗（転んだら旗から）
+  orbitRaw(0.3, 0.3)
+  B.mark(name)
+  const mat = B.omat, galMat = o.galMat || 'castle'
+  let k = 0
+  for (const e of seq) {
+    k++
+    if (e === 'drop') { orbitRaw(0.7, 0.5); B.noDeco = 0; ogap(4.4, -0.6); orbitRaw(0.32, 0.3, { kind: 'landing' }) }
+    else if (e === 'hop') {
+      orbitRaw(0.75, 0.4)
+      const rise = B.kicker(2.0, 12 * DEG, { w: W - 0.8, mat: 'plank', thick: 0.6 }); B.path[B.path.length - 1].vNeed = 9.5
+      ogap(4.3, rise - 0.25); B.path[B.path.length - 1].vJump = 9.5
+      orbitRaw(0.42, 0, { kind: 'landing', w: 5.4 }); x.ostep(0.7); orbitRaw(0.3, 0.3) // 着地は広め。速すぎる（ニトロのまま）と着地の先の壁に当たる
+    }
+    else if (e === 'gal') {
+      orbitRaw(0.6, 0.4) // 扉を破る助走
+      B.door(0.6, { breakV: 6, w: W, mat: 'bridgeplank' })
+      const a = orbitRaw(0.42, 0.6, { mat: galMat === 'castle' ? 'cobble' : mat })
+      const n = 3, al = 0.33
+      const cr = []; for (let j = 0; j < n; j++) { const s3 = B.curve(B.t.p ? x.TR + W / 2 : 0, al / n * B.orbitSign, { w: W, rise: 0, mat: 'plankold', thick: 0.35, kind: 'crumble' }); s3.mov = { type: 'crumble', delay: 0.26, back: 1e9, once: true }; cr.push(s3) }
+      const c = orbitRaw(0.4, 0.8, { mat: galMat === 'castle' ? 'cobble' : mat })
+      for (const s2 of [a, ...cr, c]) gallery(s2, { mat: galMat })
+    }
+    else if (e === 'steep' || e === 'nsteep') {
+      if (e === 'nsteep') B.can(3)
+      orbitRaw(0.7, 0.3)
+      orbitRaw(0.16, 0.9)
+      const s2 = orbitRaw(0.6, e === 'nsteep' ? 8.9 : 8.0, { kind: 'steep', mat: e === 'nsteep' ? 'rust' : mat, mu: 0.95 })
+      if (e === 'nsteep') { const i1 = B.path.length; for (let j = i1 - 12; j < i1; j++) B.path[j].nitro = true }
+      orbitRaw(0.16, 0.9); orbitRaw(0.3, 0.2)
+    }
+    else if (e === 'hang') {
+      orbitRaw(0.3, 0)
+      B.hangLedge(1.6, 3.4, { w: W, max: o.hangMax ?? 8, mat })
+      if (o.hangHz === 'ball') B.pendulum(-2.8, { w: W, T: (o.T ?? 3.4) + 1.4, ph: o.ph ?? 0, L: 3.6 }) // 縁の上を横切る鉄球（縁に掛けて耐えている間は頭の上を通る）
+      orbitRaw(0.3, 0.3)
+    }
+    else if (e === 'whoop') { orbitRaw(0.15, 0.1); for (let j = 0; j < 3; j++) B.log(1.5 + j * 2.4, 0.17, W - 0.4, 'log'); orbitRaw(0.5, 0.3) }
+    else if (e === 'pinch') orbitRaw(0.45, 0.6, { w: 2.4, kind: 'narrow' })
+    else if (e === 'wide') orbitRaw(0.4, 0.6, { w: 5.6 })
+    if (k % 3 === 0) otorch()
+    if (o.cpAt === k) B.cp(name + 'の途中', { w: W, rest: true })
   }
 }
 
@@ -41,7 +94,7 @@ export function crypt(x) {
   orbit(0.5, 1.2); otorch()
   x.ostep(0.3); orbit(0.5, 1.2)
   orbit(0.55, 1.3); otorch()
-  orbit(0.5, 1.2)
+  orbit(0.3, 0.7); x.ogap(4.3, -0.5); orbit(0.35, 0.8) // 溶岩に追われながら、勢いで切れ目を跳ぶ
   B.risers.push({ i0: r0 + 2, i1: B.path.length, y0: y0 - 3.2, rate: 0.72, yTop: B.t.p[1] - 0.4, delay: 1.0 })
   B.decoOn = true
   B.cp('溶岩の上', { w: W, rest: true })
@@ -68,10 +121,10 @@ export function crypt(x) {
   B.cp('水路の踊り場', { w: W, rest: true })
   // 1+2 水の中の木箱（流れに押されながら、ウィリーで段を越える）
   B.mark('水の中の木箱')
-  orbit(0.2, 0)
-  ochannel(x, 0.2, 0, 1.6)
-  x.ostep(0.42); ochannel(x, 0.22, 0, 1.6)
-  x.ostep(0.42); ochannel(x, 0.22, 0, 1.6)
+  orbit(0.6, 0.3); x.ogap(4.3, -0.5); orbit(0.25, 0) // 水路の手前の切れ目（勢いで）
+  ochannel(x, 0.2, 0, 1.2)
+  x.ostep(0.36); ochannel(x, 0.22, 0, 1.2)
+  x.ostep(0.36); ochannel(x, 0.22, 0, 1.2)
   orbit(0.4, 0.6); otorch()
   orbit(0.45, 1.0)
   // 3+2 扉の向こうに木箱（扉を破る速さのまま段には行けない。破ったら止まって段をよじ登る）
@@ -94,7 +147,7 @@ export function crypt(x) {
   ochannel(x, 0.5, 1.4, 2.0); B.door(1.0, { breakV: 6.5 }); orbit(0.25, 0.1)
   ochannel(x, 0.45, 1.2, 2.2); orbit(0.3, 0.3); otorch()
   orbit(0.45, 1.0)
-  laps(x, 3, '墓所の回廊')
+  gauntlet(x, '墓所の回廊', ['drop', 'gal', 'whoop', 'hop', 'pinch', 'steep', 'drop', 'gal', 'hang', 'wide', 'hop'], { cpAt: 6, galMat: 'castle' })
   B.cp('墓所の奥', { w: W, rest: true })
   // 試験: 天井の低い暗い水路（ウィリーすると頭を打つ）→ 流れに逆らって登る → 扉を破る
   B.mark('暗い水路と扉')
@@ -124,25 +177,26 @@ export function ruinsMore(x) {
       B.crumbleRun(15, 7, 2.6, 0.18)
       B.road(2, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0, noOverlap: true })
       { const rise = B.kicker(2.2, 13 * x.DEG, { w: 2.6, mat: 'cobble', thick: 0.8 }); B.gap(3.2, rise - 0.3, 'jump') }
-      B.road(11, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
+      B.road(4, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 }); B.trapStraight({ w: 2.8, mat: 'cobble' }); B.road(5, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
     },
     back: () => { B.road(6, { w: 2.8, slope: 12 * x.DEG, mat: 'cobble', thick: 1.0 }) },
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
-  laps(x, 3, '廃墟の回廊')
+  gauntlet(x, '廃墟の回廊', ['hop', 'gal', 'drop', 'steep', 'whoop', 'hang', 'pinch', 'drop', 'gal', 'hop', 'wide'], { cpAt: 6, galMat: 'castle', hangHz: 'ball', T: 3.6 })
   B.cp('廃墟の街の上', { w: x.W, rest: true })
   // 4+2 崩れる足場の上の段（止まると崩れる。勢いを殺さずに段へ）
   B.mark('崩れる足場と段')
   excursion({
     Ru: 6, Rs: 12, sRise: 6.2, w: 2.8, mat: 'cobble', plat: 'cobble', thick: 1.0,
     out: () => {
-      B.road(8, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
+      B.road(3, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 }); B.trapStraight({ w: 2.8, mat: 'cobble' }); B.road(4, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
       B.crumbleRun(8, 4, 2.6, 0.45)
       B.road(6, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0, noOverlap: true })
       B.step(0.45); B.road(4, { w: 2.8, mat: 'cobble', thick: 1.0, noOverlap: true })
       B.crumbleRun(6, 3, 2.6, 0.45)
-      B.road(8, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0, noOverlap: true })
+      B.road(5, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0, noOverlap: true }); B.trapStraight({ w: 2.8, mat: 'cobble' }); B.road(7, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
+      xgap(B, 4.3, -0.5); B.road(5, { w: 2.8, mat: 'cobble', thick: 1.0, back: 0 })
     },
     back: () => { B.road(6, { w: 2.8, slope: 10 * x.DEG, mat: 'cobble', thick: 1.0 }) },
   })
@@ -162,7 +216,7 @@ export function factoryMore(x) {
       B.road(5, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
       B.mover('fwd', { len: 9, size: 3, w: 3.0, dwell: 2.2, move: 2.8 })
       B.road(1.5, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
-      B.step(0.7); B.road(5, { w: 3.0, mat: 'rust', thick: 1.2, noOverlap: true })
+      B.hangLedge(1.6, 5, { w: 3.0, mat: 'rust', max: 8, thick: 0.8 }) // 動く床の端から高い縁へ前輪を掛ける
     },
     back: () => { B.road(5, { w: 3.0, slope: 6 * x.DEG, mat: 'grate', thick: 0.6 }) },
   })
@@ -176,7 +230,8 @@ export function factoryMore(x) {
       B.road(6, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
       B.mover('up', { rise: 3.2, size: 3.2, w: 3.0, dwell: 2.4, move: 2.6 })
       B.road(1.2, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
-      B.step(0.6); B.road(5, { w: 3.0, mat: 'rust', thick: 1.0, noOverlap: true })
+      B.step(0.6); B.road(5, { w: 3.0, mat: 'rust', thick: 1.0, noOverlap: true }); B.road(9, { w: 3.0, mat: 'rust', thick: 1.0 })
+      xgap(B, 4.3, -0.5); B.road(5, { w: 3.0, mat: 'rust', thick: 1.0, back: 0 })
     },
     back: () => { B.road(5, { w: 3.0, slope: 4 * x.DEG, mat: 'grate', thick: 0.6 }) },
   })
@@ -188,31 +243,34 @@ export function factoryMore(x) {
   excursion({
     Ru: 6, Rs: 12, sRise: 5.6, w: 3.0, mat: 'grate', plat: 'rust', thick: 0.6,
     out: () => {
-      B.road(10, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
+      B.road(15, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
       const rise = B.kicker(2.2, 12 * x.DEG, { w: 2.8, mat: 'rust', thick: 0.6 })
       B.path[B.path.length - 1].vNeed = 8.5
       B.mover('side', { len: 8, plen: 3.6, w: 3.2, amp: 3.2, dy: rise - 0.4, vGo: 8.5, vJump: 8.5, runup: 10 })
       B.road(2, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
-      B.step(0.7); B.road(5, { w: 3.0, mat: 'grate', thick: 1.2, noOverlap: true })
+      B.step(0.7); B.road(5, { w: 3.0, mat: 'grate', thick: 1.2, noOverlap: true }); B.road(9, { w: 3.0, mat: 'grate', thick: 1.2 })
+      xgap(B, 4.3, -0.5); B.road(5, { w: 3.0, mat: 'grate', thick: 1.0, back: 0 })
     },
     back: () => { B.road(6, { w: 3.0, slope: 10 * x.DEG, mat: 'grate', thick: 0.6 }) },
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
+  B.cp('回る橋の手前', { w: W, rest: true })
   // 回る橋（向きがそろった一瞬に、勢いで渡り切る）
   B.mark('回る橋')
   excursion({
     Ru: 6, Rs: 12, sRise: 5.4, w: 3.0, mat: 'grate', plat: 'rust', thick: 0.6,
     out: () => {
-      B.road(12, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
+      B.road(5, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 }); B.trapStraight({ w: 3.0, mat: 'grate' }); B.road(5, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
       B.spinBridge(8, { w: 3.4, rate: 0.3, vGo: 8 })
-      B.road(7, { w: 4.0, mat: 'rust', thick: 0.6, back: 0 })
+      B.road(5, { w: 4.0, mat: 'rust', thick: 0.6, back: 0 }); B.trapStraight({ w: 4.0, mat: 'rust' }); B.road(6, { w: 4.0, mat: 'rust', thick: 0.6, back: 0 })
+      xgap(B, 4.3, -0.5); B.road(5, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
     },
     back: () => { B.road(6, { w: 3.0, slope: 11 * x.DEG, mat: 'grate', thick: 0.6 }) },
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
-  laps(x, 3, '工場の回廊')
+  gauntlet(x, '工場の回廊', ['steep', 'drop', 'gal', 'hop', 'pinch', 'nsteep', 'whoop', 'hang', 'drop', 'gal', 'hop'], { cpAt: 6, galMat: 'rust', hangHz: 'ball', T: 3.2, ph: 1.1 })
   B.cp('歯車の天井', { w: W, rest: true })
   // 試験: 動く床で渡って、すぐ上がる床、降りたら段
   B.mark('工場の試験')
@@ -243,8 +301,8 @@ export function belfry(x) {
     out: () => {
       B.road(6, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
       B.seesaw(8, { w: 2.8, ang: 0.2 })
-      B.road(2.4, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
-      B.step(0.6); B.road(6, { w: 3.0, mat: 'cobble', thick: 1.4, noOverlap: true })
+      B.road(5, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 }); B.trapStraight({ w: 3.0, mat: 'cobble' }); B.road(7, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
+      xgap(B, 4.3, -0.5); B.road(6, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
     },
     back: () => { B.road(6, { w: 3.0, slope: 8 * x.DEG, mat: 'cobble', thick: 0.8 }) },
   })
@@ -253,7 +311,7 @@ export function belfry(x) {
   B.mark('鐘と木箱')
   orbit(0.2, 0)
   x.ostep(0.55); B.pendulum(4.5, { w: W, T: 3.6, ph: 0 }); orbit(0.5, 0, { mat: 'crate', kind: 'crate' })
-  x.ostep(0.55); B.pendulum(4.5, { w: W, T: 3.6, ph: 1.8 }); orbit(0.5, 0, { mat: 'crate', kind: 'crate' })
+  orbit(0.15, 0); B.hangLedge(1.6, 3.4, { w: W, max: 8, mat: B.omat }); B.pendulum(-2.8, { w: W, T: 4.8, ph: 1.8, L: 3.6 }); orbit(0.4, 0) // 鐘が縁の上を通り過ぎるまで、前輪を掛けて耐える
   orbit(0.45, 0.8); otorch()
   orbit(0.4, 0.9)
   B.cp('鐘楼の中ほど', { w: W, rest: true })
@@ -266,8 +324,8 @@ export function belfry(x) {
       B.seesaw(7, { w: 2.8, ang: 0.2, beam: false })
       B.road(2.2, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
       B.seesaw(6, { w: 2.6, ang: 0.24 })
-      B.road(2.2, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
-      B.step(0.5); B.road(5, { w: 3.0, mat: 'cobble', thick: 1.3, noOverlap: true })
+      B.road(5, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 }); B.trapStraight({ w: 3.0, mat: 'cobble' }); B.road(7, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
+      xgap(B, 4.3, -0.5); B.road(5, { w: 3.0, mat: 'cobble', thick: 0.8, back: 0 })
     },
     back: () => { B.road(6, { w: 3.0, slope: 8 * x.DEG, mat: 'cobble', thick: 0.8 }) },
   })
@@ -277,10 +335,10 @@ export function belfry(x) {
   orbit(0.2, 0)
   x.ostep(0.5); B.pendulum(4.5, { w: W, T: 3.2, ph: 0.4 }); orbit(0.5, 0, { mat: 'crate', kind: 'crate' })
   x.ostep(0.6); B.pendulum(4.5, { w: W, T: 3.2, ph: 2.0 }); orbit(0.5, 0, { mat: 'crate', kind: 'crate' })
-  x.ostep(0.72); orbit(0.4, 0.3)
+  orbit(0.15, 0); B.hangLedge(1.6, 3.4, { w: W, max: 7, mat: B.omat }); orbit(0.4, 0.3)
   orbit(0.45, 0.8); otorch()
   orbit(0.4, 0.9)
-  laps(x, 3, '鐘楼の回廊')
+  gauntlet(x, '鐘楼の回廊', ['gal', 'drop', 'hang', 'hop', 'whoop', 'steep', 'pinch', 'gal', 'drop', 'hop', 'wide'], { cpAt: 6, galMat: 'castle', hangHz: 'ball', T: 3.0, hangMax: 7 })
   B.cp('鐘楼の上', { w: W, rest: true })
   // 3 シーソーで下りた先の扉（ゆっくり下りたあと、短い助走で扉を破る）
   B.mark('シーソーと扉')
@@ -333,6 +391,7 @@ export function storm(x) {
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
+  B.cp('吊り橋の向こう', { w: W, rest: true })
   // 1+2 嵐の中の大ジャンプ（速さの帯: 遅いと谷、速すぎると向こうの壁）
   B.mark('嵐の大ジャンプ')
   excursion({
@@ -349,7 +408,7 @@ export function storm(x) {
   })
   orbit(0.45, 1.0); otorch()
   orbit(0.4, 0.8)
-  laps(x, 3, '嵐の回廊')
+  gauntlet(x, '嵐の回廊', ['hop', 'drop', 'nsteep', 'gal', 'pinch', 'hang', 'whoop', 'drop', 'steep', 'hop', 'gal'], { cpAt: 6, galMat: 'snowrock', hangHz: 'ball', T: 2.8, hangMax: 6 })
   B.cp('嵐の踊り場', { w: W, rest: true })
   // 1+2 下り坂から跳ぶ長い谷（速いほど遠い。着地のすぐ先に段の壁）
   B.mark('嵐の谷')
@@ -372,7 +431,7 @@ export function storm(x) {
   B.mark('嵐の段')
   orbit(0.3, 0.2)
   B.gust(10, { sgn: -x.outer(), a: 4, T: 9.0, ph: 0.6, vGo: 4 })
-  orbit(0.25, 0, { w: 3.0 }); x.ostep(0.5); orbit(0.25, 0, { w: 3.0 }); x.ostep(0.5); orbit(0.3, 0.2, { w: 3.0 })
+  orbit(0.25, 0, { w: 3.0 }); x.ostep(0.5); orbit(0.25, 0, { w: 3.0 }); B.hangLedge(1.6, 3.2, { w: 3.0, max: 7, mat: B.omat }); orbit(0.3, 0.2, { w: 3.0 }) // 風の中で縁に前輪を掛けて耐え、風が止んだら登る
   orbit(0.45, 0.9); otorch()
   orbit(0.4, 0.9)
   // 試験: 突風の中、崩れる橋 → 段

@@ -38,3 +38,9 @@
 - snd/ballhit.mp3: 100 CC0 SFX #2 / rubberduck / CC0
 - snd/cloth.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/pebbles.mp3: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/engine_hi.wav（高回転のエンジン）: racing car engine sound loops / domasx2 / CC0
+- snd/nitro.mp3（ニトロの噴射の唸り）: File:WWS Bloweroftheforge.ogg / Work With Sounds / La Fonderie / CC BY 4.0 / https://commons.wikimedia.org/wiki/File:WWS_Bloweroftheforge.ogg
+- snd/whoosh.mp3（ニトロの点火）: Air whoosh / pyranostudios / CC0
+- snd/gravel1〜3.mp3（砂利を巻き上げる・滑る）: 100 CC0 SFX #2 / rubberduck / CC0
+- snd/scream.mp3（長く落ちる時の叫び声）: File:Wilhelm Scream.ogg / Wikimedia Commons（SSE Library VOICES より）/ CC0 1.0 / https://commons.wikimedia.org/wiki/File:Wilhelm_Scream.ogg
+- snd/grunt1〜3.mp3（着地の「うっ」）: Little Grunts / crueltyinc / CC0

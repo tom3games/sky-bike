@@ -127,3 +127,13 @@ html[lang=en] .stamp{font-size:15px}
 .tk-btns .go{margin-top:0}
 @media (max-height:540px){.panel{width:min(780px,100%);padding:12px 18px}.panel h2{font-size:19px}.how-lead{margin:4px 0 6px;font-size:13px}.keys{font-size:12px}.keys th,.keys td{padding:2px 6px 2px 0;font-size:12px}.tips{display:none}.credit{display:none}.panel .go{margin-top:8px;padding:8px 18px}.panel.small{gap:6px}.t-left{margin-top:0}.logo .en{font-size:clamp(40px,8vw,84px)}}
 @media (max-width:520px){#title{background:linear-gradient(180deg,rgba(10,16,17,.6),rgba(10,16,17,.2) 55%,rgba(10,16,17,.5))}.t-left{margin-top:4vh}}
+
+/* ニトロ: アクセルの真上。まわりの輪が残りの量（ボトルの中身） */
+#touch .tb.nit{position:absolute;right:12px;bottom:102px;--n:1;background:radial-gradient(circle,rgba(13,14,12,.55) 62%,transparent 63%),conic-gradient(#5fb8ff calc(var(--n)*360deg),rgba(226,220,205,.12) 0);color:#9fd2ff}
+#touch .tb.nit span{color:#9fd2ff}
+#touch .tb.nit.empty{color:var(--ash);opacity:.6}
+#touch .tb.nit.down{box-shadow:0 0 0 2px rgba(95,184,255,.5),0 0 26px rgba(95,184,255,.55)}
+#nitroHud{width:14px;height:36px;margin-left:12px;vertical-align:middle;filter:drop-shadow(0 0 6px rgba(95,184,255,.45))}
+#nitroHud.on{filter:drop-shadow(0 0 10px rgba(130,200,255,.95))}
+/* 遊び方: ニトロの行が増えた分、背の低い画面では詰める（もどるボタンが画面に収まるように） */
+@media (max-height:940px){.how-lead{margin:6px 0 8px;font-size:13px}.keys th,.keys td{padding:2px 8px 2px 0}.tips{margin:6px 0}.tips li{margin:1px 0;font-size:12.5px;line-height:1.45}.credit{margin-top:4px;font-size:11px}.panel .go{margin-top:8px}}

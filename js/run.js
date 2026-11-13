@@ -1,7 +1,7 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=14'
+import { createBike, stepBike, resetFallen } from './physics.js?v=15'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -41,7 +41,8 @@ export function goodSpot(world, course, i) {
   const P = course.path, q = P[i]
   if (!q || !q.p || !q.w || q.branch || NOSPAWN.has(q.kind) || Math.abs(q.slope || 0) > 0.25) return false
   // 後ろ 3 m（後輪の下）とすぐ先 16 m に跳ぶ所・抜ける床・崩れる板が無い。シーソーは 8 m 先まで無い（傾いたままの端に当たる）
-  for (let k = Math.max(0, i - 3); k < Math.min(P.length, i + 16); k++) if (NOAHEAD.has(P[k].kind) || (P[k].kind === 'seesaw' && k < i + 8)) return false
+  for (let k = Math.max(0, i - 3); k < Math.min(P.length, i + 16); k++) if (NOAHEAD.has(P[k].kind) || ((P[k].kind === 'seesaw' || P[k].kind === 'draw' || P[k].kind === 'hang') && k < i + 8)) return false
+  for (let k = Math.max(0, i - 3); k < Math.min(P.length, i + 4); k++) if (P[k].door) return false // 扉に重ねて出さない
   // 前輪・真ん中・後輪の 3 か所の真下が、道の高さの動かない床
   const a = P[Math.max(0, i - 1)].p || q.p, z = P[Math.min(P.length - 1, i + 1)].p || q.p
   let dx = z[0] - a[0], dz = z[2] - a[2]; const L = Math.hypot(dx, dz) || 1; dx /= L; dz /= L
@@ -78,7 +79,7 @@ export function judge(world, course, R, b, prevP) {
   for (let i = 1; i < cps.length; i++) {
     const q = cps[i]
     if (course.climb && !q.finish) {
-      if (i > R.cp && !b.crashed && (b.g[0] || b.g[1]) && Math.hypot(b.p[0] - q.p[0], b.p[2] - q.p[2]) < Math.max(3, q.w / 2 + 1) && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.5) { R.cp = i; if (q.rest) R.rest = i; out.gate = i }
+      if (i > R.cp && !b.crashed && (b.g[0] || b.g[1]) && Math.hypot(b.p[0] - q.p[0], b.p[2] - q.p[2]) < Math.max(3, q.w / 2 + 1) && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.5) { R.cp = i; if (q.rest) { R.rest = i; if (b.nitro < 1) { b.nitro = 1; out.refill = 'flag' } } out.gate = i }
       continue
     }
     if (i <= R.cp) continue
@@ -97,6 +98,11 @@ export function judge(world, course, R, b, prevP) {
     else if (b.p[1] < q.kill - 8) out.respawn = { cp: R.cp, fell: true }
     return out
   }
+  // 燃料の缶: 近くを通ると拾ってニトロが半分たまる。拾った缶は 25 秒で戻る
+  for (const cn of course.cans || []) {
+    if (cn.t != null && world.time - cn.t < 25 && world.time >= cn.t) continue
+    if (Math.abs(b.p[0] - cn.p[0]) < 1.4 && Math.abs(b.p[2] - cn.p[2]) < 1.4 && Math.abs(b.p[1] - 0.5 - cn.p[1]) < 1.4) { cn.t = world.time; b.nitro = Math.min(1, b.nitro + 0.5); out.can = cn }
+  }
   // 道の上で最後に走っていた所（転んだ時に、そこより先へ戻さないため。跳んで届かなかった所の先へ出さない）
   if ((b.g[0] || b.g[1]) && !b.crashed) R.onI = nearI(course, b.p, R.onI)
   // 少し前の安全な地点（両輪が道に着いて、車体がほぼ道に沿っていた所）を 0.25 秒ごとに覚える
@@ -104,7 +110,7 @@ export function judge(world, course, R, b, prevP) {
   if (!b.crashed && b.g[0] && b.g[1] && R.safeT >= 15 && R.onI != null) {
     const q = course.path[R.onI]
     if (q && q.p && q.w && !['jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap'].includes(q.kind) && Math.abs(b.th - (q.slope || 0)) < 0.35 && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.2) {
-      R.safe = R.safe || []; R.safe.push({ p: q.p.slice(), yaw: q.yaw, t: world.time, i: R.onI }); if (R.safe.length > 24) R.safe.shift(); R.safeT = 0
+      R.safe = R.safe || []; R.safe.push({ p: q.p.slice(), yaw: q.yaw, t: world.time, i: R.onI, nitro: b.nitro }); if (R.safe.length > 24) R.safe.shift(); R.safeT = 0
     }
   }
   if (b.crashed && b.crashed.t > 0.8) {
@@ -112,16 +118,17 @@ export function judge(world, course, R, b, prevP) {
     const at = b.crashed.at, L = R.lastCrash
     R.crashRep = L && Math.hypot(at[0] - L[0], at[1] - L[1], at[2] - L[2]) < 2.5 ? (R.crashRep || 0) + 1 : 0; R.lastCrash = at.slice()
     if (R.crashRep >= 3) { R.crashRep = 0; R.safe = []; out.respawn = { cp: R.rest || 0 }; return out } // 同じ所で何度も転んだら旗から
+    if (!globalThis.__crashSafe) { out.respawn = { cp: R.rest || 0 }; return out } // v15: 転んだら最後に通った旗から（本人「直前からは簡単すぎ」）。落ちた時は今まで通り下の足場から登り直す
     // 出し直す所は、すぐ先に跳ぶ所・抜ける床・崩れる板がない所（助走が取れる所）にする
     const old = (R.safe || []).filter(e => e.t <= world.time - 2.2 - b.crashed.t && goodSpot(world, course, e.i))
     // 新しい順に 3 つまで見て、平らな所を選ぶ（坂の途中で止まった所から出すと、下がったり登れなかったりする）
     let sp = null
     for (let k = old.length - 1; k >= Math.max(0, old.length - 3); k--) if (Math.abs(course.path[old[k].i].slope || 0) < 0.12) { sp = old[k]; break }
     sp = sp || (old.length ? old[old.length - 1] : null)
-    if (sp) { R.safe = R.safe.filter(e => e.t <= sp.t); out.respawn = { safe: { p: sp.p, yaw: sp.yaw } }; return out }
+    if (sp) { R.safe = R.safe.filter(e => e.t <= sp.t); out.respawn = { safe: { p: sp.p, yaw: sp.yaw, nitro: sp.nitro } }; return out }
     // 覚えた所が無い（休憩所を出てすぐ・跳ぶ所が続く所）: 旗まで戻さず、転んだ所から道を後ろへたどって出せる所を探す
     const k = backSpot(world, course, R.onI ?? nearI(course, at, null), cpPathI(course, R.rest || 0))
-    out.respawn = k != null ? { safe: { p: course.path[k].p.slice(), yaw: course.path[k].yaw } } : { cp: R.rest || 0 }
+    out.respawn = k != null ? { safe: { p: course.path[k].p.slice(), yaw: course.path[k].yaw, nitro: b.nitro } } : { cp: R.rest || 0 }
     return out
   }
   // 道から地面に落ちたら（地面に車輪が着いて 0.5 秒）、休憩所へ
@@ -147,7 +154,7 @@ export function judge(world, course, R, b, prevP) {
 export function doRespawn(world, course, R, rs) {
   resetFallen(world) // 抜けた床・崩れた敷石を元に戻す（戻らないと登れなくなる）
   for (const s of world.moving) if (s.mov.type === 'seesaw') { s.mov.ang = s.mov.ang0 || 0; s.mov.w = 0 } // 傾いたままのシーソーも元へ（出し直した所の先で、上がった端に当たらない）
-  if (rs.safe) { const b = spawnAt(world, { p: rs.safe.p, yaw: rs.safe.yaw }); if (!b.crashed) return b; R.safe = []; return spawnAtCp(world, course, R.rest || 0) } // 出した所で転んでいたら旗から
+  if (rs.safe) { const b = spawnAt(world, { p: rs.safe.p, yaw: rs.safe.yaw }); if (rs.safe.nitro != null) b.nitro = rs.safe.nitro; if (!b.crashed) return b; R.safe = []; return spawnAtCp(world, course, R.rest || 0) } // 出した所で転んでいたら旗から
   if (rs.cp != null) { R.rise = {}; R.onI = null; return spawnAtCp(world, course, rs.cp) } // 休憩所からやり直すと、上がってくる溶岩も最初から
   const sp = spotNear(world, course, rs.at, rs.maxI)
   if (sp) return spawnAt(world, sp)

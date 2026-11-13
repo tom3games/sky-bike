@@ -11,7 +11,7 @@ let runs = 0, off = 0, maxDev = 0, devSum = 0; const ex = []
 for (let i0 = 12; i0 < c.path.length - 4; i0 += 5) {
   const q = c.path[i0]
   // 後ろ 8 点が、段・切れ目のない道の時だけ（段の下へ下がるのは別の話）
-  if (!q.p || !q.w || q.w < 1.3 || nearHz(q.p) || c.path.slice(i0 - 10, i0 + 1).some(z => !z.branch !== !q.branch) || c.path.slice(i0 - 13, i0 + 1).some(z => !z.p || !z.w || SKIP.has(z.kind) || (z.slope || 0) > 0.2 || z.w < 1.3)) continue
+  if (!q.p || !q.w || q.w < 1.3 || nearHz(q.p) || c.path.slice(i0 - 10, i0 + 1).some(z => !z.branch !== !q.branch) || c.path.slice(i0 - 16, i0 + 3).some(z => !z.p || !z.w || z.door || SKIP.has(z.kind) || (z.slope || 0) > 0.2 || z.w < 1.3)) continue
   const b = settle(w, createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw })), st = S.createSteer(c.path); S.resetSteer(st, b)
   let dev = 0, bad = null
   for (let s = 0; s < 210 && !bad; s++) {

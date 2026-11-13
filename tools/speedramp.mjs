@@ -10,7 +10,7 @@ const n = c.notes.find(n => n.kind === 'speedRamp')
 const lipI = c.path.findIndex((q, i) => i > n.ru0 && q.kind === 'lip')
 const after = c.path.findIndex((q, i) => i > lipI && q.kind === 'curve') + 14 // 曲がった先
 const rows = []
-const V = process.env.V ? [+process.env.V] : Array.from({ length: 25 }, (_, k) => 6 + k * 0.5)
+const V = process.env.V ? [+process.env.V] : Array.from({ length: 29 }, (_, k) => 6 + k * 0.5) // 6〜20m/s（13m/s を超える所はニトロ）
 for (const v of V) {
   const q = c.path[n.ru0 + 2]
   const b = settle(w, createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw })), st = createSteer(c.path); resetSteer(st, b)
@@ -18,7 +18,7 @@ for (const v of V) {
   let phase = 0, land = null, air = 0, bot = null, res = '', vl = 0, dist = 0
   for (let s = 0; s < 60 * 14; s++) {
     let inp
-    if (phase === 0) { inp = { thr: b.speed < v ? 1 : 0, brk: b.speed > v + 0.2 ? 0.5 : 0, lean: 0, steer: steerFor(st, b) }; if (!b.g[0] && !b.g[1]) { phase = 1; vl = b.speed } }
+    if (phase === 0) { inp = { thr: b.speed < v ? 1 : 0, brk: b.speed > v + 0.2 ? 0.5 : 0, lean: 0, steer: steerFor(st, b), nitro: v > 12.9 && b.speed < v ? 1 : 0 }; b.nitro = 1; if (!b.g[0] && !b.g[1]) { phase = 1; vl = b.speed } }
     else if (phase === 1) { inp = { thr: 0, brk: 0, lean: b.th > 0.05 ? 0.6 : b.th < -0.25 ? -0.6 : 0, steer: 0 }; if (b.g[0] || b.g[1]) { phase = 2; const sh = c.shapes[(b.cn[0] || b.cn[1]).id]; land = { y: b.p[1], tag: sh.tag }; dist = Math.hypot(b.p[0] - n.lip[0], b.p[2] - n.lip[2]); bot = createBot(c, { skill: 'good' }); bot.world = w; resetBot(bot, b) } }
     else inp = botInput(bot, b)
     const ev = []; stepBike(w, b, inp, ev)

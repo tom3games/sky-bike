@@ -8,7 +8,7 @@ import * as S from '../js/steer.js'
 const V = +(process.env.V || 15), cid = process.argv[2] || 'stage1'
 const c = COURSES[cid](), w = new World(c.shapes); w.winds = c.winds || []
 const WALL = new Set(['tower', 'pillar', 'parapet', 'post', 'gate', 'rail', 'wall', 'castle', 'barrel', 'statue', 'sign', 'boulder'])
-const TECH = new Set(['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'draw', 'lowledge', 'trap', 'seesaw', 'lift', 'slide', 'spin']) // 跳ぶ・段・時間で動く物だけ数えない（崩れる板・水・泥・急坂・木箱の上は数える）
+const TECH = new Set(['jump', 'stepUp', 'stepDown', 'lip', 'bump', 'draw', 'lowledge', 'trap', 'seesaw', 'lift', 'slide', 'spin', 'hang']) // 跳ぶ・段・時間で動く物だけ数えない（崩れる板・水・泥・急坂・木箱の上は数える）
 const nearHz = p => (c.hazards || []).some(h => Math.hypot(h.p[0] - p[0], h.p[2] - p[2]) < h.half + (h.kind === 'pend' ? 6 : 3) && Math.abs(h.p[1] - p[1]) < 3) // 鉄球は横へ弾き飛ばす範囲まで
 const markOf = i => { let n = '出発'; for (const m of c.marks || []) if (i >= m.i0) n = m.name; return n }
 const per = {}; let runs = 0, off = 0, wall = 0
@@ -22,7 +22,8 @@ for (let i0 = 0; i0 < finI - 6; i0 += 4) {
   w.setTime(0)
   let bad = null
   for (let s = 0; s < 360 && !bad; s++) {
-    let inp = { thr: b.speed < V ? 1 : 0, brk: 0, lean: 0, steer: S.steerFor(st, b) }
+    let inp = { thr: b.speed < V ? 1 : 0, brk: 0, lean: 0, steer: S.steerFor(st, b), nitro: process.env.NIT ? 1 : 0 } // NIT=1: ニトロを押しっぱなし（ボトルは減らさない）
+    if (process.env.NIT) b.nitro = 1
     if (S.assist && !process.env.NOASSIST) inp = S.assist(st, b, inp)
     stepBike(w, b, inp)
     const pq = c.path[st.i]
@@ -37,5 +38,5 @@ for (let i0 = 0; i0 < finI - 6; i0 += 4) {
   if (bad && process.env.EX) console.log('  例', i0, k, bad, c.path[st.i].kind, st.i, 'w', c.path[st.i].w, 'kap', (c.path[st.i].kap || 0).toFixed(2), 'v', b.speed.toFixed(1))
   if (bad === 'off') { off++; per[k].はみ出し++ } else if (bad) { wall++; per[k].壁++ }
 }
-console.log(`アクセル押しっぱなし ${V}m/s: ${runs} 本  はみ出し ${off}・壁 ${wall}`)
+console.log(`アクセル押しっぱなし ${V}m/s${process.env.NIT ? '＋ニトロ' : ''}: ${runs} 本  はみ出し ${off}・壁 ${wall}`)
 if (process.env.TABLE) console.table(Object.values(per))

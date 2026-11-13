@@ -2,7 +2,7 @@
 import '../mute-auto.mjs'
 import { chromium } from 'playwright'
 import { MUTE_LAUNCH, muteContext } from '../mute.mjs'
-const PORT = process.env.PORT = '5386'
+const PORT = process.env.PORT = process.env.PORT || '5386'
 await import('../server.mjs')
 const br = await chromium.launch({ ...MUTE_LAUNCH, args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle'] })
 const ctx = await br.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, locale: process.env.LOC || 'ja-JP' }); await muteContext(ctx)

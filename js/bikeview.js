@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=14'
+import { BIKE, basis, wheelCenter } from './physics.js?v=15'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -81,6 +81,23 @@ export class BikeView {
     this.fork = [-0.09, 0.09].map(z => [tube([0, 0, 0], [0, 1, 0], 0.032, black, this.root), tube([0, 0, 0], [0, 1, 0], 0.024, chrome, this.root), z])
     this.arm = [-0.09, 0.09].map(z => [tube([0, 0, 0], [0, 1, 0], 0.026, alu, this.root), z])
     this.shock = tube([0, 0, 0], [0, 1, 0], 0.03, mat(0x9a6a2a, 0.4, 0.6), this.root)
+    // ニトロのボトル（車体の左、シートの下）: ガラスの筒の中に青く光る中身。中身の高さが残りの量
+    if (!ghost) {
+      const glass = new THREE.MeshStandardMaterial({ color: 0xcfe6ff, roughness: 0.08, metalness: 0.1, transparent: true, opacity: 0.32, depthWrite: false })
+      this.nFillM = new THREE.MeshStandardMaterial({ color: 0x1b6cff, emissive: new THREE.Color(0.25, 0.9, 2.4), roughness: 0.3 })
+      const bot = new THREE.Group(); bot.position.set(-0.3, -0.02, -0.21); bot.rotation.z = Math.PI / 2 - 0.12; this.body.add(bot)
+      add(new THREE.CylinderGeometry(0.055, 0.055, 0.34, 16, 1, true), glass, bot).castShadow = false
+      for (const y of [-0.17, 0.17]) { const cap = add(new THREE.CylinderGeometry(0.06, 0.06, 0.03, 16), chrome, bot); cap.position.y = y }
+      this.nFill = add(new THREE.CylinderGeometry(0.044, 0.044, 0.32, 14), this.nFillM, bot); this.nFill.castShadow = false
+      const strap = add(new THREE.TorusGeometry(0.06, 0.008, 6, 20), black, bot); strap.rotation.x = Math.PI / 2
+      // 噴射の炎（消音器の出口から後ろへ）: 青い芯と橙の外炎。加算で光らせる
+      const fl = this.flame = new THREE.Group(); fl.position.set(-0.75, 0.115, 0.16); fl.rotation.z = Math.PI / 2 - 0.25 + Math.PI; this.body.add(fl)
+      const fm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false })
+      const cone = (r, h, m) => { const g = new THREE.ConeGeometry(r, h, 14, 1, true); g.translate(0, h / 2, 0); g.rotateZ(Math.PI); const ms = new THREE.Mesh(g, m); ms.castShadow = false; fl.add(ms); return ms }
+      this.flameOut = cone(0.075, 0.9, fm(0xff8a3a, 0.75)); this.flameIn = cone(0.04, 0.55, fm(0x7ec8ff, 0.95))
+      this.flameLight = new THREE.PointLight(0x7ab8ff, 0, 5, 2); this.flameLight.position.set(0, -0.4, 0); fl.add(this.flameLight)
+      fl.visible = false
+    }
     // 乗り手
     this.rider = new THREE.Group(); this.body.add(this.rider)
     this.ready = false
@@ -135,7 +152,7 @@ export class BikeView {
     this.root.position.set(s.p[0], s.p[1], s.p[2])
     const q = new THREE.Quaternion().setFromRotationMatrix(m)
     // 曲がる時の傾き（見た目だけ）
-    const roll = Math.max(-0.5, Math.min(0.5, -(b.psiRate || 0) * Math.abs(b.speed || 0) / 9.81 * 0.8))
+    const roll = Math.max(-0.7, Math.min(0.7, -Math.atan((b.psiRate || 0) * Math.abs(b.speed || 0) / 9.81))) // 曲がる時、速いほど深く内側へ倒れる（遠心力と釣り合う角度）
     this.roll = (this.roll || 0) + (roll - (this.roll || 0)) * 0.2
     const qr = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), this.roll)
     this.body.quaternion.copy(q).multiply(qr)
@@ -155,8 +172,19 @@ export class BikeView {
     this.ffender.position.copy(front).addScaledVector(fdir, P.R + P.rt + 0.05)
     this.ffender.quaternion.copy(q)
     this.bar.rotation.y = (s.delta || 0) * 0.8
-    const crouch = Math.max(0, Math.min(1, (s.s[0] + s.s[1]) / (2 * P.travel) * 1.4))
-    if (!this.fly) this.pose(s.lean, crouch, !b.g[0] && !b.g[1])
+    // 膝で吸収: 沈んだ量と沈む速さで腰が下がる。ウィリーでは体を後ろへ、登りの坂では前へ
+    const sv = Math.max(0, (b.sv ? (b.sv[0] + b.sv[1]) / 2 : 0))
+    this._kn = Math.max((this._kn || 0) * 0.86, Math.min(1, sv * 0.35))
+    const crouch = Math.max(0, Math.min(1, (s.s[0] + s.s[1]) / (2 * P.travel) * 1.4 + this._kn * 0.6))
+    const air = !b.g[0] && !b.g[1], wh = b.g[0] && !b.g[1] && s.th > 0.25
+    const lean = Math.max(-1, Math.min(1, s.lean + (wh ? -0.35 : 0) + (!air && !wh ? Math.max(-0.3, Math.min(0.35, s.th * 0.9)) : 0)))
+    if (!this.fly) this.pose(lean, crouch, air)
+    if (this.nFill) { const n = Math.max(0.001, b.nitro ?? 1); this.nFill.scale.y = n; this.nFill.position.y = -0.16 * (1 - n); this.nFillM.emissiveIntensity = 0.5 + (b.nitroOn ? 1.2 : 0) }
+    if (this.flame) {
+      const on = !!b.nitroOn; this._fl = (this._fl || 0) + ((on ? 1 : 0) - (this._fl || 0)) * (on ? 0.5 : 0.25)
+      this.flame.visible = this._fl > 0.02
+      if (this.flame.visible) { const k = this._fl, j = 0.8 + Math.random() * 0.45; this.flameOut.scale.set(k * (0.9 + Math.random() * 0.2), k * j, k * (0.9 + Math.random() * 0.2)); this.flameIn.scale.set(k, k * (0.85 + Math.random() * 0.3), k); this.flameLight.intensity = 6 * k * j }
+    }
   }
 }
 // 2本の骨の IK: A（付け根）→ B（関節）→ C（先）を、先が target に来るよう曲げる。pole は関節を向ける側

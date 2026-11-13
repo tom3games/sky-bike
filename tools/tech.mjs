@@ -15,7 +15,9 @@ const policies = {
 function tryMark(m, pol, seed) {
   const w = mkWorld()
   w.setTime(seed * 1.37)
-  const q = c.path[m.i0]
+  // 区間の始まりが仕掛けの真上の時は、少し手前（道のある所）から始める
+  let i0 = m.i0; if (!c.path[i0].w) for (let k = 0; k < 8 && i0 > 0 && c.path[i0 - 1].w && c.path[i0 - 1].kind !== 'jump'; k++) i0--
+  const q = c.path[i0]
   const b = settle(w, createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw }))
   const bot = policies[pol](); bot.world = w; resetBot(bot, b)
   if (!m.name.includes('谷')) { const f0 = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)]; b.v = [f0[0] * 3, 0, f0[2] * 3] }
@@ -23,7 +25,7 @@ function tryMark(m, pol, seed) {
   let sd = 1234 + seed * 77
   const queue = []
   const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
-  for (let s = 0; s < 60 * 30; s++) {
+  for (let s = 0; s < 60 * (/回廊/.test(m.name) ? 90 : 30); s++) {
     let inp = botInput(bot, b)
     if (bot.cautious) { inp = { ...inp, thr: b.speed < 3 ? 1 : 0, brk: b.speed > 4 ? 0.3 : 0, lean: 0 } }
     // ハンドルは全員自動（ゲームと同じ）。人の手の遅れ: アクセル・ブレーキ・重心だけ遅らせる（上手い 0 秒・ほか 0.25 秒）

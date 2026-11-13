@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK } from './physics.js?v=14'
+import { dropState, hingeAng, gustK } from './physics.js?v=15'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -146,6 +146,22 @@ export function buildGimmicks(course, scene, M) {
     return { f, mesh, geo, base, lit: 0, phase: f.p[0] * 0.3 + f.p[2] * 0.17 }
   })
 
+  // 燃料の缶（ニトロ）: 赤い金属の携行缶と青い光の輪。拾うと消えて 25 秒で戻る
+  const canGeo = new THREE.BoxGeometry(0.26, 0.36, 0.14), capGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10)
+  const canMat = new THREE.MeshStandardMaterial({ color: 0x9a2a1e, roughness: 0.45, metalness: 0.6 }), ringMat = new THREE.MeshBasicMaterial({ color: 0x5fb8ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
+  const cans = (course.cans || []).map(cn => {
+    const g = new THREE.Group(); g.position.set(cn.p[0], cn.p[1] + 0.45, cn.p[2])
+    const body = new THREE.Mesh(canGeo, canMat); body.castShadow = true; g.add(body)
+    const cap = new THREE.Mesh(capGeo, M.gold || canMat); cap.position.set(0.07, 0.21, 0); g.add(cap)
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 6, 32), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.4; g.add(ring)
+    const lt = new THREE.PointLight(0x5fb8ff, 3, 5, 2); lt.position.y = 0.2; g.add(lt)
+    group.add(g); return { cn, g }
+  })
+  // 前輪を掛ける縁: 角に欠けかけた石の並び（見た目だけ）
+  for (const d of (course.decor || []).filter(d => d.kind === 'hangLip')) {
+    const ax = [d.b[0] - d.a[0], d.b[1] - d.a[1], d.b[2] - d.a[2]], L = Math.hypot(...ax), n = Math.max(2, Math.round(L / 0.45))
+    for (let k = 0; k < n; k++) { const u = (k + 0.5) / n, st = new THREE.Mesh(new THREE.DodecahedronGeometry(0.11 + rnd() * 0.06, 0), M.rock || canMat); st.position.set(d.a[0] + ax[0] * u + d.n[0] * 0.05, d.a[1] + ax[1] * u - 0.05, d.a[2] + ax[2] * u + d.n[2] * 0.05); st.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3); st.castShadow = true; group.add(st) }
+  }
   const tmpC = new THREE.Color(), dim = new THREE.Color(0xd8c896), bright = new THREE.Color(0xfff0b4)
   return {
     group, objs: [group, spray.obj, pebbles.obj, dustP.obj, streak.obj],
@@ -213,6 +229,7 @@ export function buildGimmicks(course, scene, M) {
       }
       this.gust = gustNear
       streak.update(dt)
+      for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; if (!gone) c.g.rotation.y = tm * 1.4 }
       // 旗: なびき（布の端ほど大きく揺れる）。通った旗は明るくなる
       for (const fl of flags) {
         const reached = R && R.rest != null && fl.f.cp <= R.rest && (R.restSeen || {})[fl.f.cp]

@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos } from './physics.js?v=14'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=14'
+import { basis, wheelCenter, BIKE, liftPos } from './physics.js?v=15'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=15'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 export function createBot(course, o = {}) {
@@ -21,6 +21,8 @@ function nearest(bot, b, from, to) {
 }
 export function botInput(bot, b) {
   const path = bot.path, P = BIKE
+  if (b.hang) return hangInput(bot, b)
+  bot.hangT0 = null
   bot.i = nearest(bot, b, bot.i - 2, bot.i + 25)
   const B = basis(b)
   const sp = b.speed
@@ -59,11 +61,23 @@ export function botInput(bot, b) {
   if (turnAhead) vT = Math.min(vT, narrow || (bot.corner && bot.corner.narrow) ? 2.6 : 2.9)
   if (stepAt) vT = Math.min(vT, stepAt.q.dy > 0.55 ? (stepAt.d < 5 ? 1.1 : 2.5) : stepAt.q.dy > 0.4 ? 3.4 : 3.5)
   if (lipAt) vT = Math.max(vT, lipAt.q.vNeed || 12.5)
-  if (!lipAt || lipAt.d > 12) vT = Math.min(vT, vCap)
+  if (!lipAt || (lipAt.d > 12 && !((lipAt.q.vNeed || 0) >= 14.5 && lipAt.d < 30))) vT = Math.min(vT, vCap) // 屋上の大ジャンプは、助走の全部を全開で
   if (bot.jumpAhead) vT = Math.max(vT, bot.vJump || 6.5)
   if (bot.steepAhead && !stepAt) vT = Math.max(vT, 9) // すべる急坂は勢いで一気に
   if (cur.kind === 'crumble' || (path[bot.i + 2] && path[bot.i + 2].kind === 'crumble')) vT = Math.max(vT, 7) // 崩れる板の上では止まらない
   for (let j = bot.i; j < Math.min(path.length, bot.i + 9); j++) if (path[j].kind === 'trap') { vT = Math.max(vT, 7); break } // 抜け落ちる床は速さで越える
+  // 高い縁（前輪を掛ける）: 歩く速さで近づき、手前でウィリー
+  let hangAt = null, nitroNeed = false, nitroLip = 0
+  for (let j = bot.i, dd = 0; j < Math.min(path.length, bot.i + 30); j++) {
+    const q = path[j]; if (j > bot.i && path[j - 1].p && q.p) dd += Math.hypot(q.p[0] - path[j - 1].p[0], q.p[2] - path[j - 1].p[2])
+    if ((q.kind === 'jump' || q.kind === 'lip') && j > bot.i + 1) break // 先に跳ぶ所がある時は、縁のための減速はまだしない
+    if (q.kind === 'hang' && hangAt == null && dd < 16) hangAt = { d: dd, q }
+    if (q.nitro && dd < 26) nitroNeed = true
+    if (q.kind === 'lip' && (q.vNeed || 0) > 15.5 && dd < 40) nitroLip = q.vNeed
+  }
+  if (hangAt) { vT = Math.min(vT, hangAt.d < 7 ? 1.2 : 3.5) }
+  if (nitroNeed) vT = Math.max(vT, 18)
+  if (nitroLip) vT = Math.max(vT, nitroLip) // ジャンプ台で要る速さまでだけニトロ（出しすぎると跳びすぎる）
   if (bot.skill === 'bad') { vT = narrow ? 6 : turnAhead ? 7 : 14 }
   vT *= bot.vMul
   let thr = sp < vT ? 1 : 0, brk = sp > vT + 0.3 ? Math.min(sp > vT + 3 && bot.skill === 'good' ? 0.7 : 0.45, (sp - vT) * 0.4) : 0
@@ -214,9 +228,52 @@ export function botInput(bot, b) {
   bot.stuckT = Math.abs(sp) < 0.4 && !air && !bot.waiting && !(bot.backT > 0) && !(brk === 1 && thr === 0) ? (bot.stuckT || 0) + 1 : 0
   if (bot.stuckT > 100) { bot.backT = 70; bot.stuckT = 0; bot.phase = 0; bot.slowStep = true }
   if (bot.backT > 0) { bot.backT--; thr = 0; brk = 1; lean = b.th > 0.35 ? 0.6 : -0.3; steer = 0; bot.phase = 0 }
+  // 横に動く床の上: 床が道の線にそろう少し前まで、止まって待つ（床と一緒に運ばれている）
+  if (bot.skill === 'good' && bot.world && b.carryId >= 0 && !air) {
+    const sh = bot.world.shapes[b.carryId], m = sh && sh.mov
+    if (m && m.type === 'slide') {
+      const off = (sh.c[0] - sh.base.c[0]) * m.axis[0] + (sh.c[1] - sh.base.c[1]) * m.axis[1] + (sh.c[2] - sh.base.c[2]) * m.axis[2]
+      const vel = m.amp * m.w * Math.cos(bot.world.time * m.w + (m.ph || 0)), lead = off + vel * 0.7
+      if (Math.abs(lead) > 0.45) { thr = 0; brk = 1; lean = 0; bot.waiting = true } else { thr = 1; brk = 0 }
+    }
+  }
+  if (hangAt && bot.skill === 'good' && !air && bot.phase === 0) {
+    const fw = wheelCenter(b, B, 1, b.s[1]), hx = Math.cos(hangAt.q.yaw), hz = -Math.sin(hangAt.q.yaw)
+    const fd = (hangAt.q.p[0] - fw[0]) * hx + (hangAt.q.p[2] - fw[2]) * hz
+    if (fd < 2.6) { thr = sp < 1.2 ? 0.5 : 0; brk = sp > 1.8 ? 0.4 : 0; lean = -1 }
+  }
+  const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
   // ゲームと同じ、曲がりの手前の自動の減速を通す
-  const inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16 })
+  const inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
   // 反応の遅れ（人の速さ）
   if (bot.react > 0) { bot.queue.push(inp); if (bot.queue.length > bot.react) return bot.queue.shift(); return { thr: 0, brk: 0, lean: 0, steer: 0 } }
   return inp
+}
+
+// 縁に前輪を掛けて耐えている間: 体の釣り合いを直しながらブレーキで耐え、縁の上を横切る物（鉄球・突風）が過ぎてから登る。
+// 耐えられる時間が残り少なくなったら登る
+function hangInput(bot, b) {
+  const hg = b.hang
+  if (bot.hangT0 == null) bot.hangT0 = 0
+  bot.hangT0++
+  const hist = bot.hangHist || (bot.hangHist = [])
+  hist.push({ x: hg.x, xv: hg.xv }); if (hist.length > 30) hist.shift()
+  const seen = hist[Math.max(0, hist.length - 1 - Math.min(bot.react || 0, 12))]
+  let l = -(seen.x * 1.6 + seen.xv * 0.9)
+  if (bot.react > 0) l = Math.round(l / 0.5) * 0.5
+  l = Math.max(-1, Math.min(1, l))
+  // 縁の上（少し先まで）の危ない物
+  let safe = true
+  if (bot.world) {
+    const T0 = bot.world.time
+    for (const h of bot.hz) {
+      const d = Math.hypot(h.p[0] - b.p[0], h.p[2] - b.p[2]), dy = h.p[1] - b.p[1]
+      if (d > 8 || dy < -1 || dy > 3) continue
+      for (let t = 0.5; t <= 1.7; t += 0.1) if (h.unsafe(T0 + t)) { safe = false; break }
+    }
+  }
+  const tMax = (bot.world && bot.world.shapes[hg.id].hang.max) || 8
+  const minWait = 0.7
+  if ((safe && hg.t > minWait) || hg.t > tMax - 1.6) return { thr: 1, brk: 0, lean: Math.max(0.6, l), steer: 0, nitro: 0 }
+  return { thr: 0, brk: 1, lean: l, steer: 0, nitro: 0 }
 }
