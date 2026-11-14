@@ -6,7 +6,10 @@
 // 置き換える落とし穴は、組み立てた後の形の並び（tools/_traplist.mjs の番号）で選ぶ
 export const LASERS = [0, 2, 9, 10, 12, 25, 36, 41], BLASTS = [13, 32]
 export const SPIKE = { h: 0.3, back: 1.75, rise: 0.42, kick: 4.5, spin: 5.5 }
+export const ICE = { mu: 0.3 }
+export const UPDRAFT = { a: 13, run: +(globalThis.__upRun ?? 10.6), T: 4.6 }
 export const BLAST = { cut: 5.0, trig: 6.5, back: 5, lipDeg: 8, lipLen: 1.0, roadN: 2 }
+import { closest } from './physics.js?v=50'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
@@ -58,6 +61,23 @@ export function v51post(B) {
     B.cans = B.cans || []; B.cans.push({ p: add3(G.start, G.f, -9), t: null })
     B.decor.push({ kind: 'blast', G }); B.v51.blasts.push({ k: 'road', i: sp.i, start: G.start })
   }
+  // 氷の曲がり（1 か所）: 氷の区間の、幅 3.4m 以下で一番長い曲がり。板の摩擦を ICE.mu に、曲がりの手前の自動の減速を外す（速さを読むのが遊び）。
+  //   全開で入ると外へ滑って落ちる。手前の普通の道でブレーキして 6m/s ほどで入れば曲がれる
+  if (!globalThis.__noIce) { let best = null
+    for (let i = 1; i < P.length; i++) { const q = P[i]; if (q.kind !== 'curve' || P[i - 1].kind === 'curve' || q.branch || q.zone !== 'ice' || q.w > 3.4) continue; let j = i; while (P[j + 1] && P[j + 1].kind === 'curve') j++; if (!best || j - i > best[1] - best[0]) best = [i, j] }
+    if (best) { const [i0, i1] = best, ids = new Set()
+      for (let i = i0; i <= i1; i++) { const q = P[i]; q.ice = true; for (const s of B.shapes) { if (ids.has(s) || s.mov || s.tag !== 'road' || s.max && (q.p[1] > s.max[1] + 1 || q.p[1] < s.min[1] - 1)) continue; const cp = closest(s, q.p[0], q.p[1] - 0.05, q.p[2]); if (cp && cp.d < 0.3) ids.add(s) } }
+      for (const s of ids) { s.mu = ICE.mu; s.mat = 'ice' }
+      B.v51.ice = { i0, i1, n: ids.size } } }
+  // 谷底から吹き上げる風（2 か所）: 走っている途中（嵐の区間の長い道）と、跳んでいる途中（中盤の切れ目）に、間をおいてふわっと浮く。
+  //   B.winds（physics の風）に上向きの力を足すだけ。強さは重さの UPDRAFT.a 倍の加速度、吹くのは周期の 3 割ほど（gustK）
+  if (!globalThis.__noValleyWind) { const N = P.length, spots = [], mk = i => { let r = ''; for (const m of B.marks || []) if (i >= m.i0) r = m.name; return r }, bad = i => /道を選ぶ|谷を飛ぶ|大ジャンプ/.test(mk(i))
+    for (let i = Math.floor(N * 0.25); i < N * 0.55 && spots.length < 1; i++) { let ok = true; for (let j = i; j < i + 18; j++) { const q = P[j]; if (!q || !q.p || q.branch || bad(j) || q.zone === 'ground' || !['road', 'orbit'].includes(q.kind) || q.w < 4 || (q.kap || 0) > 0.012 || Math.abs(q.slope || 0) > 0.05) { ok = false; break } } if (ok) spots.push({ a: i, b: i + 18, run: true }) }
+    for (let i = Math.floor(N * 0.45); i < N * 0.75 && spots.length < 2; i++) { const q = P[i]; if (q.kind === 'jump' && !q.branch && !bad(i) && (q.len || 0) >= 5 && q.zone !== 'ground' && P[i - 1] && P[i - 1].kind !== 'blast') spots.push({ a: i - 1, b: i + 1, jump: true }) }
+    for (const [n, sp] of spots.entries()) { const pts = []; for (let j = sp.a; j <= sp.b; j++) if (P[j] && P[j].p) pts.push(P[j].p); if (sp.jump) { const q = P[sp.a + 1]; pts.push([q.p[0] + Math.cos(q.yaw) * q.len, q.p[1] + (q.dy || 0), q.p[2] - Math.sin(q.yaw) * q.len]) }
+      const mn = [0, 1, 2].map(k => Math.min(...pts.map(p => p[k])) - (k === 1 ? 1 : 3)), mx = [0, 1, 2].map(k => Math.max(...pts.map(p => p[k])) + (k === 1 ? 7 : 3))
+      const g = { min: mn, max: mx, f: [0, sp.jump ? UPDRAFT.a : UPDRAFT.run, 0], w: 2 * Math.PI / UPDRAFT.T, ph: n * 1.7, pulse: true, valley: true }
+      B.winds = B.winds || []; B.winds.push(g); B.decor.push({ kind: 'valleyWind', g }); (B.v51.winds = B.v51.winds || []).push({ i: sp.a, jump: !!sp.jump }) } }
   for (const k of BLASTS) { const s = pick(k); if (!s) continue
     const ii = near(s, ['trap']); if (!ii.length) continue
     const q = P[ii[0]], hf = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)], sg = dot(s.ax[0], hf) >= 0 ? 1 : -1, f = s.ax[0].map(v => v * sg), up = s.ax[1], w = s.h[2] * 2

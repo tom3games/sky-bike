@@ -26,6 +26,16 @@ export function buildV51(course, scene) {
   const fireTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), gr = x.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.3, 'rgba(255,170,60,0.9)'); gr.addColorStop(1, 'rgba(255,90,20,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
   const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0, toneMapped: false })); fire.visible = false; group.add(fire)
   const smoke = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, color: 0x2a2826, depthWrite: false, transparent: true, opacity: 0 })); smoke.visible = false; group.add(smoke)
+  // 谷底から吹き上げる風: 吹いている間（gustK）だけ、下から白い霧の粒が速く上がる
+  const winds = []
+  for (const d of (course.decor || []).filter(x => x.kind === 'valleyWind')) {
+    const g = d.g, n = 140, pos = new Float32Array(n * 3), seed = []
+    for (let k = 0; k < n; k++) { const r = [Math.random(), Math.random(), Math.random()]; seed.push(r); pos[k * 3] = g.min[0] + (g.max[0] - g.min[0]) * r[0]; pos[k * 3 + 1] = g.min[1] - 4 + (g.max[1] - g.min[1] + 4) * r[1]; pos[k * 3 + 2] = g.min[2] + (g.max[2] - g.min[2]) * r[2] }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const pts = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xdfe8e6, size: 0.35, transparent: true, opacity: 0, depthWrite: false })); pts.frustumCulled = false; group.add(pts)
+    winds.push({ g, pts, pos, seed, y0: g.min[1] - 4, H: g.max[1] - g.min[1] + 4 })
+  }
+  const gustK = (g, t) => { const v = Math.sin(t * g.w + g.ph); return v > 0.55 ? (v - 0.55) / 0.45 : 0 }
   let bt = -1, bp = null
   return {
     group,
@@ -35,6 +45,8 @@ export function buildV51(course, scene) {
       for (const L of lasers) { const m = L.d.spike.mov, on = m.t0 == null, flick = on ? 0.85 + 0.15 * Math.sin(t * 37 + L.d.beam[0]) : 0
         const near = !cam || Math.hypot(L.d.beam[0] - cam.x, L.d.beam[2] - cam.z) < 200
         L.beam.visible = on && near; L.glow.visible = L.glow2.visible = on && near; L.glow.material.opacity = 0.55 * flick }
+      for (const W of winds) { const k = gustK(W.g, t), near = !cam || (cam.x > W.g.min[0] - 60 && cam.x < W.g.max[0] + 60 && cam.z > W.g.min[2] - 60 && cam.z < W.g.max[2] + 60); W.pts.visible = near; if (!near) continue
+        W.pts.material.opacity = 0.15 + 0.55 * k; for (let i = 0; i < W.seed.length; i++) { const r = W.seed[i]; r[1] = (r[1] + dt * (0.05 + 0.6 * k) * (0.6 + r[0] * 0.8)) % 1; W.pos[i * 3 + 1] = W.y0 + W.H * r[1] } W.pts.geometry.attributes.position.needsUpdate = true }
       if (bt >= 0 && bp) { bt += dt; const s1 = 1.5 + 6 * Math.min(1, bt / 0.15), s2 = 2.5 + 6 * Math.min(1, bt / 1.4)
         fire.visible = bt < 0.6; fire.position.set(bp[0], bp[1] + 0.8 + bt * 2, bp[2]); fire.scale.set(s1, s1, 1); fire.material.opacity = Math.max(0, 1 - bt / 0.6)
         smoke.visible = bt < 2.4; smoke.position.set(bp[0], bp[1] + 1.2 + bt * 1.3, bp[2]); smoke.scale.set(s2, s2, 1); smoke.material.opacity = Math.min(0.7, bt * 3) * Math.max(0, 1 - bt / 2.4)

@@ -7,11 +7,11 @@ import { settle } from '../js/run.js'
 import * as S from '../js/steer.js'
 const c = COURSES.stage1(), P = c.path
 const name = i => { let n = ''; for (const m of c.marks) if (i >= m.i0) n = m.name; return n }
-const items = [...c.v51.lasers.map(x => ({ ...x, type: 'laser' })), ...c.v51.blasts.map(x => ({ ...x, type: 'blast' }))].filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.type))
-const modes = { laser: ['ふつうに全開', 'ふつうに 6m/s', '上手い bot', '人の速さ bot'], blast: ['全開だけ', '全開＋ニトロ', '上手い bot', '人の速さ bot'] }
+const items = [...c.v51.lasers.map(x => ({ ...x, type: 'laser' })), ...c.v51.blasts.map(x => ({ ...x, type: 'blast' })), ...(c.v51.ice ? [{ type: 'ice', k: 'ice', i: c.v51.ice.i0 + 4, end: c.v51.ice.i1 }] : [])].filter(x => !process.env.ONLY || process.env.ONLY.split(',').includes(x.type))
+const modes = { ice: ['ふつうに全開', 'ふつうに 6m/s', '上手い bot', '人の速さ bot'], laser: ['ふつうに全開', 'ふつうに 6m/s', '上手い bot', '人の速さ bot'], blast: ['全開だけ', '全開＋ニトロ', '上手い bot', '人の速さ bot'] }
 const rows = []
 for (const it of items) {
-  const row = { 罠: it.type === 'laser' ? 'レーザー' : '爆発', 番号: it.k, 区間: name(it.i) }
+  const row = { 罠: it.type === 'laser' ? 'レーザー' : it.type === 'ice' ? '氷' : '爆発', 番号: it.k, 区間: name(it.i) }
   for (const mode of modes[it.type]) {
     let ok = 0, why = {}
     for (let seed = 0; seed < (mode.includes('bot') ? 4 : 1); seed++) {
@@ -20,7 +20,7 @@ for (const it of items) {
       const b = settle(w, createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw })); { const v0 = mode.includes('6m') ? 6 : 8; b.v = [Math.cos(q.yaw) * v0, 0, -Math.sin(q.yaw) * v0] }
       const st = S.createSteer(P); S.resetSteer(st, b)
       const bot = mode.includes('bot') ? createBot(c, { skill: 'good', react: mode.includes('人') ? 12 : 0 }) : null; if (bot) { bot.world = w; resetBot(bot, b) }
-      const endI = Math.min(P.length - 1, it.i + 18), end = P[endI].p; let res = '進めない'
+      const endI = Math.min(P.length - 1, it.end || it.i + 18), end = P[endI].p; let res = '進めない'
       for (let s = 0; s < 60 * 10; s++) {
         let inp
         if (bot) inp = botInput(bot, b)

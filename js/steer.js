@@ -87,7 +87,8 @@ export function steerFor(st, b, lat = 0) {
 // 道の点の曲がり具合 q.kap から、横の加速度 ALAT で曲がれる速さを出し、ADEC で間に合う所から後輪だけで減速する。
 // 見極めの場所（q.wide）とジャンプの先は数えない（そこは速さを読むのが遊び）
 export const ALAT = 8, ADEC = 7
-export function cornerCap(st, b) {
+export const ICE_ALAT = 2.2 // v51 氷の曲がり: 横に踏ん張れる加速度（氷の摩擦 0.25 ほど）
+export function cornerCap(st, b, o = {}) {
   const path = st.path, sp = Math.max(0, b.speed), look = sp * sp / (2 * ADEC) + 8
   let cap = 99, d = 0
   for (let k = st.i, nk = nextI(path, k); nk >= 0 && d < look; k = nk, nk = nextI(path, k)) {
@@ -96,7 +97,8 @@ export function cornerCap(st, b) {
     // 細い道（幅 3m より狭い）へ続く曲がりは、はみ出せる幅が少ないので遅めに
     let wmin = 9; for (let j = k, n = 0; j >= 0 && n < 5; j = nextI(path, j), n++) if (path[j].w) wmin = Math.min(wmin, path[j].w)
     const alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4))
-    if (!q.wide && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
+    if (q.ice && o.ice && q.kap > 0.015) { const v = Math.sqrt(ICE_ALAT / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * 3.5 * Math.max(0, d - 2))) } // 氷は自動では減速しない（bot が速さを読む時だけ数える）
+    else if (!q.wide && !q.ice && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
     const a = q.p, c = path[nk].p; if (a && c) d += Math.hypot(c[0] - a[0], c[2] - a[2])
   }
   return cap
