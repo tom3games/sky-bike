@@ -8,14 +8,14 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=18'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=18'
-import { COURSES } from './course.js?v=18'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=18'
-import { BikeView, snap } from './bikeview.js?v=18'
-import { createBot, botInput, resetBot } from './bot.js?v=18'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=18'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=18'
+import { buildGimmicks } from './gimmicks.js?v=19'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=19'
+import { COURSES } from './course.js?v=19'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=19'
+import { BikeView, snap } from './bikeview.js?v=19'
+import { createBot, botInput, resetBot } from './bot.js?v=19'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=19'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=19'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -333,6 +333,7 @@ async function loadEnv() {
 function placeBike(b) {
   if (G.fallFrom) for (const n of [G.fallFrom.scream, G.fallFrom.crack]) if (n && n.stop) { try { n.stop() } catch (e) {} }
   G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null
+  if (G.camOff) { G.camOff.yaw = 0; G.camOff.pitch = 0; G.camOff.idle = 9 } // v19: 出し直したら、マウスで回したカメラも後ろへ戻す（前を向いたまま後ろ向きのカメラで、前へ進むのが後ろへ下がって見えていた）
   if (G.steer) resetSteer(G.steer, b)
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
