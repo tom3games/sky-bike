@@ -24,11 +24,12 @@ const place = (where) => page.evaluate(where => {
   if (where === 'chase') i = c.chases[1].i0 - 30
   if (where === 'hermit') i = G.v35.hermit.spot.i - 30
   if (where === 'drum') i = c.path.findIndex(q => q.kind === 'drum') - 30
+  if (where.startsWith('mark:')) i = c.marks.find(m => m.name === where.slice(5)).i0 - 4
   const q = P[Math.max(1, i)], b = A.createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw }); for (let k = 0; k < 30; k++) A.stepBike(G.world, b, { thr: 0, brk: 1, lean: 0, steer: 0 }); A.placeBike(b); A.buildAll()
 }, where)
 const rows = []
 const ONLYF = process.env.ONLY
-for (const [nm, where, keys, sec] of [['ニトロ 1回目', 'start', ['thr', 'nit'], 2], ['ニトロ 2回目', 'start', ['thr', 'nit'], 2], ['燃料の缶', 'can', ['thr'], 4], ['爆発するドラム缶', 'boom', ['thr'], 4], ['クラクションのカラス', 'horn', ['thr'], 5], ['普通のカラス', 'crow', ['thr'], 4], ['v36 鉄骨', 'trap:girder', ['thr'], 5], ['v36 油', 'trap:oil', ['thr'], 3], ['v36 落とし扉', 'trap:door', ['thr'], 3], ['v36 プレス機', 'trap:press', ['thr'], 4], ['v36 猿', 'chase', ['thr'], 6], ['v35 廃墟の男', 'hermit', ['thr'], 5], ['v35 回る筒', 'drum', ['thr'], 6]]) {
+for (const [nm, where, keys, sec] of [['ニトロ 1回目', 'start', ['thr', 'nit'], 2], ['ニトロ 2回目', 'start', ['thr', 'nit'], 2], ['燃料の缶', 'can', ['thr'], 4], ['爆発するドラム缶', 'boom', ['thr'], 4], ['クラクションのカラス', 'horn', ['thr'], 5], ['普通のカラス', 'crow', ['thr'], 4], ['v36 鉄骨', 'trap:girder', ['thr'], 5], ['v36 油', 'trap:oil', ['thr'], 3], ['v36 落とし扉', 'trap:door', ['thr'], 3], ['v36 プレス機', 'trap:press', ['thr'], 4], ['v36 猿', 'chase', ['thr'], 6], ['v35 廃墟の男', 'hermit', ['thr'], 5], ['v35 回る筒', 'drum', ['thr'], 6], ['v37 暗い通路', 'mark:真っ暗な通路', ['thr'], 5], ['v37 草原', 'mark:明るい草原', ['thr'], 6], ['v37 風車', 'mark:風車の羽根', ['thr'], 5], ['v37 綱渡り', 'mark:ワイヤーの綱渡り', ['thr'], 4]]) {
   if (ONLYF && !nm.includes(ONLYF)) continue
   await place(where); await page.waitForTimeout(1500)
   const r = await page.evaluate(async ([keys, sec]) => { const G = window.sky, R = G.api.renderer, n0 = R.info.programs.length; window.__lt = []; const t0 = performance.now(); G.running = true; for (const k of keys) G.keys.add(k)

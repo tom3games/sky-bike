@@ -51,6 +51,7 @@ for (let i = 0; i < main; i++) {
   const q = P[i]
   if (q.kind === 'gear' && q.gear && q.gear.u < -RUN && !(P[i - 1] && P[i - 1].kind === 'gear' && P[i - 1].gear.u === q.gear.u)) blocks.push({ i, why: `逆らう歯車（面が ${(-q.gear.u).toFixed(1)}m/s で戻る）` })
   if (q.kickJump && RUN < (q.vMinCalc ?? q.vJump)) blocks.push({ i, why: `跳ね板（${RUN}m/s では坂に届かない。要る速さ ${q.vMinCalc ?? q.vJump}m/s）` })
+  if (q.cable && (!P[i - 1] || !P[i - 1].cable)) blocks.push({ i, why: '太いケーブル（丸い 0.68m・たわむ・横風。歩いては渡れない）' }) // v37
   if (q.kind === 'swing' && (!P[i - 1] || P[i - 1].kind !== 'swing') && RUN < q.swing.vMin) blocks.push({ i, why: `揺れる吊り橋（${RUN}m/s では揺れに投げ出される。${q.swing.vMin}m/s 以上）` })
 }
 blocks.sort((a, b) => a.i - b.i)

@@ -1,12 +1,12 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=36'
-import * as P16 from './parts16.js?v=36'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=36'
-import { lab16 } from './parts16.js?v=36'
-import * as P17 from './parts17.js?v=36'
-import { finale } from './finale.js?v=36'
-import { v36traps } from './traps.js?v=36'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=36'
+import * as Z from './zones.js?v=37'
+import * as P16 from './parts16.js?v=37'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=37'
+import { lab16 } from './parts16.js?v=37'
+import * as P17 from './parts17.js?v=37'
+import { finale } from './finale.js?v=37'
+import { v36traps } from './traps.js?v=37'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=37'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -535,8 +535,10 @@ export function stage1() {
   B.curve(14, 32 * DEG, L)
   B.tut('air')
   B.road(9, L)
-  { const rise = B.kicker(3, 15 * DEG, { w: 4, mat: 'basalt', thick: 0.8 }); B.gap(5.5, rise - 0.7, 'jump') }
-  B.road(10, { ...L, back: 0 })
+  { const rise = B.kicker(3, 15 * DEG, { w: 4, mat: 'basalt', thick: 0.8 }); B.gap(3.8, rise - 0.7, 'jump') } // v37 本人「でこぼこ難しすぎ」: 切れ目 5.5→3.8m（その分、着地の道を長く。先の道の位置は同じ）
+  { const t = B.t, f = B.dir(t.yaw), ang = Math.atan2(0.5, 6), L2 = Math.hypot(0.5, 6), up = B.upv(t.yaw, -ang), fr = B.dir(t.yaw, -ang), st = add3(t.p, [0, 1, 0], 0.5)
+    B.box({ c: add3(add3(st, fr, L2 / 2), up, -0.15), h: [L2 / 2, 0.15, 3.2], yaw: t.yaw, pitch: -ang, mat: 'cobble', mu: 1.0, tag: 'road' }) } // 着地の 6m はゆるい下り（広さ 6.4m）
+  B.road(11.7, { ...L, w: 6.4, back: 0 })
   B.torch(1, 4, { down: 3 }); B.torch(-1, 4, { down: 3 })
   B.log(2.5, 0.09, 4.6); B.logGone(5.5); B.mudRun(6, 0, /* v36: 続けて並んでいた 2 本を 1 本に・低く */ { ...L, mud: 110 }); B.road(2, L) // v26 本人「結構最初の方に泥一個置いて」: 平らな泥 6m（長さは前の道 8m と同じにして、先の道の位置を変えない）。抜けると「ブリュッ」
   // 高い段（車輪の径くらい）: ゆっくりウィリーで前輪を段の上へ掛け、前体重＋アクセルで後輪を引き上げる
@@ -901,6 +903,6 @@ function finishCourse(B, o) {
     if (a.p && c.p && a.yaw != null && c.yaw != null && a.kind !== 'jump' && c.kind !== 'jump') { const ds = Math.hypot(c.p[0] - a.p[0], c.p[2] - a.p[2]); if (ds > 0.5) k = Math.max(k, Math.abs(wrapA(c.yaw - a.yaw)) / ds) }
     P[i].kap = k
   }
-  return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
 export const COURSES = { practice, stage1, lab16, lab17: P17.lab17 }

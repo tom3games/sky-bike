@@ -2,7 +2,7 @@
 // 場所: 終盤（道の点の 78〜96%）の、前後 16 点がまっすぐ平らで広い道（縁・切れ目・細い道のない所）
 // 当たり: バイクがその点を通った瞬間に、横へ 2.3m/s・前への速さを 1 割落とす（転ばない・道から落ちない量）。バイクの状態だけで決まる（ゴーストも同じ）
 export function strikerSpot(course) {
-  const P = course.path, N = P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length
+  const P = course.path, N = (P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length) - (course.v37added || 0)
   const ok = q => q && q.p && !q.branch && q.w >= 4 && ['road', 'orbit', 'pad'].includes(q.kind) && Math.abs(q.slope || 0) < 0.07 && (q.kap || 0) < 0.035 && !q.door
   for (let i = Math.floor(N * 0.78); i < N * 0.96; i++) {
     let good = true; for (let k = i - 16; k <= i + 16; k++) if (!ok(P[k])) { good = false; break }

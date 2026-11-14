@@ -1,7 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=36'
-import { doorAng } from './traps.js?v=36'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=36'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=37'
+import { doorAng } from './traps.js?v=37'
+import { BLADE } from './v37.js?v=37'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=37'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -268,6 +269,24 @@ export function botInput(bot, b) {
     const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
     if (o) { thr = o.thr; brk = o.brk; lean = o.lean; if (o.steer != null) steer = o.steer; if (o.nitroOff) nitroNeed = false; bot.stuckT = 0; bot.backT = 0; bot.waiting = true }
   }
+  // v37 風車の羽根: 足場の端の 1m 手前で待ち、羽根が足場の高さに来る少し前に出る。羽根の上は 3m/s ほどで先へ、坂に合わせて前体重。先が次の足場の高さに上がるまで先の手前で待つ
+  if (bot.skill === 'good' && bot.world) for (const h of bot.hz) { if (h.kind !== 'blade') continue
+    const Bl = BLADE, f0 = [Math.cos(h.yaw), 0, -Math.sin(h.yaw)], dx = b.p[0] - h.hub[0], dz = b.p[2] - h.hub[2], xf = dx * f0[0] + dz * f0[2], lat = Math.abs(-dx * f0[2] + dz * f0[0]) // xf: 軸から前へ
+    if (lat > 4 || xf < -14 || xf > Bl.L + 3 || Math.abs(b.p[1] - h.hub[1]) > Bl.L + 3) continue
+    const T = bot.world.time, ang = () => bladeAng(h.blades[0].mov, T).a
+    const onB = [0, 1].some(i => b.cn[i] && h.blades.includes(bot.world.shapes[b.cn[i].id]))
+    if (!onB && lat < 1.1 && xf < Bl.x0 + 1.4 && xf > 0.3 && Math.abs(b.p[1] - 0.8 - (h.hub[1] - Bl.x0 * Math.tan(-Bl.aBoard))) < 1.2) { // 待ちの足場: 止まって、下から来る羽根にすくわれるのを待つ
+      const mis = Math.abs(Math.atan2(Math.sin(b.psi - h.yaw), Math.cos(b.psi - h.yaw)))
+      if (mis > 0.15) { thr = sp < 1.0 ? 0.5 : 0; brk = sp > 1.6 ? 0.5 : 0 } else { thr = sp < 2.0 ? 1 : 0; brk = 0 } // 向きがそろうまでゆっくり回り、そろったら羽根へ（乗ると回り始める）
+      lean = 0; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; break }
+    if (onB) { bot.bladeGo = false
+      const a = ang()
+      const r = Math.hypot(xf, b.p[1] - h.hub[1]), nearTip = r > Bl.L + Bl.r0 - 2.2
+      lean = a > 0.12 ? 1 : 0.4
+      if (nearTip && a < Bl.aTop - 0.1) { thr = 0; brk = Math.abs(sp) > 0.2 ? 0.8 : 0.4 } // 先が上がるまで待つ（体重は前）
+      else { thr = sp < (nearTip ? 4.5 : 3.2) ? 1 : 0; brk = sp > 4.2 && !nearTip ? 0.4 : 0 }
+      bot.waiting = true; bot.stuckT = 0; break }
+  }
   // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る
   if (bot.skill === 'good' && bot.world && !air) for (const h of bot.hz) { if (h.kind !== 'door' || path[bot.i].branch || !(bot.i <= h.i + 4 && h.i - bot.i < 36) || ['fork', 'forkRide'].includes(path[bot.i].kind)) continue // 扉の手前の本線の上だけ（分かれ道の床の上では見ない）
     const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw), dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
@@ -277,7 +296,7 @@ export function botInput(bot, b) {
     const tArr = near / Math.max(3, sp), ok = st.at === 'lo' && st.left > tArr + (2 * h.half) / Math.max(6, sp) + 0.15
     if (ok && sp > 4) { bot.doorGo = true; thr = 1; brk = 0; lean = 0; break }
     const stopAt = near - 3
-    if (st.at === 'lo' && st.left > 2.2 && stopAt < 1.5) { bot.doorGo = true; thr = 1; brk = 0; lean = 0; break } // 閉じた直後: 止まった所から全開
+    if (st.at === 'lo' && st.left > 2.6 && stopAt < 1.5) { bot.doorGo = true; thr = 1; brk = 0; lean = 0; break } // 閉じた直後: 止まった所から全開
     if (stopAt > 0.6) { const vMax = Math.sqrt(2 * 3 * stopAt); thr = sp < Math.min(vMax, 6) ? 1 : 0; brk = sp > vMax ? Math.min(1, (sp - vMax) * 0.5 + 0.3) : 0 } else { thr = 0; brk = Math.abs(sp) > 0.15 ? 1 : 0.6 }
     lean = 0; bot.waiting = true; break }
   // v36 油だまり: 手前で 7m/s くらいにして、油の上は何も押さずに惰性で抜ける

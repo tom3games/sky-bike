@@ -139,7 +139,7 @@ function drumView(D, M, group) {
 // ------------------------------------------------------------ 兄の跡の置き場所: 道の割合 t から先で、まっすぐ平らで広い所
 export function traceSpots(course) {
   const hs = hermitSpot(course)
-  const P = course.path, N = P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length
+  const P = course.path, N = (P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length) - (course.v37added || 0) // v37 で足した終盤の道は数えない（置き場所を変えない）
   const ok = q => q && q.p && !q.branch && q.w >= 3.2 && ['road', 'orbit', 'pad'].includes(q.kind) && Math.abs(q.slope || 0) < 0.1 && (q.kap || 0) < 0.06 && !q.door
   const LIST = [
     [0.17, 'height', '兄の字だ。', "My brother's handwriting."],
@@ -167,6 +167,10 @@ export function traceSpots(course) {
   // 中盤の山: 休憩所「嵐の回廊の途中」のそばの野宿の跡（廃墟の男とは別の場所）。字の乱れは 41% と 62% の跡の間
   const cs = campSpot(course)
   if (cs) out.push({ ...cs, side: -1, kind: 'two', camp: true, ja: 'ここまでは二人で来た。', en: 'We made it this far together.', k: 8, shake: 0.36 })
+  // v37 草原の 3 台目の錆びたバイクのそば: 「ここは静かすぎる。」
+  if (course.v37 && course.v37.meadow) { const md = course.v37.meadow, f = [Math.cos(md.yaw), 0, -Math.sin(md.yaw)], len = Math.hypot(md.b[0] - md.a[0], md.b[2] - md.a[2]) + 40, ctr = [(md.a[0] + md.b[0]) / 2, 0, (md.a[2] + md.b[2]) / 2], tgt = [ctr[0] + f[0] * len * 0.28, ctr[2] + f[2] * len * 0.28]
+    const P = course.path; let bi = -1, bd = 1e9; P.forEach((q, i) => { if (!q.p || q.branch || !q.w || q.w < 3) return; const d = Math.hypot(q.p[0] - tgt[0], q.p[2] - tgt[1]); if (d < bd) { bd = d; bi = i } })
+    if (bi >= 0) { const q = P[bi]; out.push({ i: bi, p: q.p.slice(), yaw: q.yaw, w: q.w, side: 1, kind: 'shaky', ja: 'ここは静かすぎる。', en: "It's too quiet here.", k: 10, shake: 0.8 }) } }
   // v36 2 か所目の猿を逃げ切った先: 「あれに追われた。振り返るな。」（爪の跡と、震える上向きの矢印）
   const ch = course.chases && course.chases[1]
   if (ch) { const P = course.path; let i = ch.i1 + 4; while (i < P.length - 1 && !(P[i].w >= 3 && ['road', 'orbit', 'pad'].includes(P[i].kind))) i++; const q = P[i]; out.push({ i, p: q.p.slice(), yaw: q.yaw, w: q.w, side: -1, kind: 'claw', ja: 'あれに追われた。振り返るな。', en: "They chased me. Don't look back.", k: 9, shake: 0.95 }) }
@@ -179,7 +183,7 @@ export function campSpot(course) {
 }
 // 廃墟に住む男の場所: 道の 25% より先の、明るい廃墟の区間で、手前 14m がまっすぐでゆるい所（休憩所「廃墟の回廊の入口」の少し先）
 export function hermitSpot(course) {
-  const P = course.path, N = P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length
+  const P = course.path, N = (P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length) - (course.v37added || 0) // v37 で足した終盤の道は数えない（置き場所を変えない）
   const ok = z => z && z.p && !z.branch && z.w >= 4 && Math.abs(z.slope || 0) < 0.07 && (z.kap || 0) < 0.04 && ['road', 'orbit', 'pad'].includes(z.kind) && !z.door
   for (let i = Math.floor(N * 0.25); i < N * 0.6; i++) { if (P[i].zone !== 'ruin' && P[i].zone !== 'bell') continue; let g = true; for (let j = i - 14; j <= i + 4; j++) if (!ok(P[j])) { g = false; break } if (g) { const q = P[i]; return { i, p: q.p.slice(), yaw: q.yaw, w: q.w } } }
   return null

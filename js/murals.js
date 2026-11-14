@@ -79,7 +79,7 @@ export function muralTexture(k) {
 }
 // 置き場所: 道の割合 t の先で、塔の壁のすぐ横を走る所。壁の、少し先（目に入る所）に
 export function muralSpots(course) {
-  const P = course.path, N = P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length, out = []
+  const P = course.path, N = (P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length) - (course.v37added || 0) // v37 で足した終盤の道は数えない（置き場所を変えない）, out = []
   // 塔ごとに、道が塔の壁のすぐ横を回る点（壁から 1〜4m）。① 廃墟の塔の最初 ② 工場の塔の最初 ③ 鐘楼の塔の最初 ④ 鐘楼の塔の終わりの方
   const near = T => { const L = []; for (let i = 0; i < N - 8; i++) { const q = P[i]; if (!q.p || !q.w || !['orbit', 'road', 'curve', 'pad'].includes(q.kind)) continue; const d = Math.hypot(q.p[0] - T.cx, q.p[2] - T.cz) - T.r; if (d > 0.8 && d < q.w / 2 + 2 && q.p[1] > T.y0 + 1 && q.p[1] < (T.top2 ?? T.top) - 5) L.push(i) } return L }
   const T = course.towers || []

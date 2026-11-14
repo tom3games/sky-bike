@@ -2,15 +2,15 @@
 // 当たり判定なし（見た目と音だけ）。出し直したら、また止まっている。
 // 絵: Crow（Poly by Google・CC BY 3.0）を止まっている姿に、飛ぶ時は体を前へ倒して羽を 2 枚（翼の形の板）足して羽ばたかせる。
 // 全部の鳥を 1 つの InstancedMesh でまとめて描き、カメラから遠い群れ（130m 超）は描かない。
-import { strikerSpot } from './strike.js?v=36'
+import { strikerSpot } from './strike.js?v=37'
 import * as THREE from 'three'
 
 const FAR = 130
 // 道の上・縁に群れを置く所を選ぶ（決まった並び。区間に偏らないよう、道の長さで等間隔に近く・ふつうの道の点だけ）
 export function birdSpots(course, n = 22) {
   const P = course.path, ok = []
-  const BAD = new Set(['jump', 'lip', 'gap', 'stepUp', 'stepDown', 'hang', 'lift', 'glift', 'slide', 'spin', 'seesaw', 'draw', 'crumble', 'trap', 'water', 'mud', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'peg', 'bump', 'uturn'])
-  for (let i = 20; i < P.length - 20; i++) { const q = P[i]; if (q.p && !q.branch && q.w >= 2.6 && !BAD.has(q.kind) && Math.abs(q.slope || 0) < 0.12) ok.push(i) }
+  const BAD = new Set(['blade', 'drum', 'dark', 'narrow', 'jump', 'lip', 'gap', 'stepUp', 'stepDown', 'hang', 'lift', 'glift', 'slide', 'spin', 'seesaw', 'draw', 'crumble', 'trap', 'water', 'mud', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'peg', 'bump', 'uturn'])
+  for (let i = 20; i < P.length - 20 - (course.v37added || 0); i++) { const q = P[i]; if (q.p && !q.branch && q.w >= 2.6 && !BAD.has(q.kind) && Math.abs(q.slope || 0) < 0.12) ok.push(i) }
   const out = []
   let sd = 4242
   const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
@@ -37,7 +37,7 @@ function wingGeo() {
 
 // 道の真ん中に居座る群れ: 本道の半分あたりから先で、手前 16m がまっすぐ平らな道の所（向かってくるのが見えて、止まれる）
 function blockerSpot(course) {
-  const P = course.path, n0 = Math.floor(P.length * 0.47)
+  const P = course.path, n0 = Math.floor((P.length - (course.v37added || 0)) * 0.47) // v37 で足した終盤は数えない
   const flat = q => q && q.p && !q.branch && q.w >= 3 && ['road', 'orbit', 'pad', 'landing'].includes(q.kind) && Math.abs(q.slope || 0) < 0.08 && Math.abs(q.curv || 0) < 0.02
   for (let i = n0; i < P.length - 10; i++) {
     let ok = true; for (let k = i - 16; k <= i + 4; k++) if (!flat(P[k])) { ok = false; break }

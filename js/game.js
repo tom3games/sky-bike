@@ -8,21 +8,22 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=36'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=36'
-import { COURSES } from './course.js?v=36'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=36'
-import { BikeView, snap } from './bikeview.js?v=36'
-import { createBot, botInput, resetBot } from './bot.js?v=36'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=36'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=36'
-import { Birds } from './birds.js?v=36'
-import { crowPush } from './strike.js?v=36'
-import { buildV35, hankieDataURL } from './v35view.js?v=36'
-import { buildV36 } from './v36view.js?v=36'
-import { buildMurals } from './murals.js?v=36'
-import { doorAng } from './traps.js?v=36'
-import { resetDrums } from './physics.js?v=36'
+import { buildGimmicks } from './gimmicks.js?v=37'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=37'
+import { COURSES } from './course.js?v=37'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=37'
+import { BikeView, snap } from './bikeview.js?v=37'
+import { createBot, botInput, resetBot } from './bot.js?v=37'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=37'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=37'
+import { Birds } from './birds.js?v=37'
+import { crowPush } from './strike.js?v=37'
+import { buildV35, hankieDataURL } from './v35view.js?v=37'
+import { buildV36 } from './v36view.js?v=37'
+import { buildMurals } from './murals.js?v=37'
+import { buildV37 } from './v37view.js?v=37'
+import { doorAng } from './traps.js?v=37'
+import { resetDrums } from './physics.js?v=37'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -85,7 +86,7 @@ const sky = buildSky(scene)
 const hemi = new THREE.HemisphereLight(0x7aa6ae, 0x2e2a24, 1.35); scene.add(hemi)
 // 区間ごとの明るさ: col 霧に混ぜる色・tint 混ぜる量・hemi 空の明るさ・dens 霧の濃さの足し
 // dens は霧の濃さの倍率（1 = ふつう）
-const ZONEP = { ground: { col: 0x5a3b2c, tint: 0.2, hemi: 1.45, dens: 0.8 }, crypt: { col: 0x141c1b, tint: 0.6, hemi: 0.5, dens: 1.35 }, ruin: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 1 }, factory: { col: 0x4a3c30, tint: 0.35, hemi: 1.15, dens: 1.15 }, bell: { col: 0x5a5040, tint: 0.3, hemi: 1.25, dens: 1.05 }, ice: { col: 0x5f7f86, tint: 0.45, hemi: 1.4, dens: 1.1 }, storm: { col: 0x34424a, tint: 0.5, hemi: 0.95, dens: 1.3 }, roof: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 0.85 }, sky: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 }, castle: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 } }
+const ZONEP = { ground: { col: 0x5a3b2c, tint: 0.2, hemi: 1.45, dens: 0.8 }, crypt: { col: 0x141c1b, tint: 0.6, hemi: 0.5, dens: 1.35 }, ruin: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 1 }, factory: { col: 0x4a3c30, tint: 0.35, hemi: 1.15, dens: 1.15 }, bell: { col: 0x5a5040, tint: 0.3, hemi: 1.25, dens: 1.05 }, ice: { col: 0x5f7f86, tint: 0.45, hemi: 1.4, dens: 1.1 }, storm: { col: 0x34424a, tint: 0.5, hemi: 0.95, dens: 1.3 }, roof: { col: 0x2d474e, tint: 0, hemi: 1.35, dens: 0.85 }, sky: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 }, tunnel: { col: 0x07090b, tint: 0.92, hemi: 0.16, dens: 2.4 }, meadow: { col: 0xbcd6e6, tint: 0.55, hemi: 1.7, dens: 0.05 }, castle: { col: 0x6a8a90, tint: 0.2, hemi: 1.45, dens: 0.75 } }
 const FOG_BASE = 0.0062
 // 月の反対側から弱い青緑の補助光（影は付けない。影の側が真っ黒にならないように）
 const fill = new THREE.DirectionalLight(0x5f8f98, 0.55); fill.position.set(60, 40, 50); scene.add(fill)
@@ -249,6 +250,7 @@ function loadCourse(id) {
   G.v36 = c.climb ? buildV36(c, scene, M, new GLTFLoader()) : null // v36 罠と猿
   if (G.v36) G.v36.imps.onReady = () => setTimeout(warmShaders, 0)
   G.murals = c.climb ? buildMurals(c, scene) : null // v36 塔の壁の古い壁画 4 枚
+  G.v37 = c.climb ? buildV37(c, scene, M) : null // v37 草原・風車
   LM.gim = Math.round(lt() - l0); l0 = lt()
   const spot = wide ? { q: c.path[spotI], side: -1 } : null
   const signs = buildSigns(c, scene)
@@ -275,7 +277,7 @@ function loadCourse(id) {
   const farGlow = buildFlames(scene, farLights.concat(...crowns.map(cr => cr.flames)), M)
   const flames = buildFlames(scene, flamePts, M)
   LM.rest = Math.round(lt() - l0); l0 = lt()
-  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
+  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, G.v37 && G.v37.group, G.v37 && G.v37.daySky, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
   G.castleAt = c.castleAt
   if (wide) {
     // 準備完了の後の仕事（1 コマに 1 つ、今のカメラに近い物から）
@@ -647,6 +649,22 @@ function talkShow(txt, img) { const el = $('talk'); $('talkTxt').innerHTML = (im
 function talkOff() { $('talk').classList.remove('on') }
 const talking = () => G.hm && (G.hm.ph === 'talk' || G.hm.ph === 'item')
 function hermitReset() { const H = G.v35 && G.v35.hermit; if (!G.hm) return; if (talking() || G.hm.ph === 'stop') { talkOff() } if (!G.hank) { G.hm.ph = 'wait'; if (H) H.set('hide') } else { G.hm.ph = 'done'; if (H) H.set('bye') } }
+// v37 真っ暗な通路ではヘッドライト、草原では昼の光（月の光の色と強さだけ変える。光の数は同じ）と、風と鳥の声だけ（曲は鳴っていない所）
+const MOONC = new THREE.Color(0xa9c8cf), SUNC = new THREE.Color(0xfff2da), DAYT = new THREE.Color(0x3f7fc8), DAYM = new THREE.Color(0x9cc6e4), DAYB = new THREE.Color(0xdde8ec)
+function v37Step(dt, tm) {
+  if (!G.v37 || !G.course) return
+  const zq = G.course.path[(G.steer && G.bike ? G.steer.i : 0) || 0], zone = zq && zq.zone
+  G.v37.update(dt, tm, camera.position, G.world, G.state === 'play' || G.state === 'pause' ? zone : null)
+  const k = G.v37.meadowK
+  moon.color.copy(MOONC).lerp(SUNC, k); moon.intensity = 1.7 + 1.3 * k; fill.intensity = 0.55 + 0.4 * k
+  { const u = sky.material.uniforms; if (!G.skyOrig) G.skyOrig = { top: u.top.value.clone(), mid: u.mid.value.clone(), bot: u.bot.value.clone() }
+    if (k < 0.02) G.skyOrig.pano = u.hasPano.value
+    u.top.value.copy(G.skyOrig.top).lerp(DAYT, k); u.mid.value.copy(G.skyOrig.mid).lerp(DAYM, k); u.bot.value.copy(G.skyOrig.bot).lerp(DAYB, k)
+    if (G.skyOrig.pano) u.hasPano.value = k > 0.35 ? 0 : 1 } // 草原では青空（夜の空の絵を消して、空の色を昼に）
+  bloom.strength = 0.55 * (1 - 0.85 * k); renderer.toneMappingExposure = 1 - 0.28 * k // 昼の明るさでにじみが画面を白くしないように
+  if (bikeView && !(G.horn && G.horn.on)) bikeView.setLamp(zone === 'tunnel' && G.state === 'play' ? 1 : 0)
+  if (Snd.ctx) { const want = k > 0.5 && G.state === 'play'; if (want && !Snd.loops.birds) Snd.loop('birds', 'snd/birds_garden.mp3', 0.5, 2); if (!want && Snd.loops.birds) Snd.loop('birds', null, 0, 1.5) }
+}
 // v35 回る筒のうなり（近い時だけ。間をおいて低い音）
 let drumSndT = 0
 function drumSound(dt) {
@@ -666,11 +684,11 @@ function chaseFx(c, b) {
   if (c.ph === 'caught') { G.patter = false; Snd.play('monkey', { vol: 1, rate: 1.3 }); Snd.play('ballhit', { vol: 0.9 }); Snd.play('crash', { vol: 0.8 }); if (bikeView && bikeView.knockOff) bikeView.knockOff(b, scene, b.crashed ? b.crashed.side : 1); setTimeout(() => Snd.play('scream', { vol: 0.75 }), 250); why(t('why_monkey')); flash('bad') }
 }
 function patterStep(dt) { if (!G.patter || G.state !== 'play') return; patterT -= dt; if (patterT <= 0) { patterT = 0.11 + Math.random() * 0.06; Snd.play('patter', { vol: 0.35, rate: 1.5 + Math.random() * 0.4 }) } }
-// v36 落とし扉: 開く 0.5 秒前にきしむ（近い時だけ・1 回ずつ）
+// v36 落とし扉: 開く 1 秒前にきしむ（v37: 0.55→1 秒）（近い時だけ・1 回ずつ）
 function doorCreak() {
   const b = G.bike; if (!b || !G.course.traps) return
   for (const T of G.course.traps) { if (T.kind !== 'door') continue; const d = Math.hypot(T.p[0] - b.p[0], T.p[2] - b.p[2]); if (d > 40) continue
-    const st = doorAng(T.m, G.world.time), k = st.at === 'lo' && st.left < 0.55 ? 1 : 0
+    const st = doorAng(T.m, G.world.time), k = st.at === 'lo' && st.left < 1.0 ? 1 : 0
     if (k && !T._cr) Snd.play('creak', { vol: Math.max(0.3, 1 - d / 40), rate: 0.75 }); if (st.at === 'up' && !T._cl) { Snd.play('clank', { vol: Math.max(0.2, 0.8 - d / 50), rate: 0.7 }); T._cl = true } if (st.at !== 'up') T._cl = false; T._cr = k }
 }
 // ------------------------------------------------------------ v35 兄の跡: 通る時に画面の下へ小さく 1 行（走りは止めない）
@@ -1117,6 +1135,7 @@ function frame(now) {
     patterStep(Math.min(dt, 0.05))
     bgmStep(Math.min(dt, 0.05))
     drumSound(dt)
+    v37Step(Math.min(dt, 0.05), tm)
     if (G.birds) for (const e of G.birds.update(Math.min(dt, 0.05), G.state === 'play' && G.bike && !G.bike.ghost ? { p: G.bike.p, speed: G.bike.speed } : null, camera.position)) {
       const d = Math.hypot(camera.position.x - e.p[0], camera.position.y - e.p[1], camera.position.z - e.p[2]), v = Math.max(0, 1 - d / 40)
       if (v > 0) { Snd.play('flap', { vol: Math.min(1, 0.45 + e.n * 0.1) * v, rate: 1.5 + Math.random() * 0.3 }); if (e.n > 1 || Math.random() < 0.5) setTimeout(() => Snd.play('caw', { vol: 0.5 * v, rate: 0.9 + Math.random() * 0.2 }), 120 + Math.random() * 300) }

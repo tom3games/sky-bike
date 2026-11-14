@@ -6,7 +6,7 @@
 //  press   下がってくる天井（プレス機）: 演出だけ。通ると頭の 25cm 上でガクンと止まる。当たりなし
 //  chase   小さな猿のような生き物の追いかけ（js/run.js の judge が動かす。ここは場所と速さだけ）
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
-export const DOOR_CYC = { closed: 2.4, move: 0.35, open: 2.8 } // 閉じている 2.4 秒 → 0.35 秒で開く → 2.8 秒開いている → 0.35 秒で閉じる
+export const DOOR_CYC = { closed: 3.2, move: 0.35, open: 2.8 } // 閉じている 3.2 秒 → 0.35 秒で開く → 2.8 秒開いている → 0.35 秒で閉じる（v37: 2.4→3.2 秒）
 export function doorAng(m, t) { // 0 = 閉じている、m.up = 開いた角度
   const C = DOOR_CYC, P = C.closed + C.open + 2 * C.move, ph = ((t + (m.ph || 0)) % P + P) % P
   if (ph < C.closed) return { a: 0, w: 0, at: 'lo', left: C.closed - ph }
@@ -31,7 +31,7 @@ function roadBoxAt(B, q) {
 }
 
 export function v36traps(B) {
-  const P = B.path, N = P.length
+  const P = B.path, N = P.length - (B.v37added || 0) // v37 で終盤に足した道の点は数えない（罠と猿の置き場所を v36 と同じに）
   B.traps = []
   const hz = B.hazards
   // ---------------- 影が落ちてくる鉄骨（道の 44% の嵐の回廊で 3 秒、64% の工場で 2 秒。手前 42m に別の仕掛けが無い所。ほかの単調な道は急な坂の後で着く時間が読めないか、猿・油と重なった）
