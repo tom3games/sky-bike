@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=27'
+import { BIKE, basis, wheelCenter } from './physics.js?v=28'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -20,6 +20,8 @@ function profile(pts, depth, bevel = 0.012) {
   g.translate(0, 0, -depth / 2); return g
 }
 export class BikeView {
+  // v28: ライトを光らせる（0..1）
+  setLamp(k) { if (!this.lampM) return; this.lampM.emissiveIntensity = 0.05 + k * 6; this.lampLight.intensity = k * 600; this.lampGlow.visible = k > 0.02; this.lampGlow.material.opacity = Math.min(1, k) }
   constructor(scene, o = {}) {
     this.root = new THREE.Group(); this.root.name = o.ghost ? 'ghost' : 'bike'
     this.body = new THREE.Group(); this.root.add(this.body)
@@ -60,6 +62,18 @@ export class BikeView {
     for (const z of [-0.33, 0.33]) tube([0, 0.13, z - 0.05 * Math.sign(z)], [0, 0.13, z + 0.06 * Math.sign(z)], 0.022, rubber, this.bar)
     tube([0, 0, -0.07], [0, 0.13, -0.05], 0.02, alu, this.bar); tube([0, 0, 0.07], [0, 0.13, 0.05], 0.02, alu, this.bar)
     const np = add(plate(u => [0.02 + u * 0.1, -0.1 + u * 0.24], 4, 0.025, 0.2), white, this.bar)
+    // v28 ヘッドライト（ゼッケンの板の前の丸いレンズ。ふだんは暗く、クラクションの時にパッパッと光る）
+    if (!ghost) {
+      this.lampM = new THREE.MeshStandardMaterial({ color: 0xd8d4c8, emissive: 0xfff2c8, emissiveIntensity: 0.05, roughness: 0.3, metalness: 0.2 })
+      const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.03, 18), this.lampM); lens.rotation.z = Math.PI / 2; lens.position.set(0.17, 0.05, 0); this.bar.add(lens)
+      this.lampLight = new THREE.SpotLight(0xfff0d0, 0, 30, 0.45, 0.45, 1.2); this.lampLight.position.set(0.2, 0.05, 0); this.bar.add(this.lampLight)
+      const tg = new THREE.Object3D(); tg.position.set(6, -0.9, 0); this.bar.add(tg); this.lampLight.target = tg
+      // 光ったときの、ライトのまわりのにじみ（足し算で重ねる板）
+      const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32)
+      gr.addColorStop(0, 'rgba(255,250,235,1)'); gr.addColorStop(0.25, 'rgba(255,236,190,0.55)'); gr.addColorStop(1, 'rgba(255,220,160,0)'); cx.fillStyle = gr; cx.fillRect(0, 0, 64, 64)
+      this.lampGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 }))
+      this.lampGlow.scale.set(0.9, 0.9, 1); this.lampGlow.position.set(0.22, 0.05, 0); this.lampGlow.visible = false; this.bar.add(this.lampGlow)
+    }
     // ---- 車輪（当たりと同じ大きさのドーナツ）
     this.wheels = [0, 1].map(i => {
       const g = new THREE.Group()

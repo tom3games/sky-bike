@@ -8,15 +8,15 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=27'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=27'
-import { COURSES } from './course.js?v=27'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=27'
-import { BikeView, snap } from './bikeview.js?v=27'
-import { createBot, botInput, resetBot } from './bot.js?v=27'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=27'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=27'
-import { Birds } from './birds.js?v=27'
+import { buildGimmicks } from './gimmicks.js?v=28'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=28'
+import { COURSES } from './course.js?v=28'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=28'
+import { BikeView, snap } from './bikeview.js?v=28'
+import { createBot, botInput, resetBot } from './bot.js?v=28'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=28'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=28'
+import { Birds } from './birds.js?v=28'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -125,7 +125,7 @@ composer.addPass(grade)
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3' })
+Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3' })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -379,6 +379,23 @@ function boomUpdate(dt) {
   if (B.t < 1.2) { const p = [B.a[0], B.a[1] + 0.4, B.a[2]]; if (Math.random() < dt * 30) dust.emit(p, 2, 1.2, { col: 0x3a3836, up: 2.5, size: 2.4 }); if (B.t < 0.6 && Math.random() < dt * 40) dust.emit(p, 2, 1.5, { col: 0xff9a40, up: 3, size: 1.4 }) }
   const m = boomMesh(); if (m && B.vel && m.visible) { B.vel[1] -= 9.81 * dt; m.position.x += B.vel[0] * dt; m.position.y += B.vel[1] * dt; m.position.z += B.vel[2] * dt; m.rotation.x += B.spin[0] * dt; m.rotation.y += B.spin[1] * dt; m.rotation.z += B.spin[2] * dt; if (m.position.y < B.a[1] - 30) m.visible = false }
 }
+// ------------------------------------------------------------ v28 クラクション: 居座るカラスの群れの 7.5m 手前で自動で「ぷっぷー」、ライトが 2 回パッパッ。1.2 秒後に群れが飛ぶ
+function hornUpdate(dt) {
+  const Bd = G.birds, f = Bd && Bd.blocker, b = G.bike
+  if (!f || !b) return
+  const H = G.horn
+  if (H && H.on) {
+    H.t += dt
+    const t = H.t, k = (t < 0.13 || (t > 0.27 && t < 0.42)) ? 1 : 0
+    if (bikeView) bikeView.setLamp(k)
+    if (t >= 1.2 && !H.flushed) { H.flushed = true; Bd.flush(f, b.p); Snd.play('flap', { vol: 0.9, rate: 1.5 }); setTimeout(() => Snd.play('caw', { vol: 0.6 }), 150) }
+    if (t > 1.6) { H.on = false; if (bikeView) bikeView.setLamp(0) }
+    return
+  }
+  if (f.state !== 'perch' || G.state !== 'play' || b.crashed || b.ghost || (H && H.done)) return
+  const hx = Math.cos(f.yaw), hz = -Math.sin(f.yaw), ahead = (f.p[0] - b.p[0]) * hx + (f.p[2] - b.p[2]) * hz, lat = Math.abs(-(f.p[0] - b.p[0]) * hz + (f.p[2] - b.p[2]) * hx)
+  if (ahead > 0 && ahead < 7.5 && lat < 3 && Math.abs(b.p[1] - 0.8 - f.p[1]) < 2) { G.horn = { on: true, t: 0, done: true }; G.hornN = (G.hornN || 0) + 1; Snd.play('horn', { vol: 1 }) }
+}
 function placeBike(b) {
   if (G.fallFrom) for (const n of [G.fallFrom.scream, G.fallFrom.crack]) if (n && n.stop) { try { n.stop() } catch (e) {} }
   G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null
@@ -386,6 +403,7 @@ function placeBike(b) {
   if (G.steer) resetSteer(G.steer, b)
   if (G.birds) G.birds.reset() // 出し直したら、鳥はまた止まっている
   boomReset()
+  G.horn = null; if (bikeView) bikeView.setLamp(0) // 出し直したら、群れはまた居座っている
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
   if (bikeView) bikeView.resetRider()
@@ -495,8 +513,19 @@ function gatherInput() {
   const steer = G.bike && !G.bike.crashed && G.steer ? steerFor(G.steer, G.bike) : 0
   // 記録できる細かさに丸める（同じ入力なら同じ結果）
   const inp = { thr: Math.round(thr * 8) / 8, brk: Math.round(brk * 8) / 8, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro: nit }
+  hornHold(inp)
   // 曲がりの手前の自動の減速（アクセルを押しっぱなしでも、ふつうの曲がりでははみ出さない）
   return G.bike && !G.bike.crashed && G.steer ? assist(G.steer, G.bike, inp) : inp
+}
+// v28: 道をふさぐカラスの群れの手前では、自動でゆっくり減速して止まる（ひかない）。群れが飛んだら普通に進める
+function hornHold(inp) {
+  const f = G.birds && G.birds.blocker, b = G.bike
+  if (!f || f.state !== 'perch' || !b || b.crashed) return
+  const hx = Math.cos(f.yaw), hz = -Math.sin(f.yaw), ahead = (f.p[0] - b.p[0]) * hx + (f.p[2] - b.p[2]) * hz, lat = Math.abs(-(f.p[0] - b.p[0]) * hz + (f.p[2] - b.p[2]) * hx)
+  if (ahead < 0 || ahead > 28 || lat > 3 || Math.abs(b.p[1] - 0.8 - f.p[1]) > 2) return
+  const d = ahead - 3.6, vmax = Math.sqrt(Math.max(0, 2 * 2.6 * d))
+  if (b.speed > vmax + 0.1) { inp.thr = 0; inp.brk = Math.min(1, (b.speed - vmax) * 0.6 + 0.35); inp.nitro = 0 }
+  else if (d < 0.4) { inp.thr = 0; inp.brk = b.speed > 0.3 ? 0.6 : 0; inp.nitro = 0 } // 止まったら、ブレーキは離す（押し続けると下がるので）
 }
 const pack = arr => { const u = new Uint8Array(arr.length * 4); arr.forEach((v, i) => { u[i * 4] = v.thr * 8 + (v.nitro ? 16 : 0); u[i * 4 + 1] = v.brk * 8 + (v.ab || 0) * 8 * 16; u[i * 4 + 2] = Math.round(v.lean * 16) + 16; u[i * 4 + 3] = Math.round(v.steer * 16) + 16 }); let s = ''; for (const c of u) s += String.fromCharCode(c); return btoa(s) }
 function unpack(s) { const r = atob(s), out = []; for (let i = 0; i + 3 < r.length; i += 4) out.push({ thr: (r.charCodeAt(i) & 15) / 8, nitro: r.charCodeAt(i) >> 4 & 1, brk: (r.charCodeAt(i + 1) & 15) / 8, ab: (r.charCodeAt(i + 1) >> 4) / 8, lean: (r.charCodeAt(i + 2) - 16) / 16, steer: (r.charCodeAt(i + 3) - 16) / 16 }); return out }
@@ -858,6 +887,7 @@ function frame(now) {
     if (!G.lodAll && (G._lodN = (G._lodN || 0) + 1) % 6 === 0) lod()
     if (built.movers.length) updateMovers(built.movers, G.world, G.lodAll ? null : camera.position)
     boomUpdate(Math.min(dt, 0.05))
+    hornUpdate(Math.min(dt, 0.05))
     if (G.birds) for (const e of G.birds.update(Math.min(dt, 0.05), G.state === 'play' && G.bike && !G.bike.ghost ? { p: G.bike.p, speed: G.bike.speed } : null, camera.position)) {
       const d = Math.hypot(camera.position.x - e.p[0], camera.position.y - e.p[1], camera.position.z - e.p[2]), v = Math.max(0, 1 - d / 40)
       if (v > 0) { Snd.play('flap', { vol: Math.min(1, 0.45 + e.n * 0.1) * v, rate: 1.5 + Math.random() * 0.3 }); if (e.n > 1 || Math.random() < 0.5) setTimeout(() => Snd.play('caw', { vol: 0.5 * v, rate: 0.9 + Math.random() * 0.2 }), 120 + Math.random() * 300) }

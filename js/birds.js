@@ -34,9 +34,27 @@ function wingGeo() {
   return g
 }
 
+// 道の真ん中に居座る群れ: 本道の半分あたりから先で、手前 16m がまっすぐ平らな道の所（向かってくるのが見えて、止まれる）
+function blockerSpot(course) {
+  const P = course.path, n0 = Math.floor(P.length * 0.47)
+  const flat = q => q && q.p && !q.branch && q.w >= 3 && ['road', 'orbit', 'pad', 'landing'].includes(q.kind) && Math.abs(q.slope || 0) < 0.08 && Math.abs(q.curv || 0) < 0.02
+  for (let i = n0; i < P.length - 10; i++) {
+    let ok = true; for (let k = i - 16; k <= i + 4; k++) if (!flat(P[k])) { ok = false; break }
+    if (!ok) continue
+    const q = P[i], birds = []
+    let sd = 777; const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
+    for (let j = 0; j < 6; j++) birds.push({ off: [(rr() - 0.5) * 1.8, (rr() - 0.5) * Math.min(2.4, q.w - 1)], yaw: q.yaw + Math.PI + (rr() - 0.5) * 1.6, ph: rr() * 10 })
+    return { p: q.p.slice(), yaw: q.yaw, birds, i, block: true }
+  }
+  return null
+}
+
 export class Birds {
   constructor(scene, course) {
     this.scene = scene; this.flocks = birdSpots(course); this.time = 0; this.events = []
+    // v28: 中盤の道の真ん中に、近づいても飛ばない群れ（6 羽）。クラクションで飛ぶ（game.js）
+    this.blocker = blockerSpot(course)
+    if (this.blocker) this.flocks.push(this.blocker)
     this.total = this.flocks.reduce((a, f) => a + f.birds.length, 0)
     this.ready = false
     this.reset()
@@ -64,13 +82,19 @@ export class Birds {
   reset() {
     for (const f of this.flocks) { f.state = 'perch'; f.t = 0; for (const b of f.birds) { b.pos = [f.p[0] + Math.cos(f.yaw) * b.off[0] + Math.sin(f.yaw) * b.off[1], f.p[1], f.p[2] - Math.sin(f.yaw) * b.off[0] + Math.cos(f.yaw) * b.off[1]]; b.vel = [0, 0, 0]; b.fy = b.yaw; b.hop = 0 } }
   }
+  // 群れを飛び立たせる（クラクション。from: 鳴らした所）
+  flush(f, from) {
+    if (f.state !== 'perch') return
+    f.state = 'fly'; f.t = 0
+    for (const b of f.birds) { const ax = b.pos[0] - from[0], az = b.pos[2] - from[2], al = Math.hypot(ax, az) || 1, sp = 3 + Math.random() * 2.5, a = Math.atan2(az / al, ax / al) + (Math.random() - 0.5) * 1.6; b.vel = [Math.cos(a) * sp, 2.8 + Math.random() * 1.8, Math.sin(a) * sp]; b.delay = Math.random() * 0.25; b.fy = Math.atan2(-b.vel[2], b.vel[0]) }
+  }
   dispose() { if (this.body) this.scene.remove(this.body, this.wings) }
   // bike: { p, speed }。cam: カメラの位置。返り: 飛び立った群れ（音を鳴らすため）
   update(dt, bike, cam) {
     this.time += dt
     const ev = []
     if (bike) for (const f of this.flocks) {
-      if (f.state !== 'perch') continue
+      if (f.state !== 'perch' || f.block) continue // 居座る群れは近づいても飛ばない（クラクションで飛ぶ）
       const d = Math.hypot(bike.p[0] - f.p[0], bike.p[2] - f.p[2]), dy = Math.abs(bike.p[1] - 0.8 - f.p[1])
       const R = 4 + Math.min(14, Math.max(0, bike.speed) * 0.75) // 速いほど遠くから気づく
       if (d < R && dy < 4) {
