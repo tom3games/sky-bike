@@ -1,14 +1,14 @@
 // SKY BIKE v37 の見た目: 明るい草原の浮き島（昼の空・揺れる草・同じ花が等間隔・縁で止まった霧の壁・動かない雲・錆びた古いトライアルバイク 3 台）・風車（塔・軸・帆）
 // 真っ暗な通路は区間の明るさ（game.js ZONEP.tunnel）とヘッドライトで。光の数は変えない（月の光の色と強さを変えるだけ）
 import * as THREE from 'three'
-import { bladeAng } from './physics.js?v=47'
+import { bladeAng } from './physics.js?v=48'
 
 let seed = 37
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 function canvasT(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
 
 // 錆びた古いトライアルバイク（乗り手なし。草に半分埋まる）
-function rustyBike(M) {
+export function rustyBike(M) {
   const g = new THREE.Group(), rust = new THREE.MeshStandardMaterial({ color: 0x6b3a22, roughness: 0.95, metalness: 0.35 }), dark = new THREE.MeshStandardMaterial({ color: 0x241c18, roughness: 1 })
   for (const x of [-0.71, 0.71]) {
     const tire = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.07, 8, 22), dark); tire.position.set(x, 0.33, 0); g.add(tire)

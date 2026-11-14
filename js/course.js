@@ -1,12 +1,13 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=47'
-import * as P16 from './parts16.js?v=47'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=47'
-import { lab16 } from './parts16.js?v=47'
-import * as P17 from './parts17.js?v=47'
-import { finale } from './finale.js?v=47'
-import { v36traps } from './traps.js?v=47'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=47'
+import * as Z from './zones.js?v=48'
+import * as P16 from './parts16.js?v=48'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=48'
+import { lab16 } from './parts16.js?v=48'
+import * as P17 from './parts17.js?v=48'
+import { finale } from './finale.js?v=48'
+import { v36traps } from './traps.js?v=48'
+import { descent } from './v48.js?v=48'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=48'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -722,6 +723,7 @@ export function stage1() {
   addFlagsBefore(B, [['ウィリーの溝', '溝の手前'], ['崩れていく石の橋', '石の橋の手前']]) // v36 難所の前に旗（tools/flagneed.mjs: 旗から 40 秒以上かかり、人の速さ bot がくり返し失敗していた所）
   addSupports(B)
   towerDressing(B)
+  { const n0 = B.path.length; descent(B, B.castleBase, B.castleYaw); B.v37added = (B.v37added || 0) + B.path.length - n0 } // v48 下山（エピローグ）。支えと塔の飾りの後に足す（ほかの区間の飾りの並びを変えない）
   return finishCourse(B, { id: 'stage1', name: '第1面 奈落から天空へ', killBelow: 10, spawnBack: 2, climb: true, groundKill: true })
 }
 // 塔の壁の柱（当たりあり。ほとんど壁に埋まり、張り出しの内側へ 0.15m だけ出る）と、張り出しの外の縁の欠けた低い石の縁（当たりあり）
@@ -864,6 +866,7 @@ function castle(B) {
   B.cyl({ a: at(6, -16, 16), b: at(6, -16, 22), r: 2.2, mat: 'castle', tag: 'castle' })
   B.decor.push({ kind: 'roof', p: at(14, 0, 34), r: 6.2, h: 9 }, { kind: 'roof', p: at(22, 10, 28), r: 4.2, h: 7 }, { kind: 'roof', p: at(22, -10, 24), r: 4.2, h: 7 }, { kind: 'roof', p: at(0, 16, 16), r: 3.8, h: 6 }, { kind: 'roof', p: at(0, -16, 16), r: 3.8, h: 6 })
   B.castleAt = at(14, 0, 20)
+  B.castleBase = base.slice(); B.castleYaw = t.yaw // v48 下山の出口
 }
 
 // v36 区間（mark）の始まりの少し手前の、平らでまっすぐな道の点に休憩所の旗を足す（道は変えない）。旗の番号がずれるので、旗の飾りの番号も直す
@@ -906,6 +909,6 @@ function finishCourse(B, o) {
     if (a.p && c.p && a.yaw != null && c.yaw != null && a.kind !== 'jump' && c.kind !== 'jump') { const ds = Math.hypot(c.p[0] - a.p[0], c.p[2] - a.p[2]); if (ds > 0.5) k = Math.max(k, Math.abs(wrapA(c.yaw - a.yaw)) / ds) }
     P[i].kap = k
   }
-  return { ...o, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  return { ...o, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
 export const COURSES = { practice, stage1, lab16, lab17: P17.lab17 }

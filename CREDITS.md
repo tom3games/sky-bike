@@ -28,6 +28,7 @@
 - assets/models/Lady.glb（序盤のお姉さん）: Quaternius「Ultimate Modular Women」Formal（ドレスと髪の色を変え、使うアニメ 4 本だけ残した）/ CC0 / https://quaternius.com
 - snd/patter_01・02.mp3: 100 CC0 SFX #2 / rubberduck / CC0（足音）
 - assets/models/Imp.glb: Quaternius「Ultimate Animated Character Pack」Goblin_Male（使うアニメ 5 本だけ残した。小さな猿のような生き物）/ CC0 / https://quaternius.com
+- assets/models/Elder.glb（出発の後ろに出てくる村の男）: Quaternius「Ultimate Animated Character Pack」OldClassy_Male（使うアニメ 3 本だけ残した）/ CC0 / https://quaternius.com
 - assets/models/Hermit.glb: Quaternius「Ultimate Modular Men」Farmer（使うアニメ 5 本だけ残した。廃墟に住む男）/ CC0 / https://quaternius.com
 - snd/creak_a.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/creak_b.mp3: 50 RPG sound effects / Kenney / CC0
