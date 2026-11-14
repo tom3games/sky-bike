@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=44'
-import { doorAng } from './traps.js?v=44'
-import { BLADE } from './v37.js?v=44'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=44'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=45'
+import { doorAng } from './traps.js?v=45'
+import { BLADE } from './v37.js?v=45'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=45'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -432,7 +432,7 @@ function v17Lift(bot, b, SQ, PV, c) {
   const path = bot.path, cur = path[bot.i], W = bot.world, sp = c.sp
   if (!W) return null
   let gl = cur.glift || null
-  if (!gl) for (let jj = 0, dd = 0; jj < Math.min(SQ.length, 12); jj++) { const j = SQ[jj], q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2]); if (q.glift && dd < 7) { gl = q.glift; break } if (q.kind === 'hang') break }
+  if (!gl) for (let jj = 0, dd = 0; jj < Math.min(SQ.length, 20); jj++) { const j = SQ[jj], q = path[j]; if (jj > 0 && path[PV[j]].p && q.p) dd += Math.hypot(q.p[0] - path[PV[j]].p[0], q.p[2] - path[PV[j]].p[2]); if (q.glift && dd < 7 + Math.max(0, c.sp - 3) * 1.1) { /* v45 速く近づいた時は早めに止まり始める */ gl = q.glift; break } if (q.kind === 'hang') break }
   if (!gl) { bot.glGo = false; return null }
   const st = liftPos(gl.m, W.time), f = gl.f
   const al = (b.p[0] - gl.start[0]) * f[0] + (b.p[2] - gl.start[2]) * f[2]
