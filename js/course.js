@@ -6,6 +6,7 @@ import { lab16 } from './parts16.js?v=50'
 import * as P17 from './parts17.js?v=50'
 import * as V49 from './v49.js?v=50'
 import { finale } from './finale.js?v=50'
+import { chaseGroup } from './v46.js?v=50'
 import { v36traps } from './traps.js?v=50'
 import { descent } from './v48.js?v=50'
 import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=50'
@@ -404,10 +405,10 @@ export class Builder {
     const t = this.t, f = this.dir(t.yaw), p = add3(t.p, f, at)
     this.cans = this.cans || []; this.cans.push({ p, t: null })
   }
-  crumbleRun(len, n, w, delay = 0.5) {
-    const t = this.t, f = this.dir(t.yaw)
-    for (let i = 0; i < n; i++) { const c0 = add3(add3(t.p, f, len / n * (i + 0.5)), [0, 1, 0], -0.15); this.box({ c: c0, h: [len / n / 2 - 0.04, 0.15, w / 2], yaw: t.yaw, mat: 'plankold', tag: 'road', mov: { type: 'crumble', delay, back: 6 } }) }
-    for (let d = 0; d < len; d += 1) this.path.push({ p: add3(t.p, f, d), yaw: t.yaw, slope: 0, w, kind: 'crumble' })
+  crumbleRun(len, n, w, delay = 0.5, o = {}) {
+    const t = this.t, f = this.dir(t.yaw), G = o.chase ? chaseGroup(o.chase, len) : null // v51 追ってくる崩れ
+    for (let i = 0; i < n; i++) { const c0 = add3(add3(t.p, f, len / n * (i + 0.5)), [0, 1, 0], -0.15); this.box({ c: c0, h: [len / n / 2 - 0.04, 0.15, w / 2], yaw: t.yaw, mat: 'plankold', tag: 'road', mov: { type: 'crumble', delay, back: 6, ...(G ? { chase: { G, s0: len / n * i, s1: len / n * (i + 1) } } : {}) } }) }
+    for (let d = 0; d < len; d += 1) this.path.push({ p: add3(t.p, f, d), yaw: t.yaw, slope: 0, w, kind: 'crumble', ...(G ? { chase: G } : {}) })
     t.p = add3(t.p, f, len); this.last = null
   }
 }

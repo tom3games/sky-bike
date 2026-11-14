@@ -7,7 +7,7 @@ import { drum } from './drum.js?v=50'
 import { v37 } from './v37.js?v=50'
 import { v41 } from './v41.js?v=50'
 import { v45, v45tower } from './v45.js?v=50'
-import { v46 } from './v46.js?v=50'
+import { v46, chaseOf } from './v46.js?v=50'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -63,7 +63,7 @@ export function finale(B) {
   B.road(10, C)
   fall(6, 1, 13, 1.2); fall(14, -1, 15, 1.4, 0.25); fall(22, 1, 17, 1.6, 0.1)
   B.sign('崩れる前に 駆け抜けろ', { at: 2 })
-  B.crumbleRun(36, 14, 3.6, 0.32)
+  B.crumbleRun(36, 14, 3.6, 0.32, { chase: chaseOf('fin') })
   B.road(8, { ...C, kind: 'landing' })
   B.closeMark()
   // ---------------- v35 回る筒（廃工場の巨大な筒の内側を一周する。js/drum.js）

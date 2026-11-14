@@ -259,7 +259,9 @@ function seesawPose(s) {
   s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa + R0[k] * kd * (1 - ca)); s.ax = nb.ax
 }
 // 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } resetDrums(world) }
+// v51 追ってくる崩れの表（0.1 秒ごとの後輪の進み）を τ 秒で引く。表の先は最後の速さで進む
+export function chaseTab(T, tau) { const k = tau * 10, i = Math.floor(k); if (i < 0) return T[0]; if (i + 1 >= T.length) { const n = T.length - 1; return T[n] + (T[n] - T[n - 1]) * (k - n) } return T[i] + (T[i + 1] - T[i]) * (k - i) }
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
 // v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
@@ -389,6 +391,7 @@ export class World {
         const K = key(i, j, k); let L = this.grid.get(K); if (!L) this.grid.set(K, L = []); L.push(id)
       }
     })
+    this.chases = [...new Set(this.moving.filter(x => x.mov.type === 'crumble' && x.mov.chase).map(x => x.mov.chase.G))]; for (const G of this.chases) { G.t0 = null; G.planks = this.moving.filter(x => x.mov.chase && x.mov.chase.G === G) }
     this.buf = []
     this.setTime(0)
     resetDrums(this)
@@ -418,6 +421,7 @@ export class World {
       else if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle' || m.type === 'topple') v16Pose(s, t, dtT)
       if (m.type === 'crumble') { if (s.gone && t - s.goneAt > m.back) { s.gone = false; s.touch = 0 } else if (!s.gone && s.touch > 0 && s.lastTouch !== undefined && t - s.lastTouch > 1.5) s.touch = 0 }
     }
+    for (const G of this.chases || []) { if (t === 0 || (G.t0 != null && t - G.t0 > G.reset)) G.t0 = null } // v51 追ってくる崩れ: 崩れ終わって板が戻ったら、また待つ
   }
   tick() {
     // シーソー: 前の 1 コマにバイクから受けた回す力で、8 回に分けて傾ける（重さで傾く。乗っていなければゆっくり元へ戻る）
@@ -855,7 +859,15 @@ function sub(world, b, inpIn, ev) {
   { const up = !!b._upBrk
     if (inp.brk > 0 && !inp._auto && inp.thr <= 0 && (inp.lean <= 0.3 || up) && b.g[0] && b.g[1] && vr < (up ? 1.0 : 0.6) && (b.revT > 0 || Math.abs(vr) < (up ? 1.0 : 0.6))) b.revT = (b.revT || 0) + H; else b.revT = 0 }
   // ---- 崩れる足場: 乗っている時間がたまると落ちる（ゴーストは崩さない）
-  if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { if (!(sh.touch > 0) && ev) ev.push({ t: 'crumbleTouch', id: sh.id, v: b.speed }); if (!(sh.touch > 0)) { b._crList = b._crList || []; if (!b._crList.includes(sh.id)) b._crList.push(sh.id) } sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
+  // v51 本人「崩壊していく所、全速力で走っても後輪がちょっと引っかかる感じに」: 追ってくる崩れ（chase）。最初の板に車輪が触れた時から、崩れの先が
+  //   s = v0 τ + a τ²/2 − lead（τ は触れてからの秒）で前へ進み、先が板の終わりの 0.25m 手前に来た板から抜け落ちる（tab: 全開で走った後輪の進みの表 × k − lead）。全開（ニトロ）でようやく後輪のすぐ後ろ
+  if (!b.ghost && world.chases && world.chases.length) for (const G of world.chases) {
+    if (G.t0 == null) { for (let i = 0; i < 2; i++) { const cn = b.cn[i]; const sh = cn && world.shapes[cn.id]; if (sh && sh.mov && sh.mov.chase && sh.mov.chase.G === G && !sh.gone) { G.t0 = world.time; if (ev) ev.push({ t: 'crumbleTouch', id: sh.id, v: b.speed, chase: true }) } } }
+    if (G.t0 == null) continue
+    const tau = world.time - G.t0, sw = G.tab ? chaseTab(G.tab, tau) * G.k - G.lead : G.v0 * tau + G.a * tau * tau / 2 - G.lead
+    for (const sh of G.planks) if (!sh.gone && sh.goneAt < G.t0 && sw >= sh.mov.chase.s1 - 0.25) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id, fast: true }) }
+  }
+  if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone && !sh.mov.chase) { if (!(sh.touch > 0) && ev) ev.push({ t: 'crumbleTouch', id: sh.id, v: b.speed }); if (!(sh.touch > 0)) { b._crList = b._crList || []; if (!b._crList.includes(sh.id)) b._crList.push(sh.id) } sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
   // v31 本人「落ちる板が、最高速度で進んでると反応してない」: 速く走り抜けた板も、離れた直後（0.12 秒）に後ろで崩れ落ちる（渡り切れるのはそのまま。遅い時は今まで通り乗っている間に落ちる）
   if (!b.ghost && b._crList && b._crList.length) b._crList = b._crList.filter(id => { const sh = world.shapes[id]; if (sh.gone) return false; const dt = world.time - (sh.lastTouch ?? -1e9); if (dt > 1.0) return false
     const away = closest(sh, b.p[0], b.p[1], b.p[2]).d

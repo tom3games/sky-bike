@@ -81,6 +81,7 @@ export function botInput(bot, b) {
   if (bot.jumpAhead) vT = Math.max(vT, bot.vJump || 6.5)
   if (bot.steepAhead && !stepAt) vT = Math.max(vT, 9) // すべる急坂は勢いで一気に
   if (cur.kind === 'crumble' || (path[bot.i + 2] && path[bot.i + 2].kind === 'crumble')) vT = Math.max(vT, 7) // 崩れる板の上では止まらない
+  { let ch = false; for (let j = bot.i; j < Math.min(path.length, bot.i + 22); j++) if (path[j].chase) { ch = true; break } if (ch) vT = Math.max(vT, 30) } // v51 追ってくる崩れの前と上は全開（ニトロは nitro の点で）
   for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 9); j = SQ[++jj]) if (path[j].kind === 'trap') { vT = Math.max(vT, 7); break } // 抜け落ちる床は速さで越える
   // 高い縁（前輪を掛ける）: 歩く速さで近づき、手前でウィリー
   let hangAt = null, nitroNeed = false, nitroLip = 0
@@ -333,7 +334,8 @@ export function botInput(bot, b) {
     bot.oilOn = onOil; if (onOil) { thr = 0; brk = 0; lean = 0 } }
   // v35 回る筒: 助走から筒を出るまで全開（人も同じ。遅いと真上で落ちる）
   if (b._dph || cur.kind === 'drum' || cur.kind === 'drumRun' || SQ.slice(0, 30).some(j => path[j].kind === 'drum')) { thr = 1; brk = 0; lean = 0; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 }
-  const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
+  { let ch = null; for (let j = bot.i; j < Math.min(path.length, bot.i + 45); j++) { if (path[j].chase) { ch = j; break } if (path[j].kind === 'jump' || path[j].kind === 'lip') break } /* 曲がりは自動の減速（assist）に任せて、アクセルは離さない（人も全開のまま角を抜ける） */ if (bot.skill === 'good' && ch != null && !air) { thr = 1; brk = 0; if (path[ch].chase.nitro) nitroNeed = true; if (path[bot.i].chase || ch - bot.i < 4) lean = b.th > 0.3 ? 0.6 : 0 } } // v51 追ってくる崩れの上は全開（全開の時の後輪の進みに合わせて崩れが追ってくる）
+  const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
   if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach')) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
