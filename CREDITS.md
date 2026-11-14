@@ -24,6 +24,8 @@
 - snd/birds_garden.mp3: Birds singing in garden / ezwa（Wikimedia Commons）/ Public domain（40 秒に切った）
 - snd/monkey_0〜5.mp3・monkey_taunt.mp3: 猿の声: 店主の声の録音
 - snd/man_voice.mp3: 男の声: 店主の声の録音
+- snd/onee_voice.mp3: お姉さんの声: 店主の声の録音
+- assets/models/Lady.glb（序盤のお姉さん）: Quaternius「Ultimate Modular Women」Formal（ドレスと髪の色を変え、使うアニメ 4 本だけ残した）/ CC0 / https://quaternius.com
 - snd/patter_01・02.mp3: 100 CC0 SFX #2 / rubberduck / CC0（足音）
 - assets/models/Imp.glb: Quaternius「Ultimate Animated Character Pack」Goblin_Male（使うアニメ 5 本だけ残した。小さな猿のような生き物）/ CC0 / https://quaternius.com
 - assets/models/Hermit.glb: Quaternius「Ultimate Modular Men」Farmer（使うアニメ 5 本だけ残した。廃墟に住む男）/ CC0 / https://quaternius.com

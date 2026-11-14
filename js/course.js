@@ -1,12 +1,12 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=39'
-import * as P16 from './parts16.js?v=39'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=39'
-import { lab16 } from './parts16.js?v=39'
-import * as P17 from './parts17.js?v=39'
-import { finale } from './finale.js?v=39'
-import { v36traps } from './traps.js?v=39'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=39'
+import * as Z from './zones.js?v=40'
+import * as P16 from './parts16.js?v=40'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=40'
+import { lab16 } from './parts16.js?v=40'
+import * as P17 from './parts17.js?v=40'
+import { finale } from './finale.js?v=40'
+import { v36traps } from './traps.js?v=40'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=40'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]

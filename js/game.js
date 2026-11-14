@@ -8,22 +8,23 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=39'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=39'
-import { COURSES } from './course.js?v=39'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=39'
-import { BikeView, snap } from './bikeview.js?v=39'
-import { createBot, botInput, resetBot } from './bot.js?v=39'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=39'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=39'
-import { Birds } from './birds.js?v=39'
-import { crowPush } from './strike.js?v=39'
-import { buildV35, hankieDataURL } from './v35view.js?v=39'
-import { buildV36 } from './v36view.js?v=39'
-import { buildMurals } from './murals.js?v=39'
-import { buildV37 } from './v37view.js?v=39'
-import { doorAng } from './traps.js?v=39'
-import { resetDrums } from './physics.js?v=39'
+import { buildGimmicks } from './gimmicks.js?v=40'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=40'
+import { COURSES } from './course.js?v=40'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=40'
+import { BikeView, snap } from './bikeview.js?v=40'
+import { createBot, botInput, resetBot } from './bot.js?v=40'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=40'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=40'
+import { Birds } from './birds.js?v=40'
+import { crowPush } from './strike.js?v=40'
+import { buildV35, hankieDataURL } from './v35view.js?v=40'
+import { buildV36 } from './v36view.js?v=40'
+import { buildLady } from './lady.js?v=40'
+import { buildMurals } from './murals.js?v=40'
+import { buildV37 } from './v37view.js?v=40'
+import { doorAng } from './traps.js?v=40'
+import { resetDrums } from './physics.js?v=40'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -48,8 +49,8 @@ THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
 
 // ------------------------------------------------------------ 言葉（日英）
 const TXT = {
-  ja: { loading: '塔へ向かう', kicker: '奈落の底から、雲の上の城まで。', c_practice: '練習場', c_stage1: '登る', c_stage1_sub: '第1面 奈落から天空へ', how: '遊び方', sound_on: '音 あり', sound_off: '音 なし', how_lead: 'ハンドルは自動で道をなぞる。操るのはアクセル・ブレーキ・体重の前後・ニトロだけ。PC はマウスでカメラも回せる。', k_thr: 'アクセル', k_brk: 'ブレーキ（止まると下がる）', k_back: '後ろ体重', k_fwd: '前体重', k_nit: 'ニトロ（押すだけで全開。旗と燃料の缶で満タン）', k_cam: 'カメラ（クリックでマウスを固定・Esc で外す）', kc_thr: '左クリック / ↑', kc_brk: '右クリック / ↓ / S', kc_cam: 'マウス', tip10: 'ニトロは押すだけで全開になる。休憩所の旗と道の燃料の缶で満たせる。曲がりの手前で押しても、自動の減速で切れる', k_cp: '休憩所からやり直す', k_pause: '一時停止', tip1: '段の前は後ろ体重で前輪を上げ、乗ったら前体重', tip2: '登りは前体重、下りは後ろ体重', tip3: '空中は体重で車体を着地の坂に合わせる', tip4: '曲がる前はブレーキ。速すぎると外へふくらむ', tip5: '後ろ体重のあとすぐ前体重で、車体が跳ねる', tip6: '止まっている時・ゆっくり惰性の時は、後ろ体重だけで前輪が上がる（約33度で止まる）。前体重だけで前輪で立つ（約22度。ブレーキも押すと約32度）', tip7: '回りすぎ・頭から落ちると転んで、最後に通った休憩所の旗から。道の外へ落ちたら着いた所から登り直し（深く落ちたら旗から）', tip8: '高い縁は ゆっくり近づき 後ろ体重＋アクセルで前輪を掛け、ブレーキで耐え、前体重＋アクセルで登る', tip9: '扉は速さで破る。シーソーはゆっくり。ひびの入った床は速さで越える', tip10: '猿に追われたら、ニトロ・ウィリー・ジャンプ台で引き離す', tip11: '油の上は何も押さずに惰性で抜ける。落とし扉はきしむ音のあと開く', tip12: '鉄骨は影が濃くなると落ちる。回る筒の中はアクセルを入れたまま', tip13: '風車は羽根に乗ると回り、上で止まったら降りる。綱渡りは横風の合間に', logo_sub: '崩れた塔を、雲の上まで', t_climb: '高い縁: 後ろ体重＋アクセルで掛け、前体重＋アクセル', cr: [['t', 'SKY BIKE'], ['h', '作った人'], ['', 'とも（ひまつぶし横丁）'], ['', 'X @ktomo_dev'], ['h', 'ほかのゲーム'], ['', 'tom3games.com'], ['h', '声'], ['', 'とも'], ['h', '音楽'], ['', 'とも'], ['h', '素材'], ['', 'カラス: Crow / Poly by Google（CC BY 3.0）'], ['', '火の音: Work With Sounds / La Fonderie（CC BY 4.0）'], ['', 'ほか CC0 の素材（Poly Haven・Quaternius・Kenney ほか）'], ['end', '遊んでくれてありがとう']], credit: '素材: Poly Haven・Quaternius・Kenney ほか（CC0）。火の音: Work With Sounds / La Fonderie（CC BY 4.0）。カラス: Poly by Google（CC BY 3.0）。一覧は CREDITS.md', back: 'もどる', faults: 'フォルト', arrived: '到着', time: '時間', best: '自己ベスト', retry: 'もう一回', next: '登る', share: 'Xでポスト', menu: 'メニュー', paused: '一時停止', resume: '続ける', restart: '最初から', why_head: '頭を打った', why_back: '後ろへ回りすぎた', why_front: '前へ回った', why_body: '体が当たった', why_hard: '着地が強すぎ', why_belly: '車体の下を強く打った', why_fall: '落ちた', medal: ['金', '銀', '銅', '完走'], newBest: '自己ベスト更新', rest: 'セーブした', fell: 'Nm 落ちた', net: '休憩所に戻った', lava: '溶岩に落ちた', best_alt: '最高', hard_on: 'ハードコア 入', hard_off: 'ハードコア 切', t_thr: 'アクセル', t_back: '段の前は 後ろ体重', t_fwd: '登りは 前体重', t_air: '空中は体重で角度を合わせる', t_brk: '曲がる前は ブレーキ', why_monkey: 'はたき落とされた', story0: '兄は、ここへ行くと言って帰ってこなかった。', letter: '先に行く。お前なら来ると思った。', items: '持ち物', hankie: '黄ばんだハンカチ', hm: ['よお、こんなところで何してんだ。', 'よく見たら汚ねえ顔してんな。', 'これで顔拭けや。'], hmGot: '黄ばんだハンカチを貰った。', tapNext: 'タップ / クリックで次へ', keys: '<b>左クリック</b>アクセル <b>右クリック</b>ブレーキ <b>A</b>後ろ体重 <b>D</b>前体重 <b>W</b>ニトロ <b>マウス</b>カメラ <i></i><b>R</b>休憩所へ <b>Esc</b>止める' },
-  en: { loading: 'Heading to the tower', kicker: 'From the abyss to the castle above the clouds.', c_practice: 'Practice Yard', c_stage1: 'Climb', c_stage1_sub: 'Stage 1: Abyss to the Sky', how: 'How to play', sound_on: 'Sound on', sound_off: 'Sound off', how_lead: 'Steering is automatic. You only control throttle, brake, leaning back or forward, and nitro. On PC the mouse turns the camera.', k_thr: 'Throttle', k_brk: 'Brake (reverse when stopped)', k_back: 'Lean back', k_fwd: 'Lean forward', k_nit: 'Nitro (full throttle on its own; refill at flags and fuel cans)', k_cam: 'Camera (click to lock the mouse, Esc to release)', kc_thr: 'Left click / ↑', kc_brk: 'Right click / ↓ / S', kc_cam: 'Mouse', tip10: 'Nitro gives full throttle by itself. Refill it at rest flags and fuel cans. It cuts out when the bike slows for a corner', k_cp: 'Back to rest point', k_pause: 'Pause', tip1: 'Lean back to lift the front onto a step, then lean forward', tip2: 'Lean forward going up, back going down', tip3: 'In the air, lean to match the landing slope', tip4: 'Brake before corners. Too fast and you run wide', tip5: 'Lean back then quickly forward to hop', tip6: 'Stopped or rolling slowly, just lean back to lift the front (holds at about 33°). Just lean forward to stand on the front wheel (about 22°, about 32° with the brake)', tip7: 'Loop out or land on your head and you restart from the last rest flag. Fall off and you climb from where you land (fall too far and it is the flag)', tip8: 'Tall ledge: creep up, lean back + throttle to hook the front wheel, hold the brake, then lean forward + throttle to climb', tip9: 'Smash doors with speed. Ride seesaws slowly. Keep your speed over cracking floors', tip10: 'Chased by monkeys? Nitro, a wheelie or a kicker jump shakes them off', tip11: 'On oil, press nothing and coast. Trapdoors creak just before they open', tip12: 'A girder drops when its shadow darkens. Keep the throttle on inside the drum', tip13: 'Ride a windmill blade up and step off when it stops. Cross the cable between gusts', logo_sub: 'Ride the ruined tower above the clouds', t_climb: 'Tall ledge: lean back + throttle to hook, lean forward + throttle', cr: [['t', 'SKY BIKE'], ['h', 'Made by'], ['', 'Tomo (Himatsubushi Yokocho)'], ['', 'X @ktomo_dev'], ['h', 'More games'], ['', 'tom3games.com'], ['h', 'Voice'], ['', 'Tomo'], ['h', 'Music'], ['', 'Tomo'], ['h', 'Assets'], ['', 'Crow: Crow / Poly by Google (CC BY 3.0)'], ['', 'Fire sound: Work With Sounds / La Fonderie (CC BY 4.0)'], ['', 'Other CC0 assets (Poly Haven, Quaternius, Kenney and others)'], ['end', 'Thank you for playing']], credit: 'Assets: Poly Haven, Quaternius, Kenney and others (CC0). Fire sound: Work With Sounds / La Fonderie (CC BY 4.0). Crow: Poly by Google (CC BY 3.0). Full list in CREDITS.md', back: 'Back', faults: 'Faults', arrived: 'Arrived', time: 'Time', best: 'Best', retry: 'Retry', next: 'Climb', share: 'Post on X', menu: 'Menu', paused: 'Paused', resume: 'Resume', restart: 'Restart', why_head: 'Head hit', why_back: 'Looped out backward', why_front: 'Over the bars', why_body: 'Body hit', why_hard: 'Landing too hard', why_belly: 'Bottomed out hard', why_fall: 'Fell', medal: ['GOLD', 'SILVER', 'BRONZE', 'DONE'], newBest: 'New best', rest: 'Saved', fell: 'Fell Nm', net: 'Back to rest point', lava: 'Into the lava', best_alt: 'Best', hard_on: 'Hardcore ON', hard_off: 'Hardcore OFF', t_thr: 'Throttle', t_back: 'Lean back before a step', t_fwd: 'Lean forward going up', t_air: 'Lean to match the landing', t_brk: 'Brake before the corner', why_monkey: 'Knocked off', story0: 'My brother said he was going up there, and never came back.', letter: "I went on ahead. I knew you'd make it.", items: 'Items', hankie: 'Yellowed handkerchief', hm: ["Yo, what're you doing out here?", 'Man, your face is filthy.', 'Here, wipe it with this.'], hmGot: 'Got a yellowed handkerchief.', tapNext: 'Tap / click for next', keys: '<b>Left click</b>throttle <b>Right click</b>brake <b>A</b>lean back <b>D</b>lean fwd <b>W</b>nitro <b>Mouse</b>camera <i></i><b>R</b>rest point <b>Esc</b>pause' },
+  ja: { loading: '塔へ向かう', kicker: '奈落の底から、雲の上の城まで。', c_practice: '練習場', c_stage1: '登る', c_stage1_sub: '第1面 奈落から天空へ', how: '遊び方', sound_on: '音 あり', sound_off: '音 なし', how_lead: 'ハンドルは自動で道をなぞる。操るのはアクセル・ブレーキ・体重の前後・ニトロだけ。PC はマウスでカメラも回せる。', k_thr: 'アクセル', k_brk: 'ブレーキ（止まると下がる）', k_back: '後ろ体重', k_fwd: '前体重', k_nit: 'ニトロ（押すだけで全開。旗と燃料の缶で満タン）', k_cam: 'カメラ（クリックでマウスを固定・Esc で外す）', kc_thr: '左クリック / ↑', kc_brk: '右クリック / ↓ / S', kc_cam: 'マウス', tip10: 'ニトロは押すだけで全開になる。休憩所の旗と道の燃料の缶で満たせる。曲がりの手前で押しても、自動の減速で切れる', k_cp: '休憩所からやり直す', k_pause: '一時停止', tip1: '段の前は後ろ体重で前輪を上げ、乗ったら前体重', tip2: '登りは前体重、下りは後ろ体重', tip3: '空中は体重で車体を着地の坂に合わせる', tip4: '曲がる前はブレーキ。速すぎると外へふくらむ', tip5: '後ろ体重のあとすぐ前体重で、車体が跳ねる', tip6: '止まっている時・ゆっくり惰性の時は、後ろ体重だけで前輪が上がる（約33度で止まる）。前体重だけで前輪で立つ（約22度。ブレーキも押すと約32度）', tip7: '回りすぎ・頭から落ちると転んで、最後に通った休憩所の旗から。道の外へ落ちたら着いた所から登り直し（深く落ちたら旗から）', tip8: '高い縁は ゆっくり近づき 後ろ体重＋アクセルで前輪を掛け、ブレーキで耐え、前体重＋アクセルで登る', tip9: '扉は速さで破る。シーソーはゆっくり。ひびの入った床は速さで越える', tip10: '猿に追われたら、ニトロ・ウィリー・ジャンプ台で引き離す', tip11: '油の上は何も押さずに惰性で抜ける。落とし扉はきしむ音のあと開く', tip12: '鉄骨は影が濃くなると落ちる。回る筒の中はアクセルを入れたまま', tip13: '風車は羽根に乗ると回り、上で止まったら降りる。綱渡りは横風の合間に', logo_sub: '崩れた塔を、雲の上まで', t_climb: '高い縁: 後ろ体重＋アクセルで掛け、前体重＋アクセル', cr: [['t', 'SKY BIKE'], ['img', '作者のとも'], ['h', '作った人'], ['', 'とも（ひまつぶし横丁）'], ['', 'X @ktomo_dev'], ['h', 'ほかのゲーム'], ['', 'tom3games.com'], ['h', '声'], ['', 'とも'], ['h', '音楽'], ['', 'とも'], ['h', '素材'], ['', 'カラス: Crow / Poly by Google（CC BY 3.0）'], ['', '火の音: Work With Sounds / La Fonderie（CC BY 4.0）'], ['', 'ほか CC0 の素材（Poly Haven・Quaternius・Kenney ほか）'], ['end', '遊んでくれてありがとう']], credit: '素材: Poly Haven・Quaternius・Kenney ほか（CC0）。火の音: Work With Sounds / La Fonderie（CC BY 4.0）。カラス: Poly by Google（CC BY 3.0）。一覧は CREDITS.md', back: 'もどる', faults: 'フォルト', arrived: '到着', time: '時間', best: '自己ベスト', retry: 'もう一回', next: '登る', share: 'Xでポスト', menu: 'メニュー', paused: '一時停止', resume: '続ける', restart: '最初から', why_head: '頭を打った', why_back: '後ろへ回りすぎた', why_front: '前へ回った', why_body: '体が当たった', why_hard: '着地が強すぎ', why_belly: '車体の下を強く打った', why_fall: '落ちた', medal: ['金', '銀', '銅', '完走'], newBest: '自己ベスト更新', rest: 'セーブした', fell: 'Nm 落ちた', net: '休憩所に戻った', lava: '溶岩に落ちた', best_alt: '最高', hard_on: 'ハードコア 入', hard_off: 'ハードコア 切', t_thr: 'アクセル', t_back: '段の前は 後ろ体重', t_fwd: '登りは 前体重', t_air: '空中は体重で角度を合わせる', t_brk: '曲がる前は ブレーキ', why_monkey: 'はたき落とされた', story0: '兄は、ここへ行くと言って帰ってこなかった。', letter: '先に行く。お前なら来ると思った。', items: '持ち物', hankie: '黄ばんだハンカチ', ly: ['何しにきたの？', 'お兄さんがここに？', '……イケメンなら覚えてたんだけどね。', 'ホクロのでかい男ならきたわよ。'], hm: ['よお、こんなところで何してんだ。', 'よく見たら汚ねえ顔してんな。', 'これで顔拭けや。'], hmGot: '黄ばんだハンカチを貰った。', tapNext: 'タップ / クリックで次へ', keys: '<b>左クリック</b>アクセル <b>右クリック</b>ブレーキ <b>A</b>後ろ体重 <b>D</b>前体重 <b>W</b>ニトロ <b>マウス</b>カメラ <i></i><b>R</b>休憩所へ <b>Esc</b>止める' },
+  en: { loading: 'Heading to the tower', kicker: 'From the abyss to the castle above the clouds.', c_practice: 'Practice Yard', c_stage1: 'Climb', c_stage1_sub: 'Stage 1: Abyss to the Sky', how: 'How to play', sound_on: 'Sound on', sound_off: 'Sound off', how_lead: 'Steering is automatic. You only control throttle, brake, leaning back or forward, and nitro. On PC the mouse turns the camera.', k_thr: 'Throttle', k_brk: 'Brake (reverse when stopped)', k_back: 'Lean back', k_fwd: 'Lean forward', k_nit: 'Nitro (full throttle on its own; refill at flags and fuel cans)', k_cam: 'Camera (click to lock the mouse, Esc to release)', kc_thr: 'Left click / ↑', kc_brk: 'Right click / ↓ / S', kc_cam: 'Mouse', tip10: 'Nitro gives full throttle by itself. Refill it at rest flags and fuel cans. It cuts out when the bike slows for a corner', k_cp: 'Back to rest point', k_pause: 'Pause', tip1: 'Lean back to lift the front onto a step, then lean forward', tip2: 'Lean forward going up, back going down', tip3: 'In the air, lean to match the landing slope', tip4: 'Brake before corners. Too fast and you run wide', tip5: 'Lean back then quickly forward to hop', tip6: 'Stopped or rolling slowly, just lean back to lift the front (holds at about 33°). Just lean forward to stand on the front wheel (about 22°, about 32° with the brake)', tip7: 'Loop out or land on your head and you restart from the last rest flag. Fall off and you climb from where you land (fall too far and it is the flag)', tip8: 'Tall ledge: creep up, lean back + throttle to hook the front wheel, hold the brake, then lean forward + throttle to climb', tip9: 'Smash doors with speed. Ride seesaws slowly. Keep your speed over cracking floors', tip10: 'Chased by monkeys? Nitro, a wheelie or a kicker jump shakes them off', tip11: 'On oil, press nothing and coast. Trapdoors creak just before they open', tip12: 'A girder drops when its shadow darkens. Keep the throttle on inside the drum', tip13: 'Ride a windmill blade up and step off when it stops. Cross the cable between gusts', logo_sub: 'Ride the ruined tower above the clouds', t_climb: 'Tall ledge: lean back + throttle to hook, lean forward + throttle', cr: [['t', 'SKY BIKE'], ['img', 'Tomo, the maker'], ['h', 'Made by'], ['', 'Tomo (Himatsubushi Yokocho)'], ['', 'X @ktomo_dev'], ['h', 'More games'], ['', 'tom3games.com'], ['h', 'Voice'], ['', 'Tomo'], ['h', 'Music'], ['', 'Tomo'], ['h', 'Assets'], ['', 'Crow: Crow / Poly by Google (CC BY 3.0)'], ['', 'Fire sound: Work With Sounds / La Fonderie (CC BY 4.0)'], ['', 'Other CC0 assets (Poly Haven, Quaternius, Kenney and others)'], ['end', 'Thank you for playing']], credit: 'Assets: Poly Haven, Quaternius, Kenney and others (CC0). Fire sound: Work With Sounds / La Fonderie (CC BY 4.0). Crow: Poly by Google (CC BY 3.0). Full list in CREDITS.md', back: 'Back', faults: 'Faults', arrived: 'Arrived', time: 'Time', best: 'Best', retry: 'Retry', next: 'Climb', share: 'Post on X', menu: 'Menu', paused: 'Paused', resume: 'Resume', restart: 'Restart', why_head: 'Head hit', why_back: 'Looped out backward', why_front: 'Over the bars', why_body: 'Body hit', why_hard: 'Landing too hard', why_belly: 'Bottomed out hard', why_fall: 'Fell', medal: ['GOLD', 'SILVER', 'BRONZE', 'DONE'], newBest: 'New best', rest: 'Saved', fell: 'Fell Nm', net: 'Back to rest point', lava: 'Into the lava', best_alt: 'Best', hard_on: 'Hardcore ON', hard_off: 'Hardcore OFF', t_thr: 'Throttle', t_back: 'Lean back before a step', t_fwd: 'Lean forward going up', t_air: 'Lean to match the landing', t_brk: 'Brake before the corner', why_monkey: 'Knocked off', story0: 'My brother said he was going up there, and never came back.', letter: "I went on ahead. I knew you'd make it.", items: 'Items', hankie: 'Yellowed handkerchief', ly: ['What brings you here?', 'Your brother came here?', "...I'd have remembered him if he was handsome.", 'A guy with a huge mole did come by, though.'], hm: ["Yo, what're you doing out here?", 'Man, your face is filthy.', 'Here, wipe it with this.'], hmGot: 'Got a yellowed handkerchief.', tapNext: 'Tap / click for next', keys: '<b>Left click</b>throttle <b>Right click</b>brake <b>A</b>lean back <b>D</b>lean fwd <b>W</b>nitro <b>Mouse</b>camera <i></i><b>R</b>rest point <b>Esc</b>pause' },
 }
 let lang = 'ja'
 try { lang = localStorage.getItem('sky-lang') || ((navigator.language || 'ja').slice(0, 2) === 'ja' ? 'ja' : 'en') } catch (e) {}
@@ -135,7 +136,7 @@ composer.addPass(grade)
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
+Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -253,6 +254,9 @@ function loadCourse(id) {
   G.gim = buildGimmicks(c, scene, M)
   G.v35 = c.climb ? buildV35(c, scene, M, new GLTFLoader()) : null // v35 回る筒・廃墟の男・兄の跡
   if (G.v35) G.v35.hermit.onReady = () => setTimeout(warmShaders, 0)
+  if (G.ladyG) scene.remove(G.ladyG); G.ladyG = new THREE.Group(); G.ladyG.name = 'lady'; scene.add(G.ladyG)
+  G.ladyV = c.climb ? buildLady(c, G.ladyG, M, new GLTFLoader()) : null // v40 序盤の旗のそばのお姉さん
+  if (G.ladyV) G.ladyV.onReady = () => setTimeout(warmShaders, 0)
   G.v36 = c.climb ? buildV36(c, scene, M, new GLTFLoader()) : null // v36 罠と猿
   if (G.v36) G.v36.imps.onReady = () => setTimeout(warmShaders, 0)
   G.murals = c.climb ? buildMurals(c, scene) : null // v36 塔の壁の古い壁画 4 枚
@@ -283,7 +287,7 @@ function loadCourse(id) {
   const farGlow = buildFlames(scene, farLights.concat(...crowns.map(cr => cr.flames)), M)
   const flames = buildFlames(scene, flamePts, M)
   LM.rest = Math.round(lt() - l0); l0 = lt()
-  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, G.v37 && G.v37.group, G.v37 && G.v37.daySky, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
+  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.ladyG, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, G.v37 && G.v37.group, G.v37 && G.v37.daySky, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
   G.castleAt = c.castleAt
   if (wide) {
     // 準備完了の後の仕事（1 コマに 1 つ、今のカメラに近い物から）
@@ -490,6 +494,7 @@ function placeBike(b) {
   G.patter = false
   if (BGM.ph !== 'off' && G.state === 'play') bgmStop(0.3) // v36 出し直したら曲は止める（助走路に入ったら build から）
   hermitReset() // v35 廃墟の男: もらう前なら隠れ直す。もらった後は手を振るだけ
+  ladyReset()
   G.strikeVis = false // 体当たりのカラスも戻る（バイクは新しく作るので、当たった印も消える）
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
@@ -504,7 +509,7 @@ function startRun(id) {
   G.world.setTime(0); for (const s of G.world.moving) { s.gone = false; s.touch = 0 }
   resetDrums(G.world) // v35 回る筒の口を最初の形へ
   $('letter').classList.remove('on', 'quiet', 'peek'); G.ending = null; bgmStop(1.0); if (G.v35 && G.v35.tracks) G.v35.tracks.visible = false
-  G.hank = false; G.hm = { ph: 'wait' }; G.story = { seen: {}, t0: G.course.climb ? 0.6 : null }; storyOff(); talkOff()
+  G.hank = false; G.hm = { ph: 'wait' }; G.ly = { ph: 'wait' }; G.ladyDone = false; G.story = { seen: {}, t0: G.course.climb ? 0.6 : null }; storyOff(); talkOff()
   for (const cn of G.course.cans || []) cn.t = null; skid.clear()
   spawnAt(0)
   G.rec = { course: id, inp: [], ev: [] }
@@ -593,7 +598,7 @@ document.querySelectorAll('.tb').forEach(btn => {
   btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up)
 })
 function gatherInput() {
-  if (G.testInput) { const ti = G.testInput(); if (Q.get('hm')) hermitHold(ti); return ti }
+  if (G.testInput) { const ti = G.testInput(); if (Q.get('hm')) { hermitHold(ti); ladyHold(ti) } return ti }
   const K = G.keys, T = G.touch, pad = readPad()
   const M = G.mouse || {}
   let thr = K.has('thr') || T.thr || M.thr ? 1 : 0, brk = K.has('brk') || T.brk || M.brk ? 1 : 0
@@ -608,6 +613,7 @@ function gatherInput() {
   const inp = { thr: Math.round(thr * 8) / 8, brk: Math.round(brk * 8) / 8, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro: nit }
   hornHold(inp)
   hermitHold(inp)
+  ladyHold(inp)
   // 曲がりの手前の自動の減速（アクセルを押しっぱなしでも、ふつうの曲がりでははみ出さない）
   return G.bike && !G.bike.crashed && G.steer ? assist(G.steer, G.bike, inp) : inp
 }
@@ -647,6 +653,7 @@ function hermitStep(dt) { // 1 コマごと（話の送り: 数秒で自動で�
   if (M.t > (M.ph === 'item' ? 3.4 : 3.2)) talkNext()
 }
 function talkNext() {
+  if (G.ly && G.ly.ph === 'talk') return ladyNext()
   const M = G.hm, H = G.v35 && G.v35.hermit; if (!M || M.t < 0.35) return
   if (M.ph === 'talk') {
     M.line++; M.t = 0
@@ -656,8 +663,32 @@ function talkNext() {
 }
 function talkShow(txt, img) { const el = $('talk'); $('talkTxt').innerHTML = (img ? `<img src="${img}" alt="">` : '') + txt; $('talkNx').textContent = t('tapNext'); el.classList.add('on') }
 function talkOff() { $('talk').classList.remove('on') }
-const talking = () => G.hm && (G.hm.ph === 'talk' || G.hm.ph === 'item')
+const talking = () => (G.hm && (G.hm.ph === 'talk' || G.hm.ph === 'item')) || (G.ly && G.ly.ph === 'talk')
 function hermitReset() { const H = G.v35 && G.v35.hermit; if (!G.hm) return; if (talking() || G.hm.ph === 'stop') { talkOff() } if (!G.hank) { G.hm.ph = 'wait'; if (H) H.set('hide') } else { G.hm.ph = 'done'; if (H) H.set('bye') } }
+// v40 序盤の旗のそばのお姉さん: 近づくと自動でゆっくり止まり、4 行（タップ/クリック/キーで送る・3.2 秒で自動）。同じ走りで 1 回だけ。出し直し後は手を振るだけ
+function lyGeom(b) { const L = G.ladyV, sp = L && L.spot; if (!sp || !b) return null; const hx = Math.cos(sp.yaw), hz = -Math.sin(sp.yaw); return { L, sp, ahead: (sp.p[0] - b.p[0]) * hx + (sp.p[2] - b.p[2]) * hz, lat: Math.abs(-(sp.p[0] - b.p[0]) * hz + (sp.p[2] - b.p[2]) * hx), dy: Math.abs(b.p[1] - 0.8 - sp.p[1]) } }
+function ladyHold(inp) {
+  const b = G.bike, M = G.ly; if (!M || G.state !== 'play' || !b || b.crashed) return
+  const g = lyGeom(b); if (!g || !g.L.ready) return
+  if (G.ladyDone) { if (M.ph !== 'talk' && g.ahead > -3 && g.ahead < 30 && g.lat < 4 && g.dy < 2.5) g.L.set('bye'); if (M.ph !== 'talk') return }
+  if (M.ph === 'wait') { if (g.ahead > HM_STOP && g.ahead < 30 && g.lat < 3 && g.dy < 2) { M.ph = 'stop'; g.L.set('look') } else return }
+  if (M.ph === 'stop') {
+    if (g.ahead < 0 || g.lat > 4 || g.dy > 3) { M.ph = 'wait'; g.L.set('lean'); return }
+    const d = g.ahead - HM_STOP, vmax = Math.sqrt(Math.max(0, 2 * 2.4 * d))
+    if (b.speed > vmax + 0.1) { inp.thr = 0; inp.brk = Math.min(1, (b.speed - vmax) * 0.6 + 0.35); inp.nitro = 0 }
+    else if (d < 0.6) { M.hold = (M.hold || 0) + 1; inp.thr = 0; inp.brk = M.hold % 20 ? 1 : 0; inp.nitro = 0; if (Math.abs(b.speed) < 0.25 && b.g[0] && b.g[1]) { M.ph = 'talk'; M.line = 0; M.t = 0; G.ladyDone = true; G.ladyTalks = (G.ladyTalks || 0) + 1; g.L.set('talk'); talkShow(t('ly')[0]); G.oneeVoice = (G.oneeVoice || 0) + 1; Snd.duck(0.5, 1.2); Snd.play('oneeVoice', { vol: 1, jitter: 0 }) } }
+    return
+  }
+  if (M.ph === 'talk') { M.hold = (M.hold || 0) + 1; inp.thr = 0; inp.brk = M.hold % 20 ? 1 : 0; inp.lean = 0; inp.nitro = 0 }
+}
+function ladyStep(dt) { const M = G.ly; if (!M || M.ph !== 'talk') return; M.t += dt; if (M.t > 3.2) ladyNext() }
+function ladyNext() {
+  const M = G.ly; if (!M || M.ph !== 'talk' || M.t < 0.35) return
+  M.line++; M.t = 0
+  if (M.line < t('ly').length) talkShow(t('ly')[M.line])
+  else { M.ph = 'done'; talkOff(); if (G.ladyV) G.ladyV.set('after') }
+}
+function ladyReset() { const L = G.ladyV, M = G.ly; if (!M) return; if (M.ph === 'talk' || M.ph === 'stop') talkOff(); if (!G.ladyDone) { M.ph = 'wait'; if (L && L.set) L.set('lean') } else { M.ph = 'done'; if (L && L.set) L.set('bye') } }
 // v37 真っ暗な通路ではヘッドライト、草原では昼の光（月の光の色と強さだけ変える。光の数は同じ）と、風と鳥の声だけ（曲は鳴っていない所）
 const MOONC = new THREE.Color(0xa9c8cf), SUNC = new THREE.Color(0xfff2da), DAYT = new THREE.Color(0x3f7fc8), DAYM = new THREE.Color(0x9cc6e4), DAYB = new THREE.Color(0xdde8ec)
 function v37Step(dt, tm) {
@@ -862,9 +893,12 @@ function endingCam() {
   aimLights(camera.position)
   return true
 }
+// v40 エンドクレジットの作者の写真（丸く小さく）。ページを開いた時に読み込んでおく
+const CR_IMG = new Image(); CR_IMG.decoding = 'async'; CR_IMG.width = CR_IMG.height = 72; CR_IMG.src = 'assets/credits/tomo.webp'
 function showCredits(done) {
   const C = $('credits'), R = $('crRoll'); G.credits = true; G.creditsN = (G.creditsN || 0) + 1
-  R.innerHTML = t('cr').map(([k, v]) => `<p class="${k ? 'cr-' + k : ''}">${v}</p>`).join('')
+  R.innerHTML = t('cr').map(([k, v]) => k === 'img' ? `<p class="cr-img"></p>` : `<p class="${k ? 'cr-' + k : ''}">${v}</p>`).join('')
+  { const ph = R.querySelector('.cr-img'), im = CR_IMG; im.alt = t('cr').find(x => x[0] === 'img')[1]; if (ph) ph.appendChild(im) } // 先に読み込んである写真（出た瞬間に空白にしない）
   R.classList.remove('roll'); C.hidden = false; void R.offsetWidth; R.classList.add('roll')
   let over = false
   const end = () => { if (over) return; over = true; G.credits = false; C.hidden = true; R.classList.remove('roll'); R.removeEventListener('animationend', end); C.removeEventListener('pointerdown', skip); done() }
@@ -1157,9 +1191,10 @@ function frame(now) {
     boomUpdate(Math.min(dt, 0.05))
     hornUpdate(Math.min(dt, 0.05))
     if (G.v35) G.v35.update(Math.min(dt, 0.05), tm, camera.position)
+    if (G.ladyV) G.ladyV.update(Math.min(dt, 0.05), camera.position, G.state === 'play' || G.state === 'pause' ? G.bike : null)
     if (G.v36) { G.v36.update(Math.min(dt, 0.05), tm, camera.position, G.world, G.R, G.state === 'play' ? G.bike : null); for (const k of G.v36.impEvents()) if (G.state === 'play') { monkeyCall(2, 0.95); monkeyCall(2, 0.8, 0.25) } for (const e of G.v36.pressEvents()) { Snd.play('clank', { vol: 1, rate: 0.55 }); Snd.play('rockbreak', { vol: 0.7, rate: 0.8 }); Snd.play('crack', { vol: 0.6 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 30, 2.5, { col: 0x6a5a48, up: 0.5, size: 1.2 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 14, 1.6, { col: 0x8a7a68, heavy: 1, size: 0.6 }) } }
     if (G.state === 'play') doorCreak()
-    if (G.state === 'play') hermitStep(Math.min(dt, 0.05))
+    if (G.state === 'play') { hermitStep(Math.min(dt, 0.05)); ladyStep(Math.min(dt, 0.05)) }
     patterStep(Math.min(dt, 0.05))
     bgmStep(Math.min(dt, 0.05))
     drumSound(dt)
