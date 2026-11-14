@@ -9,7 +9,7 @@ spots.push(['出発のジャンプ台 24度', P.findIndex(q => q.kind === 'ramp'
 // 他の坂（上り 10 度以上・道の点が 4 つ以上続く所）から数か所
 { let n = 0; for (let i = 60; i < P.length - 5 && n < 6; i += 1) { const q = P[i]; if (!q.p || q.branch || !q.w || (q.slope || 0) < 0.17 || !['road', 'ramp', 'orbit', 'steep'].includes(q.kind)) continue; if (![1, 2, 3, 4, 5, 6, 7, 8, 9].every(k => P[i + k] && Math.abs((P[i + k].slope || 0) - q.slope) < 0.02)) continue; spots.push([`坂 ${Math.round(q.slope * 57.3)}度 (${q.kind} ${i})`, i + 7]); n++; i += 400 } }
 let fails = 0
-for (const lean of [0, 1]) for (const [nm0, i] of spots) { const nm = nm0 + (lean ? '・前体重のまま' : '')
+for (const lean of [0, 1]) for (const [nm0, i] of spots) { if (lean && Math.abs(P[i].slope || 0) < 0.3) continue; const nm = nm0 + (lean ? '・前体重のまま' : '') // 前体重のままで下がるのは 17 度より急な登りだけ（それより緩い所は前輪立ち）
   const q = P[i], f = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)]
   // 坂を登ってきて止まった所: 少し手前から、ゆっくり登る速さで置く
   const b = createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw, pitch: q.slope })

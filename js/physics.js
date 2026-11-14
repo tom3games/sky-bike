@@ -520,7 +520,7 @@ export function framePts(b, B) { return BIKE.frame.map(([x, y, r]) => ({ c: body
 export function stepBike(world, b, inp, ev) {
   // v29 登り坂で止まりかけてブレーキを押している時は、前体重を効かせない（前輪で立たず、そのまま下がれる。本人「ジャンプ台に乗ったままバックできない」）
   { const cn = b.cn[0] || b.cn[1], hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
-    b._upBrk = !!(cn && inp.brk > 0 && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.14)
+    b._upBrk = !!(cn && inp.brk > 0 && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.3)
     if (b._upBrk && inp.lean > 0) inp = { ...inp, lean: 0 } }
   // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
   if (!b.ghost && world.traps.length) for (const s of world.traps) {
