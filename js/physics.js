@@ -625,10 +625,13 @@ function sub(world, b, inpIn, ev) {
         // ウィリーで 26 度を超えたら、アクセルで後ろへ起き上がる回す力を弱める（前へ進む力はそのまま）。後ろへ回っていく速さが遅くなり、保てる角度の幅が少し広がる
         if (!b.g[1] && b.th > 0.45) { const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2], F = [t[0] * fd, t[1] * fd, t[2] * fd]; tau -= P.wheelieEase * ((ry * F[2] - rz * F[1]) * B.R[0] + (rz * F[0] - rx * F[2]) * B.R[1] + (rx * F[1] - ry * F[0]) * B.R[2]) }
       }
-      if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
+      if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) { b.wasRev = true; Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk }
+      if (vt > 0.2) b.wasRev = false // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
     }
     // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
     const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -((b.brkV0 || 0) > 0 ? Math.max(0.2, Math.min(1.15, 0.067 * Math.max(spd, (b.brkT || 0) < 1.3 ? b.brkV0 : 0))) : Math.max(0.2, Math.min(0.5, 0.034 * spd))) /* v20: 全速で約50度まで前輪を効かせる。v23: 急ブレーキ（押し続けた時）だけ。ふつうのブレーキは v19 のまま */ ? 0 : 0.85 + 0.15 * Math.min(1, spd / 15)) // v15: 前輪をしっかり効かせる（遅い時に前が少し沈んだだけで前ブレーキが抜けていた） // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
+    // v27: 下がっている時にアクセルを押したら、両輪で後ろへの動きをすぐ止める（ブレーキで下がった後、アクセルを押しても 0.5 秒前へ出なかった）
+    if (inp.thr > 0 && vt < -0.15 && b.wasRev) Ft += clamp(-vt * 3000, 0, 1) * 1.0 * lim * inp.thr // ブレーキで下がっていた時だけ（段に当たって戻された時などは今まで通り）
     // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
     if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk

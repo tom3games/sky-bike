@@ -8,15 +8,15 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=23'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=23'
-import { COURSES } from './course.js?v=23'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=23'
-import { BikeView, snap } from './bikeview.js?v=23'
-import { createBot, botInput, resetBot } from './bot.js?v=23'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=23'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=23'
-import { Birds } from './birds.js?v=23'
+import { buildGimmicks } from './gimmicks.js?v=27'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=27'
+import { COURSES } from './course.js?v=27'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=27'
+import { BikeView, snap } from './bikeview.js?v=27'
+import { createBot, botInput, resetBot } from './bot.js?v=27'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=27'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=27'
+import { Birds } from './birds.js?v=27'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -125,7 +125,7 @@ composer.addPass(grade)
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'] })
+Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3' })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -254,6 +254,9 @@ function loadCourse(id) {
   }
   G._lt = 0; G._near = null // 松明の光の割り当てを作り直す（前のコースの番号を使わない）
   G.steer = createSteer(c.path)
+  // v27: 序盤の赤いドラム缶のうち、道がいちばん先に近くを通る 1 個は、近くを通ると爆発する（見た目と音だけ。バイクには何もしない）
+  G.boom = null
+  if (c.climb) { let best = null; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel') return; let bi = -1, bd = 1e9; c.path.forEach((q, i) => { if (!q.p || q.branch) return; const d = Math.hypot(q.p[0] - sh.a[0], q.p[2] - sh.a[2]); if (Math.abs(q.p[1] - sh.a[1]) < 1.5 && d < bd) { bd = d; bi = i } }); if (bd < 4.5 && (!best || bi < best.i)) best = { si, i: bi, a: sh.a.slice(), b: sh.b.slice() } }); G.boom = best }
   // v22: 道に止まっているカラス（近づくと飛び立つ。当たりなし）
   if (G.birds) G.birds.dispose()
   G.birds = c.climb ? new Birds(scene, c) : null
@@ -335,12 +338,54 @@ async function loadEnv() {
   } catch (e) { console.warn('env', e) }
 }
 
+// ------------------------------------------------------------ v27 爆発するドラム缶
+const boomLight = new THREE.PointLight(0xff8a3a, 0, 16, 2); scene.add(boomLight)
+// 火の玉と煙の玉（中心が明るいぼかしの板。カメラを向く）
+const boomTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(64, 64, 4, 64, 64, 62); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
+const boomFire = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex, color: 0xff9a40, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); boomFire.visible = false; scene.add(boomFire)
+const boomSmoke = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex, color: 0x2a2826, depthWrite: false, transparent: true, opacity: 0 })); boomSmoke.visible = false; scene.add(boomSmoke)
+function boomMesh() { const B = G.boom; if (!B || !built || !built.props) return null; if (B.mesh && B.mesh.parent) return B.mesh; let m = null, bd = 1e9; built.props.children.forEach(o => { const d = Math.hypot(o.position.x - B.a[0], o.position.z - B.a[2]); if (d < bd) { bd = d; m = o } }); B.mesh = bd < 0.3 ? m : null; if (B.mesh) B.home = { p: B.mesh.position.clone(), r: B.mesh.rotation.clone() }; return B.mesh }
+function boomReset() {
+  const B = G.boom; if (!B) return
+  B.done = false; B.t = 0
+  const sh = G.world && G.world.shapes[B.si]; if (sh) { sh.a = B.a.slice(); sh.b = B.b.slice() }
+  const m = boomMesh(); if (m && B.home) { m.position.copy(B.home.p); m.rotation.copy(B.home.r); m.visible = true }
+  boomLight.intensity = 0; boomFire.visible = false; boomSmoke.visible = false
+}
+function boomUpdate(dt) {
+  const B = G.boom; if (!B) return
+  if (!B.done) {
+    const b = G.bike; if (G.state !== 'play' || !b || b.ghost) return
+    if (Math.hypot(b.p[0] - B.a[0], b.p[2] - B.a[2]) < 4.3 && Math.abs(b.p[1] - 0.8 - B.a[1]) < 2) {
+      B.done = true; B.t = 0; G.boomN = (G.boomN || 0) + 1
+      // 当たりの円柱は遠くへ（バイクには何も当たらない・押さない）
+      const sh = G.world.shapes[B.si]; if (sh) { sh.a = [B.a[0], -9999, B.a[2]]; sh.b = [B.b[0], -9998, B.b[2]] }
+      const p = [B.a[0], B.a[1] + 0.5, B.a[2]]
+      Snd.play('boom', { vol: 1 }); setTimeout(() => Snd.play('clank', { vol: 0.6 }), 350); setTimeout(() => Snd.play('rockfall', { vol: 0.5 }), 500)
+      dust.emit(p, 40, 7, { col: 0xff7a2a, up: 7, size: 2.2 }) // 火の粉
+      dust.emit(p, 18, 3, { col: 0xffc060, up: 4, size: 2.2 }) // 炎
+      dust.emit(p, 30, 2.5, { col: 0x2e2c2a, up: 3, size: 2.6 }) // 煙
+      dust.emit(p, 22, 8, { col: 0x8a2a20, heavy: 1, up: 6, size: 1.0 }) // 缶の破片
+      boomLight.position.set(p[0], p[1] + 1, p[2]); boomLight.intensity = 90
+      const m = boomMesh(); if (m) { B.vel = [(Math.random() - 0.5) * 3, 9, (Math.random() - 0.5) * 3]; B.spin = [(Math.random() - 0.5) * 12, (Math.random() - 0.5) * 8, (Math.random() - 0.5) * 12] }
+    }
+    return
+  }
+  B.t += dt
+  boomLight.intensity = Math.max(0, 90 * (1 - B.t / 0.7))
+  { const t = B.t, fireS = 1.2 + 4.5 * Math.min(1, t / 0.18), smokeS = 2 + 5 * Math.min(1, t / 1.6)
+    boomFire.visible = t < 0.7; boomFire.position.set(B.a[0], B.a[1] + 1 + t * 1.5, B.a[2]); boomFire.scale.set(fireS, fireS, 1); boomFire.material.opacity = Math.max(0, 1 - t / 0.7) * 0.95
+    boomSmoke.visible = t < 2.6; boomSmoke.position.set(B.a[0], B.a[1] + 1.3 + t * 1.2, B.a[2]); boomSmoke.scale.set(smokeS, smokeS, 1); boomSmoke.material.opacity = Math.min(0.75, t * 3) * Math.max(0, 1 - t / 2.6) }
+  if (B.t < 1.2) { const p = [B.a[0], B.a[1] + 0.4, B.a[2]]; if (Math.random() < dt * 30) dust.emit(p, 2, 1.2, { col: 0x3a3836, up: 2.5, size: 2.4 }); if (B.t < 0.6 && Math.random() < dt * 40) dust.emit(p, 2, 1.5, { col: 0xff9a40, up: 3, size: 1.4 }) }
+  const m = boomMesh(); if (m && B.vel && m.visible) { B.vel[1] -= 9.81 * dt; m.position.x += B.vel[0] * dt; m.position.y += B.vel[1] * dt; m.position.z += B.vel[2] * dt; m.rotation.x += B.spin[0] * dt; m.rotation.y += B.spin[1] * dt; m.rotation.z += B.spin[2] * dt; if (m.position.y < B.a[1] - 30) m.visible = false }
+}
 function placeBike(b) {
   if (G.fallFrom) for (const n of [G.fallFrom.scream, G.fallFrom.crack]) if (n && n.stop) { try { n.stop() } catch (e) {} }
   G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null
   if (G.camOff) { G.camOff.yaw = 0; G.camOff.pitch = 0; G.camOff.idle = 9 } // v19: 出し直したら、マウスで回したカメラも後ろへ戻す（前を向いたまま後ろ向きのカメラで、前へ進むのが後ろへ下がって見えていた）
   if (G.steer) resetSteer(G.steer, b)
   if (G.birds) G.birds.reset() // 出し直したら、鳥はまた止まっている
+  boomReset()
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
   if (bikeView) bikeView.resetRider()
@@ -812,6 +857,7 @@ function frame(now) {
     // 近い升目は細かく、遠い升目は軽い影に。塔の飾りは塔から 320m 以内だけ
     if (!G.lodAll && (G._lodN = (G._lodN || 0) + 1) % 6 === 0) lod()
     if (built.movers.length) updateMovers(built.movers, G.world, G.lodAll ? null : camera.position)
+    boomUpdate(Math.min(dt, 0.05))
     if (G.birds) for (const e of G.birds.update(Math.min(dt, 0.05), G.state === 'play' && G.bike && !G.bike.ghost ? { p: G.bike.p, speed: G.bike.speed } : null, camera.position)) {
       const d = Math.hypot(camera.position.x - e.p[0], camera.position.y - e.p[1], camera.position.z - e.p[2]), v = Math.max(0, 1 - d / 40)
       if (v > 0) { Snd.play('flap', { vol: Math.min(1, 0.45 + e.n * 0.1) * v, rate: 1.5 + Math.random() * 0.3 }); if (e.n > 1 || Math.random() < 0.5) setTimeout(() => Snd.play('caw', { vol: 0.5 * v, rate: 0.9 + Math.random() * 0.2 }), 120 + Math.random() * 300) }
