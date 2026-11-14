@@ -1,8 +1,8 @@
 // SKY BIKE v36 の見た目: 鉄骨の影・油だまりと倒れた樽・プレス機・小さな猿のような生き物。当たりは physics.js / run.js（ここは見せるだけ）
 import * as THREE from 'three'
 import { clone as skClone } from '../vendor/jsm/utils/SkeletonUtils.js'
-import { girderPose } from './physics.js?v=41b'
-import { pathS, CHASE } from './run.js?v=41b'
+import { girderPose } from './physics.js?v=42'
+import { pathS, CHASE } from './run.js?v=42'
 
 let seed = 36
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)

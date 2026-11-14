@@ -1,8 +1,8 @@
 // SKY BIKE v16 の仕掛け: 回る歯車・ウィリーの溝・揺れる鎖の吊り橋・倒れる煙突・跳ね板・道を選ぶ横に動く床。
 // どれも course.js の Builder（B）の今の位置（B.t）から作り、B.t を仕掛けの先へ進める（Builder のメソッドと同じ約束）。
 // 見た目と当たりは同じ形の一覧（B.shapes）から。動く物は physics.js の mov（gear / wave / topple / kick / shuttle）。
-import { Builder } from './course.js?v=41b'
-import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=41b'
+import { Builder } from './course.js?v=42'
+import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=42'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
