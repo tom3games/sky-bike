@@ -537,7 +537,7 @@ function hornUpdate(dt) {
   const hx = Math.cos(f.yaw), hz = -Math.sin(f.yaw), ahead = (f.p[0] - b.p[0]) * hx + (f.p[2] - b.p[2]) * hz, lat = Math.abs(-(f.p[0] - b.p[0]) * hz + (f.p[2] - b.p[2]) * hx)
   if (ahead > 0 && ahead < 7.5 && lat < 3 && Math.abs(b.p[1] - 0.8 - f.p[1]) < 2) { G.horn = { on: true, t: 0, done: true }; G.hornN = (G.hornN || 0) + 1; Snd.duck(0.55, 1.0); Snd.play('horn', { vol: 1 }) }
 }
-function placeBike(b) {
+function placeBike(b) { G.spawnHold = true;
   if (G.fallFrom) for (const n of [G.fallFrom.scream, G.fallFrom.crack]) if (n && n.stop) { try { n.stop() } catch (e) {} }
   G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null; if (G.skip && G.skip.ph !== 'in') { G.skip = { ph: 'in', t: 0 } }
   if (G.camOff) { G.camOff.yaw = 0; G.camOff.pitch = 0; G.camOff.idle = 9 } // v19: 出し直したら、マウスで回したカメラも後ろへ戻す（前を向いたまま後ろ向きのカメラで、前へ進むのが後ろへ下がって見えていた）
@@ -908,9 +908,10 @@ function fixedStep() {
   const ev = []
   G.prev = snap(b)
   if (G.running) G.world.tick()
-  if (G.running || G.R.cont == null) stepBike(G.world, b, inp, ev) // v51 続きから: 最初に何か押すまでは旗の所で止めておく（坂の旗で待つと後ろへ転がり落ちる）
+  if (G.spawnHold && (inp.thr > 0.05 || inp.brk > 0.05 || Math.abs(inp.lean) > 0.2 || inp.nitro || !b.g[0] || !b.g[1])) G.spawnHold = false // v51 旗から出し直した後は、何か押すまでその場で止めておく（坂の旗で待つと後ろへ転がり落ちていた。全旗の 4 分の 1）
+  if ((G.running || G.R.cont == null) && !G.spawnHold) stepBike(G.world, b, inp, ev) // v51 続きから: 最初に何か押すまでは旗の所で止めておく（坂の旗で待つと後ろへ転がり落ちる）
   strikeStep(b, true)
-  if (G.running && !G.epi) { G.rec.inp.push(inp); G.steps++; G.time = G.steps * DT } // v48 下山は時間に入れない（門に着いた時で止める）
+  if (G.running && !G.epi) { G.rec.inp.push(G.spawnHold ? { ...inp, hold: 1 } : inp); G.steps++; G.time = G.steps * DT } // v48 下山は時間に入れない（門に着いた時で止める）
   if (G.ghost && G.running && !G.epi) stepGhost()
   for (const e of ev) {
     if (e.t === 'crash') {
@@ -984,7 +985,7 @@ function stepGhost() {
   const inp = gh.rec[gh.i]
   if (!inp) return
   gh.prevSnap = snap(gh.bike)
-  stepBike(G.world, gh.bike, inp)
+  if (!inp.hold) stepBike(G.world, gh.bike, inp) // v51 出し直しの後の止めておいた刻みは、ゴーストも止める
   strikeStep(gh.bike, false)
   gh.i++
 }
