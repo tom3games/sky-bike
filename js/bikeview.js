@@ -173,6 +173,7 @@ export class BikeView {
     if (lie) this.root.position.y -= 0.42 * Math.abs(Math.sin(this.roll))
     const qr = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), this.roll)
     this.body.quaternion.copy(q).multiply(qr)
+    this.wheels[1].visible = !b.noFront // v51 下山で前輪が外れた（外れた前輪は v48view の wheelProp）
     for (let i = 0; i < 2; i++) {
       const c = wheelCenter(s, Bs, i, s.s[i]), w = this.wheels[i]
       w.position.set(c[0] - s.p[0], c[1] - s.p[1], c[2] - s.p[2])

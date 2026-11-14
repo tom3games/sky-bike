@@ -595,6 +595,7 @@ export class World {
 }
 
 // ------------------------------------------------------------ バイク
+export const NOFRONT_HOLD = 2.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
 export const BRK_HOLD = 0.25 // v23: 急ブレーキで後輪を持ち上げるのは、ブレーキ全開をこの秒数（0.25 秒）より長く押し続けた時だけ
 export const BIKE = {
   m: 180, Ip: 60, g: 9.81,
@@ -669,6 +670,9 @@ export function stepBike(world, b, inp, ev) {
     else if (inp.nitro && inp.thr > 0.5 && b.nitro <= 0 && ev && !b._nEmptyT) { ev.push({ t: 'nitroEmpty' }); b._nEmptyT = 40 }
     if (b._nEmptyT) b._nEmptyT-- }
   if (b.hang) { hangStep(world, b, inp, ev); b.steps++; return }
+  // v51 下山の終わりで前輪が外れる（本人の案）: wheelOff の付いた道に前輪が乗った瞬間に外れて、NOFRONT_HOLD 秒は見えない前輪で走ったまま（漫画の間）、その後は前輪の当たりが無くなる
+  if (b.noFront) b.noFront.t += DT
+  else if (!b.ghost && !b.crashed && b.cn[1] && b.g[1] && b.speed > 1 && world.shapes[b.cn[1].id].wheelOff) { b.noFront = { t: 0 }; if (ev) ev.push({ t: 'wheelOff' }) }
   for (let k = 0; k < SUB; k++) { b._subK = k; sub(world, b, inp, ev) }
   if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
   if (!b.ghost && world.drums.length) drumTrack(world, b, ev)
@@ -800,6 +804,7 @@ function sub(world, b, inpIn, ev) {
     return vt
   }
   for (let i = 0; i < 2; i++) {
+    if (i === 1 && b.noFront && b.noFront.t >= NOFRONT_HOLD) { b.g[1] = false; b.cn[1] = null; b.side[1] = null; b.s[1] = 0; b.sv[1] = 0; continue } // v51 前輪が無い
     const ax = i ? axisF(B) : axisR(B)
     const SUP = { ax, min: 0.35, side: false }, SIDE = { ax, min: 0.35, side: true }
     const c0 = wheelCenter(b, B, i, 0)
@@ -926,6 +931,20 @@ function sub(world, b, inpIn, ev) {
     b.scrape = Math.max(b.scrape, con.depth)
     stopSink(con.q, n, con.depth + 0.03)
     if (-vn > P.hardLand * 0.8 && !b.crashed && ev && !(b.thudT > 0)) { ev.push({ t: 'thud', v: -vn }); b.thudT = 0.3 }
+  }
+  // ---- v51 前輪が無い時: フォークの先（前輪の軸の所）が地面に当たる。食い込んで止まるので、速いと前へつんのめる
+  if (b.noFront && b.noFront.t >= NOFRONT_HOLD) {
+    const fc = wheelCenter(b, B, 1, 0), con = world.sphere(fc[0], fc[1], fc[2], 0.07, ids)
+    b.noFront.stub = !!con
+    if (con) {
+      curId = con.id
+      const vq = velAt(con.q), n = con.n, vn = vq[0] * n[0] + vq[1] * n[1] + vq[2] * n[2]
+      const N = Math.max(0, P.kr * con.depth - P.cr * vn)
+      const vt = [vq[0] - n[0] * vn, vq[1] - n[1] * vn, vq[2] - n[2] * vn], vtl = Math.sqrt(vt[0] * vt[0] + vt[1] * vt[1] + vt[2] * vt[2]) || 1
+      const Ff = Math.min(1.1 * N, vtl * 4000)
+      addF([n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff], con.q, 'stub')
+      stopSink(con.q, n, con.depth + 0.03)
+    }
   }
   // ---- 弾き飛ばす物（振り子の鉄球・落石）: 人・車体・車輪のどこかに当たったら、当たった向きへ強く押し出す（転ばせない）
   b.knockT = Math.max(0, (b.knockT || 0) - H)
@@ -1055,6 +1074,16 @@ function sub(world, b, inpIn, ev) {
       const dv = 2.5 * b.pre
       b.v[0] += B.u[0] * dv; b.v[1] += B.u[1] * dv; b.v[2] += B.u[2] * dv; b.pre = 0; b.hopCool = 0.5
       if (ev) ev.push({ t: 'hop', dv })
+    }
+  }
+  // ---- v51 前輪が無い時のウィリーの補助: 後ろ体重なら、地面から約 37 度（25〜45 度の間）に保つ。全開でも後ろへ回らない。
+  //      後ろ体重をやめると前へ倒れ、フォークの先が刺さる・頭から行くと転倒（頭を打った）
+  if (b.noFront && !b.crashed) {
+    const NF = b.noFront, n0 = b.g[0] && b.cn[0] ? (b.cn[0].nw || b.cn[0].n) : [0, 1, 0], rel = B.f[0] * n0[0] + B.f[1] * n0[1] + B.f[2] * n0[2]
+    if (inp.lean < -0.3 && b.g[0]) { const tgt = 0.6, e = tgt - rel; tau += e * 9000 - b.w * 900; if (rel > 0.7 && b.w > 0) tau -= b.w * 3000 }
+    if (NF.t >= NOFRONT_HOLD) {
+      NF.stubT = NF.stub && !(inp.lean < -0.3) ? (NF.stubT || 0) + H : 0
+      if (rel < -0.55 || NF.stubT > 0.45) crash(b, 'head', 0, ev)
     }
   }
   // ---- 積分

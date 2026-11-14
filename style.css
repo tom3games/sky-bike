@@ -158,6 +158,7 @@ html[lang=en] .stamp{font-size:15px}
   background:radial-gradient(ellipse at 18% 30%,rgba(120,86,40,.28),rgba(120,86,40,0) 38%),radial-gradient(ellipse at 82% 76%,rgba(96,70,36,.32),rgba(96,70,36,0) 30%),radial-gradient(circle at 64% 18%,rgba(70,50,28,.2),rgba(70,50,28,0) 12%),linear-gradient(97deg,rgba(0,0,0,0) 48.6%,rgba(80,60,34,.18) 49.6%,rgba(0,0,0,0) 50.8%),linear-gradient(176deg,#cdbb8c,#b9a26f 60%,#a88e5c);
   clip-path:polygon(0 7%,6% 2%,13% 5%,22% 0,31% 4%,42% 1%,50% 5%,61% 0,70% 3%,79% 0,88% 4%,96% 1%,100% 8%,98% 22%,100% 37%,97% 52%,100% 68%,98% 84%,100% 95%,92% 100%,83% 96%,72% 100%,63% 97%,52% 100%,41% 96%,30% 100%,20% 97%,9% 100%,0 94%,2% 78%,0 62%,3% 46%,0 30%,2% 16%);filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
 #talk.on{opacity:1;transform:translate(-50%,0) rotate(-1.2deg)}
+#talk.hi{bottom:calc(56% + var(--bot));min-width:0;padding:12px 26px 14px 24px} /* v51 走りながらの一言（前輪が外れた）: バイクに重ねない */
 #talk .nx{position:absolute;right:14px;bottom:6px;font:600 11px var(--goth);color:rgba(50,38,24,.55);letter-spacing:.1em}
 #talk img{display:block;width:96px;height:96px;margin:2px auto 6px}
 /* v35 兄の手紙（ゴールの門の前） */
