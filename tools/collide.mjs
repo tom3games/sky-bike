@@ -7,11 +7,16 @@ import { COURSES } from '../js/course.js'
 import { createBot, botInput, resetBot } from '../js/bot.js'
 
 const which = process.argv[2] || 'all'
+// RANGE=名前（mark か旗の名前）: その区間だけ（例 RANGE=落石の坂 node tools/collide.mjs stage1）
 const ids = which === 'all' ? Object.keys(COURSES) : [which]
 let totalNG = 0
+const RANGE_INFO = g => `道の点 ${g.i0}〜${g.i1}・旗 ${g.ci}`
 for (const cid of ids) {
   const c = COURSES[cid](), w = new World(c.shapes); w.winds = c.winds || []; w.setTime(0)
-  const drivable = c.shapes.filter(s => ['road', 'pad', 'spiral', 'kicker', 'pipe', 'island', 'log'].includes(s.tag))
+  let RG = null
+  if (process.env.RANGE) { const m = c.marks.find(x => x.name === process.env.RANGE); const ci = c.cps.findIndex(q => q.p && m && Math.hypot(q.p[0] - c.path[m.i0].p[0], q.p[2] - c.path[m.i0].p[2]) < 40 && q.rest); const i1 = (c.marks.find(x => x.i0 > m.i0) || { i0: c.path.length }).i0; const pts = c.path.slice(m.i0 - 20, i1).filter(q => q.p); const mn = [Math.min(...pts.map(q => q.p[0])) - 14, Math.min(...pts.map(q => q.p[2])) - 14], mx = [Math.max(...pts.map(q => q.p[0])) + 14, Math.max(...pts.map(q => q.p[2])) + 14]; RG = { i0: m.i0 - 20, i1, ci: Math.max(0, ci), mn, mx }; console.log('範囲', RANGE_INFO(RG)) }
+  const inRG = s => !RG || (s.max[0] > RG.mn[0] && s.min[0] < RG.mx[0] && s.max[2] > RG.mn[1] && s.min[2] < RG.mx[1])
+  const drivable = c.shapes.filter(s => ['road', 'pad', 'spiral', 'kicker', 'pipe', 'island', 'log'].includes(s.tag) && inRG(s))
   // ---------- 1. 玉を落とす
   let drops = 0, ballNG = 0, ballEx = [], rolled = 0, unsettled = 0
   const r = 0.2, m = 1, k = 20000, cdmp = 120
@@ -64,7 +69,8 @@ for (const cid of ids) {
   }
   // ---------- 1.5 頭の上の空き: 道の上 1.0〜2.2m に形が無いこと（門・看板の板は 2.6m より上なので数えない）
   let headNG = 0; const headEx = []
-  for (const q of c.path) {
+  for (const [qi, q] of c.path.entries()) {
+    if (RG && (qi < RG.i0 || qi > RG.i1)) continue
     if (!q.p || !q.w || q.kind === 'jump') continue
     for (let up = 1.0; up <= 2.2; up += 0.3) {
       const x = q.p[0], y = q.p[1] + up, z = q.p[2]
@@ -86,7 +92,8 @@ for (const cid of ids) {
     const bot = createBot(c, { skill: 'good', lat, vMul }); bot.world = w
     let cp = 0, faults = 0, s = 0
     const spawn = i => { const q = c.cps[i]; const b = createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw }); for (let kk = 0; kk < 20; kk++) stepBike(w, b, { thr: 0, brk: 1, lean: 0, steer: 0 }); return b }
-    let b = spawn(0); resetBot(bot, b)
+    let b = spawn(RG ? RG.ci : 0); resetBot(bot, b); if (RG) cp = RG.ci
+    const R0 = RG ? { cp: RG.ci, rest: RG.ci } : null; if (R0) bot.R = R0
     let prevSv = [0, 0], lastAir = 0, deep = [0, 0]
     while (s < 60 * 400) {
       const prev = b.p.slice()
@@ -106,6 +113,7 @@ for (const cid of ids) {
         prevSv[i] = b.sv[i]
       }
       for (let i = cp + 1; i < c.cps.length; i++) { const q = c.cps[i], hx = Math.cos(q.yaw), hz = -Math.sin(q.yaw); const d0 = (prev[0] - q.p[0]) * hx + (prev[2] - q.p[2]) * hz, d1 = (b.p[0] - q.p[0]) * hx + (b.p[2] - q.p[2]) * hz; if (d0 < 0 && d1 >= 0 && Math.abs(-(b.p[0] - q.p[0]) * hz + (b.p[2] - q.p[2]) * hx) < q.w / 2 + 1.2 && !b.crashed) { cp = i; break } }
+      if (RG && bot.i > RG.i1) { finished++; break }
       if (c.cps[cp].finish) { finished++; break }
       if ((b.crashed && b.crashed.t > 1.5) || b.p[1] < c.cps[cp].kill - 8) { faults++; b = spawn(cp); resetBot(bot, b); bot.vMul = vMul * (0.8 + (faults * 0.37) % 0.4); prevSv = [0, 0]; if (faults > 40) break }
     }

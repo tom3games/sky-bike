@@ -1,7 +1,7 @@
 // SKY BIKE v41 落石の坂の見た目: 坂の上に止まっている大きな丸い岩（ごつごつ）。転がる間は道のりに合わせて回る。割れたら消える（破片と土煙は game.js）
 import * as THREE from 'three'
-import { pathS } from './run.js?v=41'
-import { ROCK } from './v41.js?v=41'
+import { pathS } from './run.js?v=41b'
+import { ROCK } from './v41.js?v=41b'
 
 export function buildBoulder(course, group, M) {
   const B = course.boulder; if (!B) return null
@@ -24,7 +24,8 @@ export function buildBoulder(course, group, M) {
       mesh.visible = !broken
       if (broken) return
       const s = st && (st.ph === 'roll' || st.ph === 'hit') ? st.s : s0
-      const q = posAt(s); mesh.position.set(q.p[0], q.p[1] + ROCK.R * 0.92, q.p[2])
+      // 遠い間は左の通り道（画面の真ん中）、バイクの 9〜27m 手前で道の真ん中へ寄ってくる（当たる判定は道のりだけ。避けられない形は同じ）
+      const sb = st && st.bi != null ? S[st.bi] : s - 40, k = Math.max(0, Math.min(1, (s - ROCK.R - sb - 9) / 18)), q = posAt(s), lat = globalThis.__rockLat ?? (ROCK.lat ?? 0) * k; mesh.position.set(q.p[0] + R[0] * lat, q.p[1] + ROCK.R * 0.92, q.p[2] + R[2] * lat) // 道の横寄りを転がる（カメラは斜め後ろなので、画面の真ん中に来る側へ）
       ang += (s - lastS) / ROCK.R; lastS = s
       if (s === s0) { ang = 0 }
       qr.setFromAxisAngle(axis, ang); mesh.quaternion.copy(q0).multiply(qr)
