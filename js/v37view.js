@@ -1,7 +1,7 @@
 // SKY BIKE v37 の見た目: 明るい草原の浮き島（昼の空・揺れる草・同じ花が等間隔・縁で止まった霧の壁・動かない雲・錆びた古いトライアルバイク 3 台）・風車（塔・軸・帆）
 // 真っ暗な通路は区間の明るさ（game.js ZONEP.tunnel）とヘッドライトで。光の数は変えない（月の光の色と強さを変えるだけ）
 import * as THREE from 'three'
-import { bladeAng } from './physics.js?v=38'
+import { bladeAng } from './physics.js?v=39'
 
 let seed = 37
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)

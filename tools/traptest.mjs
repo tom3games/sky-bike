@@ -1,3 +1,4 @@
+if (process.env.STEERNOW) globalThis.__steerNow = 1
 if (process.env.GD1) globalThis.__gD1 = +process.env.GD1
 if (process.env.GD2) globalThis.__gD2 = +process.env.GD2
 // v36 罠: 40m 手前から走って 25m 先まで抜けられるか（上手い・人の速さ 0.2 秒・0.25 秒・全開だけ）。8 回ずつ（時刻をずらす）

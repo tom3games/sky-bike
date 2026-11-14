@@ -3,7 +3,7 @@
 //   塔のまわり（tower モード）: 塔の中心のまわりの円弧（1 周しない。塔ごとに 1 回だけ）
 //   自由な道（free モード）: 区間の向き hd に沿って、ゆるい S 字で進む円弧。excursion は外へ出て戻らず、そのまま先へ進む
 // 当たりと見た目は今まで通り同じ形の一覧（B.shapes）から作る。
-import { dsin, dcos } from './physics.js?v=38'
+import { dsin, dcos } from './physics.js?v=39'
 
 const DEG = Math.PI / 180
 const RM0 = 17.1 // v15 の周の道の半径（区間の長さは「角度 × これ」で決めてあった）
@@ -109,7 +109,7 @@ export function makeWorldX(B, o = {}) {
     } else if (kind === 'log') {
       const ra = Math.max(3, L - L1); B.log(1.4, 0.15, W - 0.4, 'log'); X.seg(ra, Math.min(rise - r1, ra * 0.3), { ...ro, sweep: 0 })
     } else if (kind === 'step') {
-      X.ostep(0.32); const ra = Math.max(2, L - L1); X.seg(ra, Math.min(rise - r1, ra * 0.3), ro)
+      X.ostep(ro.stepH ?? 0.32); const ra = Math.max(2, L - L1); X.seg(ra, Math.min(rise - r1, ra * 0.3) + (0.32 - (ro.stepH ?? 0.32)), ro) // 段を低くした分は後の坂で登る（先の道の高さを変えない）
     } else {
       const n = 3, al = Math.min(L - L1 - 0.8, 6.2)
       for (let k = 0; k < n; k++) { const s3 = X.seg(al / n, 0, { ...ro, mat: 'plankold', thick: 0.35, kind: 'crumble' }); s3.mov = { type: 'crumble', delay: 0.28, back: 1e9, once: true } }

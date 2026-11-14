@@ -1,3 +1,4 @@
+if (process.env.STEERNOW) globalThis.__steerNow = 1
 // node tools/sim.mjs <course> <skill> [maxSec]  → 自動で走らせて時間・フォルト・どこで失敗したか（ゲームと同じルール js/run.js）
 import { World, stepBike, DT, hashBike } from '../js/physics.js'
 import { COURSES } from '../js/course.js'

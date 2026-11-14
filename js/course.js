@@ -1,12 +1,12 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=38'
-import * as P16 from './parts16.js?v=38'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=38'
-import { lab16 } from './parts16.js?v=38'
-import * as P17 from './parts17.js?v=38'
-import { finale } from './finale.js?v=38'
-import { v36traps } from './traps.js?v=38'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=38'
+import * as Z from './zones.js?v=39'
+import * as P16 from './parts16.js?v=39'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=39'
+import { lab16 } from './parts16.js?v=39'
+import * as P17 from './parts17.js?v=39'
+import { finale } from './finale.js?v=39'
+import { v36traps } from './traps.js?v=39'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=39'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -873,7 +873,9 @@ function addFlagsBefore(B, list) {
   const idx = B.cps.map(cpI)
   for (const [mark, name] of list) {
     const m = (B.marks || []).find(x => x.name === mark); if (!m) continue
-    let i = m.i0 - 2; while (i > m.i0 - 30 && !(P[i] && P[i].p && P[i].w >= 3 && ['road', 'orbit', 'pad', 'curve'].includes(P[i].kind) && Math.abs(P[i].slope || 0) < 0.08 && ['road', 'orbit', 'pad', 'curve'].includes((P[i + 3] || {}).kind) && ['road', 'orbit', 'pad', 'curve'].includes((P[i - 3] || {}).kind))) i--
+    // v39: 旗のすぐ先（12 点以内）に切れ目・縁があると助走が取れない（石の橋の手前の旗が切れ目の 4m 手前で、出し直すと跳び切れず転び続けた）
+    const runOk = i => { for (let k = i + 1; k <= i + 12 && k < m.i0; k++) if (P[k] && ['jump', 'lip', 'hang'].includes(P[k].kind)) return false; return true }
+    let i = m.i0 - 2; while (i > m.i0 - 45 && !(P[i] && P[i].p && P[i].w >= 3 && ['road', 'orbit', 'pad', 'curve'].includes(P[i].kind) && Math.abs(P[i].slope || 0) < 0.08 && ['road', 'orbit', 'pad', 'curve', 'water'].includes((P[i + 3] || {}).kind) && ['road', 'orbit', 'pad', 'curve'].includes((P[i - 3] || {}).kind) && runOk(i))) i--
     const q = P[i], at = idx.findIndex(k => k > i), pos = at < 0 ? B.cps.length : at
     const R = B.right(q.yaw), w = q.w, base = add3(q.p, R, -(w / 2 + 0.45))
     B.cps.splice(pos, 0, { p: q.p.slice(), yaw: q.yaw, w, name, zone: q.zone || B.zone, rest: true, added: true }); idx.splice(pos, 0, i)

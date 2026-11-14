@@ -2,7 +2,7 @@
 // 当たり判定なし（見た目と音だけ）。出し直したら、また止まっている。
 // 絵: Crow（Poly by Google・CC BY 3.0）を止まっている姿に、飛ぶ時は体を前へ倒して羽を 2 枚（翼の形の板）足して羽ばたかせる。
 // 全部の鳥を 1 つの InstancedMesh でまとめて描き、カメラから遠い群れ（130m 超）は描かない。
-import { strikerSpot } from './strike.js?v=38'
+import { strikerSpot } from './strike.js?v=39'
 import * as THREE from 'three'
 
 const FAR = 130

@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=38'
+import { hbeam } from './course.js?v=39'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -574,7 +574,7 @@ export function factory(x) {
   orbit(0.55, 1.3); otorch()
   x.tower({ sign: 1, r: 20, name: '歯車の塔' })
   B.mark('ウィリーの段'); orbit(0.25, 0); x.ostep(0.44); orbit(0.8, 0.6, { plain: true }); x.ogap(4.3, -0.5); orbit(0.4, 0.4)
-  orbit(0.45, 0.8); otorch()
+  orbit(0.45, 0.8, { stepH: 0.24 }); otorch() // v39: 登り坂の途中の段 0.32→0.24m（人の速さが坂の段で止まって後ろへ回っていた）
   B.mark('三段の壁'); orbit(0.2, 0)
   for (let k = 0; k < 2; k++) { x.ostep(0.72); orbit(0.16, 0) }
   orbit(0.12, 0); B.hangLedge(1.6, 3.4, { w: W, max: 9, mat: B.omat }); orbit(0.3, 0)

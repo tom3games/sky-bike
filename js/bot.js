@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=38'
-import { doorAng } from './traps.js?v=38'
-import { BLADE } from './v37.js?v=38'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=38'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=39'
+import { doorAng } from './traps.js?v=39'
+import { BLADE } from './v37.js?v=39'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=39'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -313,7 +313,8 @@ export function botInput(bot, b) {
   if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1]) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
   if (bot.oilOn) inp = { ...inp, thr: 0, ab: 0, brk: 0, lean: 0 } // 油の上では何も押さない（手前で速さを落としてあるので自動の減速も入らない）
   // 反応の遅れ（人の速さ）
-  if (bot.react > 0) { bot.queue.push(inp); if (bot.queue.length > bot.react) return bot.queue.shift(); return { thr: 0, brk: 0, lean: 0, steer: 0 } }
+  // v39: STEERNOW（globalThis.__steerNow）で、ハンドルだけ遅らせない人の bot（ゲームのハンドルは自動なので人の遅れが乗らない）。ふだんは今までどおり全部遅らせる（これまでの数字と比べられるように）
+  if (bot.react > 0) { bot.queue.push(inp); const st = globalThis.__steerNow ? inp.steer : null; if (bot.queue.length > bot.react) { const d = bot.queue.shift(); return st == null ? d : { ...d, steer: st } } return { thr: 0, brk: 0, lean: 0, steer: st ?? 0 } }
   return inp
 }
 

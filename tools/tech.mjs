@@ -1,3 +1,4 @@
+if (process.env.STEERNOW) globalThis.__steerNow = 1
 // 技の区間ごとに「上手い入力なら越えられ、適当な入力では越えられない」を数える
 // node tools/tech.mjs  → 表（区間・上手い bot・適当（全開）・慎重だが技なし）と、谷のジャンプの速さの表
 if (process.env.OLDL) globalThis.__oldLaunch = 1

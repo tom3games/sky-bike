@@ -159,3 +159,4 @@ html[lang=en] .stamp{font-size:15px}
 .tk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 .tk-item img{width:44px;height:44px}
 @media (min-width:1000px) and (max-height:940px){#how .panel{width:min(1000px,92vw)}#how .tips{columns:2;column-gap:28px}#how .tips li{break-inside:avoid}} /* v38 遊び方の一言が増えたので、PC の横長の画面では 2 列（もどるが下で切れない） */
+#credits{position:fixed;inset:0;background:#060706;z-index:32;overflow:hidden;cursor:pointer}#crRoll{position:absolute;left:0;right:0;top:100%;padding:0 20px;text-align:center;color:#e6dcc4;font:400 14px/1.9 var(--min);letter-spacing:.08em}#crRoll.roll{animation:crUp 36s linear forwards}@keyframes crUp{to{transform:translateY(calc(-100% - 100vh))}}#crRoll .cr-t{font-size:22px;letter-spacing:.32em;margin-bottom:56px}#crRoll .cr-h{font-size:11px;opacity:.6;margin-top:30px}#crRoll .cr-end{margin-top:90px} /* v39 エンドクレジット */
