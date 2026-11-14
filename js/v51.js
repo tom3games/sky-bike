@@ -7,6 +7,7 @@
 export const LASERS = [0, 2, 9, 10, 12, 25, 36, 41], BLASTS = [13, 32]
 export const SPIKE = { h: 0.3, back: 1.75, rise: 0.42, kick: 4.5, spin: 5.5 }
 export const ICE = { mu: 0.3 }
+export const SLICK = { mu: +(globalThis.__slickMu ?? 0.45) }
 export const UPDRAFT = { a: 13, run: +(globalThis.__upRun ?? 10.6), T: 4.6 }
 export const BLAST = { cut: 5.0, trig: 6.5, back: 5, lipDeg: 8, lipLen: 1.0, roadN: 2 }
 import { closest } from './physics.js?v=50'
@@ -78,6 +79,15 @@ export function v51post(B) {
       const mn = [0, 1, 2].map(k => Math.min(...pts.map(p => p[k])) - (k === 1 ? 1 : 3)), mx = [0, 1, 2].map(k => Math.max(...pts.map(p => p[k])) + (k === 1 ? 7 : 3))
       const g = { min: mn, max: mx, f: [0, sp.jump ? UPDRAFT.a : UPDRAFT.run, 0], w: 2 * Math.PI / UPDRAFT.T, ph: n * 1.7, pulse: true, valley: true }
       B.winds = B.winds || []; B.winds.push(g); B.decor.push({ kind: 'valleyWind', g }); (B.v51.winds = B.v51.winds || []).push({ i: sp.a, jump: !!sp.jump }) } }
+  // ニトロでないと登れない急坂（2 か所）: 41 度の急坂のうち、嵐の回廊の最初と最後の塔のニトロの急坂。表面を濡れた滑る石にして、タイヤの力では登り切れず、
+  //   ニトロ（重心を押す力。タイヤの滑りに関係なく効く）で登る。坂の形・長さは変えない
+  if (!globalThis.__noSlick) { const done = new Set(), mk = i => { let r = ''; for (const m of B.marks || []) if (i >= m.i0) r = m.name; return r }
+    for (let i = 1; i < P.length; i++) { const q = P[i]; if (q.kind !== 'steep' || P[i - 1].kind === 'steep' || q.branch) continue; let j = i; while (P[j + 1] && P[j + 1].kind === 'steep') j++
+      const nm = mk(i), mx = Math.max(...P.slice(i, j + 1).map(x => x.slope || 0)); if (mx < 0.7 || !(/嵐の回廊|ニトロの急坂/.test(nm)) || done.has(nm)) continue; done.add(nm)
+      const ids = new Set(); for (let k = i; k <= j; k++) { const qq = P[k]; qq.slick = true; for (const s of B.shapes) { if (ids.has(s) || s.mov || s.tag !== 'road' || s.max && (qq.p[1] > s.max[1] + 1 || qq.p[1] < s.min[1] - 1)) continue; const cp = closest(s, qq.p[0], qq.p[1] - 0.05, qq.p[2]); if (cp && cp.d < 0.3) ids.add(s) } }
+      for (const s of ids) { s.mu = SLICK.mu; s.mat = 'wetstone'; s.slick = true }
+      for (let k = Math.max(0, i - 14); k <= j; k++) P[k].nitro = true
+      ;(B.v51.slick = B.v51.slick || []).push({ i, j, nm, n: ids.size }) } }
   for (const k of BLASTS) { const s = pick(k); if (!s) continue
     const ii = near(s, ['trap']); if (!ii.length) continue
     const q = P[ii[0]], hf = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)], sg = dot(s.ax[0], hf) >= 0 ? 1 : -1, f = s.ax[0].map(v => v * sg), up = s.ax[1], w = s.h[2] * 2

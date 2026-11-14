@@ -482,6 +482,7 @@ export function practice() {
 //   溶岩の底（玄武岩の道）→ 廃墟（崩れた石の張り出しと朽ちた木の橋）→ 工場（さびた鉄骨）→ 氷 → 塔の屋上 → 谷を跳んで天空城
 // 塔のまわりは左回りと右回りを交互に登る。向きを変える所は、塔から外へ張り出した道の先の浮いた広場で U ターンし、
 // 行きの道の真上を通って塔へ戻る（下を見ると、今まで登ってきた道が見える）。上の周から落ちると下の周に落ちる。
+export const SJ = { gap: +(globalThis.__sjGap ?? 8) }
 export function stage1() {
   const B = new Builder([0, 0, 0], 0)
   B.plats = []; B.props = []
@@ -498,6 +499,7 @@ export function stage1() {
   B.torch(-1, -2, { down: 3 }); B.torch(1, -2, { down: 3 })
   // 大きいジャンプ台（テーブル型）: 登り 24° → 平らな台 → ゆるい下り。遅いと台の上、全開だと下り坂の先まで飛ぶ
   B.mark('出発の大ジャンプ')
+  B.sign({ touch: '炎のボタンで ニトロ', pc: 'W で ニトロ' }, { at: 1 }) // v51 ニトロでないと届かない最初の台
   B.road(4, L)
   { const ramp = B.road(6, { ...L, slope: 24 * DEG, mat: 'plank', kind: 'ramp' }); ramp.launch = true
     // ジャンプ台の見た目: 縁の鉄の帯（板の中に半分埋める）と、両脇の支えの柱・松明
@@ -513,11 +515,13 @@ export function stage1() {
     B.torch(-1, -3, { down: 3, w: w + 0.6 }); B.torch(1, -3, { down: 3, w: w + 0.6 })
   }
   B.path[B.path.length - 1].kind = 'lip'; B.path[B.path.length - 1].vNeed = 11
+  for (let k = B.path.length - 1, n = 0; k >= 0 && n < 9; k--, n++) B.path[k].nitro = true // v51 台の手前からニトロ（bot）
   // 速さの帯: 遅いと切れ目の底（地面）へ落ちてすぐ出発に戻る。ちょうどだと着地の坂。速すぎると向こうの高い段の壁に当たる
   { const lip = B.t.p.slice(), f = B.dir(B.t.yaw)
     B.box({ c: [lip[0] + f[0] * 4, lip[1] - 3.2, lip[2] + f[2] * 4], h: [4.2, 0.4, 3.5], yaw: B.t.yaw, mat: 'ground', tag: 'ground' })
-    B.gap(5.5, -0.6, 'jump') } // v29 本人「戻して」: v27 の着地坂・短い坂をやめて v26 の形（切れ目 5.5m・着地の坂 9m・0.75m の段）に戻した
-  B.road(9, { ...L, slope: -Math.atan2(1.1, 9), mat: 'cobble', kind: 'landing', back: 0 })
+    B.gap(SJ.gap, -0.6, 'jump'); B.path[B.path.length - 1].vJump = 30; B.path[B.path.length - 1].nitro = true } // v29 本人「戻して」: v27 の着地坂・短い坂をやめて v26 の形（切れ目 5.5m・着地の坂 9m・0.75m の段）に戻した
+  // v51 本人「一番最初にニトロでジャンプしないと届かないジャンプ台を。ニトロの有用性を宣伝」: 切れ目を SJ.gap に広げ、広げた分だけ着地の坂を短くする（坂の終わりの位置と高さは前と同じ＝後の道は動かない）
+  { const H = 8.93 + 5.5 - SJ.gap, sl = Math.atan2(1.1, H); B.road(H / Math.cos(sl), { ...L, slope: -sl, mat: 'cobble', kind: 'landing', back: 0 }) }
   const LW = { ...L, w: 6.6 } // v38: 着地の先〜低い段の練習の手前の道を 5→6.6m に（曲がりの外の縁から落ちていた。道の線と長さは同じ）
   B.road(1.5, LW)
   B.torch(-1, -1, { down: 3 }); B.torch(1, -1, { down: 3 })
