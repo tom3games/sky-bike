@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=49'
+import { hbeam } from './course.js?v=50'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -20,7 +20,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=49'
+import { senseLift, SENSE } from './v49.js?v=50'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)

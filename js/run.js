@@ -1,9 +1,9 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=49'
-import { ROCK as ROCK0 } from './v41.js?v=49'
-import { nextI } from './steer.js?v=49'
+import { createBike, stepBike, resetFallen } from './physics.js?v=50'
+import { ROCK as ROCK0 } from './v41.js?v=50'
+import { nextI } from './steer.js?v=50'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 

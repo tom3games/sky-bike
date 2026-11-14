@@ -8,27 +8,28 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=49'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=49'
-import { COURSES } from './course.js?v=49'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=49'
-import { BikeView, snap } from './bikeview.js?v=49'
-import { createBot, botInput, resetBot } from './bot.js?v=49'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=49'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=49'
-import { Birds } from './birds.js?v=49'
-import { crowPush } from './strike.js?v=49'
-import { buildV35, hankieDataURL } from './v35view.js?v=49'
-import { buildV36 } from './v36view.js?v=49'
-import { buildLady } from './lady.js?v=49'
-import { buildElder, ELDER } from './elder.js?v=49'
-import { buildBoulder } from './v41view.js?v=49'
-import { buildMotes } from './motes.js?v=49'
-import { buildMurals } from './murals.js?v=49'
-import { buildV37 } from './v37view.js?v=49'
-import { buildEpi } from './v48view.js?v=49'
-import { doorAng } from './traps.js?v=49'
-import { resetDrums } from './physics.js?v=49'
+import { buildGimmicks } from './gimmicks.js?v=50'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=50'
+import { COURSES } from './course.js?v=50'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=50'
+import { BikeView, snap } from './bikeview.js?v=50'
+import { createBot, botInput, resetBot } from './bot.js?v=50'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=50'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=50'
+import { Birds } from './birds.js?v=50'
+import { crowPush } from './strike.js?v=50'
+import { buildV35, hankieDataURL } from './v35view.js?v=50'
+import { buildV36 } from './v36view.js?v=50'
+import { buildLady } from './lady.js?v=50'
+import { buildElder, ELDER } from './elder.js?v=50'
+import { buildBoulder } from './v41view.js?v=50'
+import { buildMotes } from './motes.js?v=50'
+import { buildMurals } from './murals.js?v=50'
+import { buildV37 } from './v37view.js?v=50'
+import { buildEpi } from './v48view.js?v=50'
+import { buildSenseLamps } from './v49view.js?v=50'
+import { doorAng } from './traps.js?v=50'
+import { resetDrums } from './physics.js?v=50'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -274,6 +275,7 @@ function loadCourse(id) {
   G.murals = c.climb ? buildMurals(c, scene, M) : null // v36 塔の壁の古い壁画 4 枚
   G.v37 = c.climb ? buildV37(c, scene, M) : null // v37 草原・風車
   if (G.epiV) scene.remove(G.epiV.group); G.epiV = c.epi ? buildEpi(c, scene, M) : null // v48 下山の終わりの小屋
+  if (G.lampV) scene.remove(G.lampV.group); G.lampV = buildSenseLamps(c, scene) // v50 後輪で乗る台のランプ
   LM.gim = Math.round(lt() - l0); l0 = lt()
   const spot = wide ? { q: c.path[spotI], side: -1 } : null
   const signs = buildSigns(c, scene)
@@ -523,7 +525,7 @@ function startRun(id) {
   G.world.setTime(0); for (const s of G.world.moving) { s.gone = false; s.touch = 0 }
   G.R.seed = Q.get('trapseed') ? +Q.get('trapseed') : 1 + Math.floor(Math.random() * 2147483000); rerollTraps(G.world, G.R) // v47 罠の間合いを走りごとに変える
   resetDrums(G.world) // v35 回る筒の口を最初の形へ
-  $('letter').classList.remove('on', 'quiet', 'peek'); G.ending = null; G.epi = null; bgmStop(1.0); if (G.v35 && G.v35.tracks) G.v35.tracks.visible = false
+  $('letter').classList.remove('on', 'quiet', 'peek'); G.ending = null; G.epi = null; if (G.epiV && G.epiV.silh) G.epiV.silh.visible = false; bgmStop(1.0); if (G.v35 && G.v35.tracks) G.v35.tracks.visible = false
   G.hank = false; G.hm = { ph: 'wait' }; G.ly = { ph: 'wait' }; G.ladyDone = false; G.vl = { ph: 'idle', n: 0 }; if (G.elder) G.elder.hide(); G.story = { seen: {}, t0: G.course.climb ? 0.6 : null }; storyOff(); talkOff()
   for (const cn of G.course.cans || []) cn.t = null; skid.clear()
   spawnAt(0)
@@ -852,7 +854,7 @@ function strikeStep(b, main) {
 }
 function fixedStep() {
   const b = G.bike, c = G.course
-  const inp = G.epi && G.epi.ph === 'end' ? { thr: 0, brk: 1, lean: 0, steer: 0 } : gatherInput() // v48 小屋の前で止まる
+  const inp = G.epi && G.epi.ph === 'end' ? { thr: 0, brk: b.speed > 0.2 ? 1 : 0, lean: 0, steer: 0 } : gatherInput() // 止まったらブレーキを離す（押し続けると下がる） // v48 小屋の前で止まる
   G.inp = inp
   if (!G.running && (inp.thr > 0 || inp.brk > 0 || inp.lean)) G.running = true
   const ev = []
@@ -987,10 +989,14 @@ function startEpi(done) {
 // 下山の毎刻み: 深く落ちたら近くの旗へ（下に道は無い）。小屋の前に着いたら止めて、ゆっくり暗くして結果
 function epiStep(j, b) {
   const c = G.course, E = c.epi, P = G.epi
-  if (P.ph === 'end') { P.t += DT; if (P.t > 2.6 && !P.shown) { P.shown = true; G.state = 'result'; G.epi = null; P.done() } return true }
+  if (P.ph === 'end') { // v50 止まったら窓の中の人影を 1 秒ほど → ゆっくり暗く → 結果
+    P.t += DT; const sh = G.epiV && G.epiV.silh
+    if (sh) sh.visible = P.t > 0.7 && P.t < 1.8
+    if (P.t > 1.8 && !P.dark) { P.dark = true; $('letter').classList.add('on', 'quiet') }
+    if (P.t > 4.4 && !P.shown) { P.shown = true; G.state = 'result'; G.epi = null; P.done() } return true }
   const rest = c.cps[G.R.rest]
   if (!j.respawn && rest && b.p[1] < Math.min(rest.p[1], epiFloor(b)) - 16) { why(t('net')); respawn({ cp: G.R.rest }, false); return true }
-  if (Math.hypot(b.p[0] - E.end[0], b.p[2] - E.end[2]) < 9 && Math.abs(b.p[1] - 0.79 - E.end[1]) < 2.5) { P.ph = 'end'; P.t = 0; $('letter').classList.add('on', 'quiet'); return true }
+  if (Math.hypot(b.p[0] - E.end[0], b.p[2] - E.end[2]) < 9 && Math.abs(b.p[1] - 0.79 - E.end[1]) < 2.5) { P.ph = 'end'; P.t = 0; G.silhN = (G.silhN || 0) + 1; return true }
   return false
 }
 // 下山の道のうち、今いる所に一番近い点の高さ
@@ -1307,6 +1313,7 @@ function frame(now) {
     hornUpdate(Math.min(dt, 0.05))
     if (G.v35) G.v35.update(Math.min(dt, 0.05), tm, camera.position)
     if (G.bv) { G.bv.update(G.R && G.R.bo); boulderAmbient(Math.min(dt, 0.05)) }
+    if (G.lampV) G.lampV.update(camera)
     if (G.elder) G.elder.update(Math.min(dt, 0.05), G.state === 'play' || G.state === 'pause' ? G.bike : null)
     if (G.ladyV) G.ladyV.update(Math.min(dt, 0.05), camera.position, G.state === 'play' || G.state === 'pause' ? G.bike : null)
     if (G.v36) { G.v36.update(Math.min(dt, 0.05), tm, camera.position, G.world, G.R, G.state === 'play' ? G.bike : null); for (const k of G.v36.impEvents()) if (G.state === 'play') { monkeyCall(2, 0.95); monkeyCall(2, 0.8, 0.25) } for (const e of G.v36.pressEvents()) { Snd.play('clank', { vol: 1, rate: 0.55 }); Snd.play('rockbreak', { vol: 0.7, rate: 0.8 }); Snd.play('crack', { vol: 0.6 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 30, 2.5, { col: 0x6a5a48, up: 0.5, size: 1.2 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 14, 1.6, { col: 0x8a7a68, heavy: 1, size: 0.6 }) } }

@@ -2,8 +2,8 @@
 // 道の端の先の奈落に、小さな鉄の台。ウィリーで前輪を上げたまま後輪だけを台に乗せると、感知して動き出し（横・上・前、route のとおり。区間の間で一度止まる）、
 // 向こうの足場の手前で止まる。前体重で前輪を足場に下ろして降りる。前輪まで乗せると前輪が台の先から落ちる。乗るのに失敗したら、台はそのまま待つ。
 // 誰も乗らなくなると 1.5 秒で元へ戻る。旗からの出し直しで元へ（physics.js resetFallen）。動きは physics.js senseAt / senseTrack
-import { Builder } from './course.js?v=49'
-import { finish16 } from './parts16.js?v=49'
+import { Builder } from './course.js?v=50'
+import { finish16 } from './parts16.js?v=50'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 export const SENSE = { L: 0.6, W: 0.46, TH: 0.22, gap: 0.04, exitGap: 0.25, v: 1.3, vUp: 0.4, pause: 0.9 }
 

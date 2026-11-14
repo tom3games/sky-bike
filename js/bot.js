@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=49'
-import { doorAng } from './traps.js?v=49'
-import { BLADE } from './v37.js?v=49'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=49'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=50'
+import { doorAng } from './traps.js?v=50'
+import { BLADE } from './v37.js?v=50'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=50'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -321,7 +321,7 @@ export function botInput(bot, b) {
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
   if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach')) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
   // v48b 空中で、着地のすぐ先に曲がりがあると分かっている時は、着いた瞬間に効くようにブレーキを先に押しておく（人も着地の前から構える。反応の遅れで着いてから押すと曲がりの外へ飛ぶ: 旗 39 の浮き島）
-  if (!b.g[0] && !b.g[1] && bot.skill === 'good' && bot.react > 0 && sp > 6) { let k = bot.i; for (let n = 0; n < 6 && path[k] && (path[k].kind === 'jump' || path[k].kind === 'lip' || !path[k].w); n++) k++
+  if (!b.g[0] && !b.g[1] && bot.skill === 'good' && bot.react > 0 && sp > 6 && !globalThis.__noPreBrake) { let k = bot.i; for (let n = 0; n < 6 && path[k] && (path[k].kind === 'jump' || path[k].kind === 'lip' || !path[k].w); n++) k++
     if (path[k]) { const cap = cornerCap({ path, i: k }, b); if (cap < sp - 1.5) inp = { ...inp, thr: 0, brk: Math.max(inp.brk || 0, 0.7) } } }
   if (bot.oilOn) inp = { ...inp, thr: 0, ab: 0, brk: 0, lean: 0 } // 油の上では何も押さない（手前で速さを落としてあるので自動の減速も入らない）
   // v41 落石の坂: 予告（地鳴り）が始まったら、門まで真っすぐバック（ブレーキを押し続ける。ハンドルは自動のバックの線）
