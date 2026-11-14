@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=37b'
-import { doorAng } from './traps.js?v=37b'
-import { BLADE } from './v37.js?v=37b'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=37b'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=38'
+import { doorAng } from './traps.js?v=38'
+import { BLADE } from './v37.js?v=38'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=38'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -149,7 +149,8 @@ export function botInput(bot, b) {
     } else {
       // 地面: 車体が坂から浮きすぎ・突っ込みすぎを直す
       const d = b.th - slope
-      if (d > 0.18) lean = Math.min(1, (d - 0.1) * 5)
+      const onKick = [0, 1].some(i => b.cn[i] && bot.world && bot.world.shapes[b.cn[i].id].tag === 'kicker') || (lipAt && lipAt.d < 4) // v38: ジャンプ台の上は台の傾き。前体重にしない（遅れて跳んだ後に前へ回っていた）
+      if (d > 0.18 && !onKick) lean = Math.min(1, (d - 0.1) * 5)
       if (d > 0.6 && sp > 2.5 && !stepAt && !bot.react) thr = 0 // 走りながら前輪が上がりすぎたらアクセルを戻す（後ろへ回って転ばない。v17: 溝の出口で全開のまま後ろへ回っていた。段をよじ登る遅い時は戻さない）
       else if (d < -0.15) lean = Math.max(-1, (d + 0.1) * 5)
       if (slope > 0.15 && thr) lean = Math.max(lean, slope > 0.5 ? 1 : 0.5)

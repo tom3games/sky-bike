@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=37b'
+import { doorAng } from './traps.js?v=38'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -1000,7 +1000,7 @@ function sub(world, b, inpIn, ev) {
   let rate = 0, pivot = null
   const st = b.crashed ? 0 : -inp.steer
   if (b.g[0] && b.g[1]) rate = b.speed * dsin(b.delta) / dcos(b.delta) / (P.front[0] - P.rear[0])
-  else if (b.g[1] && !b.g[0]) { rate = st * 2.3; pivot = b.cn[1].q }
+  else if (b.g[1] && !b.g[0]) { rate = st * (globalThis.__oldJack ? 2.3 : 2.3 - 1.7 * Math.min(1, Math.max(0, (Math.abs(b.speed) - 2) / 2))); pivot = b.cn[1].q } // v38 本人「着地で後輪が浮いて、後輪がコースの外へ引っ張られる」: 走りながら前輪だけ着いた時は、自動ハンドルで前輪を軸に後ろを振らない（止まりかけの前輪を軸に回る技はそのまま）
   else if (b.g[0] && !b.g[1]) { rate = st * 1.2 + b.speed * dsin(b.delta) / dcos(b.delta) / 1.42 * 0.5; pivot = b.cn[0].q }
   else rate = st * 0.5
   // 横風は接地中も前輪をあおって向きを変える（タイヤは横には滑らないが、ハンドルが取られる）
@@ -1312,7 +1312,9 @@ function v16Track(world, b, ev) {
       if (on0 || on1) m.lastTouch = T
       if (m.trig == null && on0 && b.g[0] && on1 && b.g[1] && !b.crashed && (m.armed ?? true)) {
         const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
-        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }) }
+        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve })
+          // v38 本人「跳ね板から次の壁まで直撃」: 板の向きを少し後ろへ傾けた形。前へ速すぎる分は跳ねる時に削る（どの速さで乗っても坂か着地の道に下りる）
+          if (m.vxMax != null) { const vf = b.v[0] * m.f[0] + b.v[2] * m.f[2]; if (vf > m.vxMax) { const d = vf - m.vxMax; b.v[0] -= m.f[0] * d; b.v[2] -= m.f[2] * d } } }
       }
       if (!on0 && !on1 && m.trig == null && T - (m.lastTouch ?? -1e9) > 0.3) m.armed = true
       // v29 本人「一回しか跳ねへん」: 板に乗ったままでも、板が下りた後に引き金の手前まで下がれば、もう一度跳ねる

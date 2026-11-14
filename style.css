@@ -158,3 +158,4 @@ html[lang=en] .stamp{font-size:15px}
 #letter.on.quiet p{opacity:0;transition:opacity .4s}
 .tk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
 .tk-item img{width:44px;height:44px}
+@media (min-width:1000px) and (max-height:940px){#how .panel{width:min(1000px,92vw)}#how .tips{columns:2;column-gap:28px}#how .tips li{break-inside:avoid}} /* v38 遊び方の一言が増えたので、PC の横長の画面では 2 列（もどるが下で切れない） */

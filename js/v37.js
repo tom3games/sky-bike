@@ -105,7 +105,7 @@ function cable(B, span) {
   for (let k = 0; k < N; k++) B.cyl({ a: pts[k], b: pts[k + 1], r, mat: 'chain', mu: 1.15, tag: 'cable' })
   for (let d = 0; d < span; d += 1) { const u = d / span; B.path.push({ p: add3(add3(t.p, f, d), [0, 1, 0], -sag * 4 * u * (1 - u)), yaw, slope: Math.atan(-sag * 4 * (1 - 2 * u) / span), w: 0.36, kind: 'narrow', cable: true }) }
   // 両端の柱（道の外）
-  for (const e of [pts[0], pts[N]]) for (const sg of [-1, 1]) { const q = add3(e, B.right(yaw), sg * 1.6); B.cyl({ a: [q[0], q[1] - 6, q[2]], b: [q[0], q[1] + 2.6, q[2]], r: 0.22, mat: 'iron', tag: 'post' }) }
+  for (const e of [pts[0], pts[N]]) for (const sg of [-1, 1]) { const q = add3(e, B.right(yaw), sg * 2.5); B.cyl({ a: [q[0], q[1] - 6, q[2]], b: [q[0], q[1] + 2.6, q[2]], r: 0.22, mat: 'iron', tag: 'post' }) }
   { const t0 = B.t.p.slice(); B.t.p = add3(t0, f, span * 0.25); B.gust(span * 0.5, { a: 2.2, T: 5.2, sgn: 1, w: 1.5 }); B.t.p = t0 } // 横風は真ん中の半分だけ（間をおいて吹く）
   B.decor.push({ kind: 'cable', pts, r })
   t.p = add3(t.p, f, span); B.last = null

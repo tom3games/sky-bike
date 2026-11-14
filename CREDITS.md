@@ -22,7 +22,8 @@
 - assets/models/Rider.glb: Quaternius「Ultimate Modular Men」Swat（アニメを外した）/ CC0 / https://quaternius.com
 - snd/bgm_final_build.mp3・bgm_final_climax.mp3・bgm_gate.mp3: 音楽: 店主が用意
 - snd/birds_garden.mp3: Birds singing in garden / ezwa（Wikimedia Commons）/ Public domain（40 秒に切った）
-- snd/monkey_0〜2.mp3: Monkey Sounds / AntumDeluge（OpenGameArt）/ CC0
+- snd/monkey_0〜5.mp3・monkey_taunt.mp3: 猿の声: 店主の声の録音
+- snd/man_voice.mp3: 男の声: 店主の声の録音
 - snd/patter_01・02.mp3: 100 CC0 SFX #2 / rubberduck / CC0（足音）
 - assets/models/Imp.glb: Quaternius「Ultimate Animated Character Pack」Goblin_Male（使うアニメ 5 本だけ残した。小さな猿のような生き物）/ CC0 / https://quaternius.com
 - assets/models/Hermit.glb: Quaternius「Ultimate Modular Men」Farmer（使うアニメ 5 本だけ残した。廃墟に住む男）/ CC0 / https://quaternius.com

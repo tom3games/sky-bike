@@ -6,7 +6,7 @@ import { chromium, webkit } from 'playwright'
 import { execSync } from 'node:child_process'
 // 個人のアカウント名は公開リポジトリに書かない。実行時に gh から取る（2026-11-02 live.mjs に名前が文字で入ったまま5本公開していた）
 const OWNER = (() => { try { return execSync('gh api user -q .login', { encoding: 'utf8' }).trim().toLowerCase() } catch { return '' } })()
-const URL0 = 'https://tom3games.github.io/sky-bike/'
+const URL0 = process.env.LIVEURL || 'https://tom3games.github.io/sky-bike/' // LIVEURL=http://localhost:PORT/ で push 前にローカルで確認
 const out = []
 for (const [name, bt, opts] of [['chromium', chromium, {}], ['webkit', webkit, { isMobile: true, hasTouch: true, deviceScaleFactor: 2 }]]) {
   const b = await bt.launch(bt === chromium ? { ...MUTE_LAUNCH, args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle', '--ignore-gpu-blocklist'] } : {}), ctx = await b.newContext({ locale: 'ja-JP', viewport: { width: 390, height: 844 }, ...opts })

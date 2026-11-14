@@ -1,4 +1,4 @@
-// PC の操作（v17）: 左クリック＝アクセル・右クリック＝ブレーキ/バック（右クリックのメニューは出ない）・A/D＝体重・マウス＝カメラ・Space＝ニトロ（押すだけで全開）
+// PC の操作（v17）: 左クリック＝アクセル・右クリック＝ブレーキ/バック（右クリックのメニューは出ない）・A/D＝体重・マウス＝カメラ・W＝ニトロ（押すだけで全開。v38 で Space・Shift から W へ）
 // 本物のマウスとキーを Playwright で送り、バイクの速さ・車体の角度・カメラの向きの数字で確かめる。 node tools/pctest.mjs
 import '../mute-auto.mjs'
 import { chromium } from 'playwright'
@@ -44,13 +44,20 @@ rec.カメラ = [s0.camAz, s1.camAz, s0.off, s1.off]; out.push([`マウスを横
 s0 = await st(); for (let k = 0; k < 10; k++) await page.mouse.move(700, 360 + (k + 1) * 10); await W(400); s1 = await st()
 rec.カメラ上下 = [s0.camY, s1.camY]; out.push([`マウスを下へ動かすとカメラが上から見下ろす（高さ ${s0.camY} → ${s1.camY} m）`, s1.camY > s0.camY + 0.5])
 await page.evaluate(() => { window.sky.camFree = false })
-// 5 Space だけでニトロ＋全開（アクセルを押さない）
+// 5 W だけでニトロ＋全開（アクセルを押さない）
 await page.evaluate(() => window.sky.startRun('practice')); await W(900)
-s0 = await st(); await page.keyboard.down('Space'); await W(250); const sN = await st(); await W(1300); s1 = await st(); await page.keyboard.up('Space'); await W(200)
-rec.ニトロ単独 = [s0.v, sN.nitroOn, s1.v, s1.nitro]; out.push([`Space だけ（アクセルなし）で全開とニトロ（速さ ${s0.v} → ${s1.v}、ニトロ ${sN.nitroOn ? '点いた' : '点かない'}、残り ${s1.nitro}）`, sN.nitroOn && s1.v > s0.v + 4])
+s0 = await st(); await page.keyboard.down('KeyW'); await W(250); const sN = await st(); const wThr = await page.evaluate(() => window.sky.keys.has('thr')); await W(1300); s1 = await st(); await page.keyboard.up('KeyW'); await W(200)
+rec.ニトロ単独 = [s0.v, sN.nitroOn, s1.v, s1.nitro]; out.push([`W だけ（アクセルなし）で全開とニトロ（速さ ${s0.v} → ${s1.v}、ニトロ ${sN.nitroOn ? '点いた' : '点かない'}、残り ${s1.nitro}）`, sN.nitroOn && s1.v > s0.v + 4])
+out.push([`W はアクセルとして二重に効かない（W を押している間のアクセルのキー ${wThr ? 'あり' : 'なし'}）`, !wThr])
+// 5b Space・Shift ではニトロが点かない（進まない）
+for (const k of ['Space', 'ShiftLeft']) {
+  await page.evaluate(() => window.sky.startRun('practice')); await W(900)
+  const a = await st(); await page.keyboard.down(k); await W(900); const z = await st(); await page.keyboard.up(k); await W(200)
+  out.push([`${k} ではニトロが点かない（ニトロ ${z.nitroOn ? '点いた' : '点かない'}・速さ ${a.v} → ${z.v}）`, !z.nitroOn && z.v < a.v + 1])
+}
 // 6 ニトロとブレーキを同時: ブレーキが先（ニトロは点かず、進まない）
 await page.evaluate(() => window.sky.startRun('practice')); await W(900)
-await page.keyboard.down('Space'); await page.keyboard.down('KeyS'); await W(800); s1 = await st(); await page.keyboard.up('KeyS'); await page.keyboard.up('Space'); await W(200)
+await page.keyboard.down('KeyW'); await page.keyboard.down('KeyS'); await W(800); s1 = await st(); await page.keyboard.up('KeyS'); await page.keyboard.up('KeyW'); await W(200)
 out.push([`ニトロとブレーキを同時に押すとブレーキが先（ニトロ ${s1.nitroOn ? '点いた' : '点かない'}・速さ ${s1.v}）`, !s1.nitroOn && s1.v < 0.5])
 // 7 Esc でマウスの固定が外れる（Playwright からは Pointer Lock の Esc を送れないので exitPointerLock で同じ状態に）・その後の左クリックで戻る
 await page.evaluate(() => document.exitPointerLock && document.exitPointerLock()); await W(200)

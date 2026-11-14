@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=37b'
+import { arcPoint } from './physics.js?v=38'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -109,8 +109,21 @@ function cylUV(geo, s, rep) {
   geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
 }
 // 形の違う部品をまとめる（索引なし・位置と法線と模様の座標だけにそろえる）
+// v38 まだら: 頂点の色で、上ほど明るく・根元は暗い苔色、ところどころ濃淡（新しい画像は使わない）。y0〜y1 が根元〜てっぺん
+export function mottle(geo, y0, y1, moss = 1) {
+  const p = geo.attributes.position, n = p.count, c = new Float32Array(n * 3), H = Math.max(1, y1 - y0)
+  for (let i = 0; i < n; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i), t = Math.min(1, Math.max(0, (y - y0) / H))
+    const m = 0.8 + 0.4 * vnoise(x * 0.05, y * 0.05, z * 0.05) + 0.22 * (vnoise(x * 0.19 + 7, y * 0.19, z * 0.19) - 0.5)
+    const b = (0.74 + 0.4 * t) * m, w = moss * Math.max(0, 1 - t / 0.4) * (0.45 + 0.55 * vnoise(x * 0.09 + 3, y * 0.09, z * 0.09))
+    c[i * 3] = b * (1 - 0.38 * w); c[i * 3 + 1] = b * (1 - 0.1 * w); c[i * 3 + 2] = b * (1 - 0.45 * w)
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(c, 3)); return geo
+}
+const vcMat = m => { const q = m.clone(); q.vertexColors = true; return q }
 function mergeLoose(arr) {
-  const out = arr.map(g0 => { let g = g0.index ? g0.toNonIndexed() : g0; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv') g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); if (!g.attributes.normal) g.computeVertexNormals(); return g })
+  const keepC = arr.every(g => g.attributes.color)
+  const out = arr.map(g0 => { let g = g0.index ? g0.toNonIndexed() : g0; for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'uv' && !(keepC && k === 'color')) g.deleteAttribute(k); if (!g.attributes.uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2)); if (!g.attributes.normal) g.computeVertexNormals(); return g })
   return mergeGeometries(out)
 }
 const mkGeo = (a, uv) => { const q = new THREE.BufferGeometry(); q.setAttribute('position', new THREE.Float32BufferAttribute(a, 3)); if (uv) { q.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); q.userData.uvM = true } q.computeVertexNormals(); return q }
@@ -143,7 +156,7 @@ export function shapeGeometry(s, chip = 0) {
     return { top: mkGeo(tops, tuv), side: mkGeo(sides, suv) }
   } else if (s.type === 'cyl') {
     const seg = Math.min(200, Math.max(12, Math.ceil(Math.PI / Math.acos(1 - 0.0025 / s.r))))
-    let g = new THREE.CylinderGeometry(s.r, s.r, s.L, seg, s.tag === 'tower' ? 8 : 1)
+    let g = new THREE.CylinderGeometry(s.r, s.r, s.L, seg, s.tag === 'tower' ? 20 : 1)
     const k = 1 / Math.cos(Math.PI / seg); g.scale(k, 1, k) // 角の数で内側に入る分を外接させて補う
     const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(...s.d))
     g.applyQuaternion(q); g.translate((s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2)
@@ -291,7 +304,9 @@ export function buildCourse(course, scene, nowZones = null) {
   function flush() {
   for (const key in byMat) {
     const parts = key.split('|'), k = parts[2], ch = chunks.get(parts[0] + '|' + parts[1])
-    const mesh = new THREE.Mesh(mergeGeometries(byMat[key], false), M[k] || M.rock)
+    const geo = mergeGeometries(byMat[key], false)
+    if (k === 'tower') { geo.computeBoundingBox(); mottle(geo, course.lavaY != null ? course.lavaY : geo.boundingBox.min.y, geo.boundingBox.max.y, 1); M.towerV = M.towerV || vcMat(M.tower) }
+    const mesh = new THREE.Mesh(geo, k === 'tower' ? M.towerV : (M[k] || M.rock))
     mesh.castShadow = k !== 'tower'; mesh.receiveShadow = true; mesh.name = 'course:' + k; mesh.matrixAutoUpdate = false
     ch.det.push(mesh)
     group.add(mesh)
@@ -759,7 +774,7 @@ export function buildMountains(scene, center, rad, M) {
       }
     }
   }
-  const geo = mergeGeometries(parts); geo.computeVertexNormals(); worldUV(geo, 8)
+  const geo = mergeGeometries(parts); geo.computeVertexNormals(); worldUV(geo, 8); mottle(geo, -40, 150, 0.8); mat.vertexColors = true
   g.add(new THREE.Mesh(geo, mat))
   g.userData.lights = lights
   scene.add(g)
@@ -795,9 +810,14 @@ export function buildValley(course, scene, M) {
     if (rnd() < 0.45) { const ly = base + h * (0.35 + rnd() * 0.3), la = rot + Math.floor(rnd() * 4) * Math.PI / 2; lights.push([x + Math.cos(la) * w * 0.5, ly, z - Math.sin(la) * w * 0.5, 1]) }
   }
   const island = (x, y, z, s, zn) => {
+    // v38 島ごとに大きさ・横長さ・下の岩の垂れ方・傾きをばらつかせる（数は同じ。並びの乱数は使わず位置から決める）
+    const h1 = hash3(x * 0.37, y * 0.11, z * 0.53), h2 = hash3(z * 0.41, x * 0.29, y * 0.07), h3 = hash3(y * 0.23, z * 0.17, x * 0.61)
+    s *= 0.65 + 0.95 * h1
+    const hang = 0.65 + 1.0 * h2, ax = 0.75 + 0.65 * h3
     const rg = new THREE.IcosahedronGeometry(1, 3), p = rg.attributes.position, v = new THREE.Vector3()
-    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); v.multiplyScalar(0.62 + 0.5 * vnoise(v.x * 1.6 + x, v.y * 1.6, v.z * 1.6 + z) + 0.22 * vnoise(v.x * 5 + 3, v.y * 5, v.z * 5)); if (v.y > 0) v.y *= 0.12; else v.y *= 0.85 + (-v.y) * 0.25; p.setXYZ(i, v.x, v.y, v.z) }
-    rg.scale(s, s * 0.9, s * 0.8); rg.rotateY(rnd() * 3); rg.translate(x, y, z); rocks.push(rg.toNonIndexed())
+    for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i); v.multiplyScalar(0.62 + 0.5 * vnoise(v.x * 1.6 + x, v.y * 1.6, v.z * 1.6 + z) + 0.22 * vnoise(v.x * 5 + 3, v.y * 5, v.z * 5)); if (v.y > 0) v.y *= 0.12; else v.y *= (0.85 + (-v.y) * 0.25) * hang; p.setXYZ(i, v.x, v.y, v.z) }
+    rg.scale(s * ax, s * 0.9, s * 0.8 / Math.sqrt(ax)); rg.rotateZ((h2 - 0.5) * 0.18); rg.rotateX((h1 - 0.5) * 0.14); rg.rotateY(rnd() * 3); rg.translate(x, y, z)
+    const rn = rg.toNonIndexed(); mottle(rn, y - s * 1.3 * hang, y + s * 0.12, 1); rocks.push(rn)
     const top = y + s * 0.1, out = (zn === 'ice' || zn === 'roof' || zn === 'sky' || zn === 'castle') ? snow : stone
     // 崩れた尖塔 1 本・アーチ・折れた柱
     const sh = s * (1.4 + rnd() * 1.4), tw = new THREE.BoxGeometry(s * 0.4, sh, s * 0.4); tw.translate(x + s * 0.25, top + sh / 2, z); out.push(tw.toNonIndexed())
@@ -852,7 +872,7 @@ export function buildValley(course, scene, M) {
   const darkI = M.girder.clone(); darkI.color = new THREE.Color(0x2c2018)
   const pale = M.snowrock.clone(); pale.color = new THREE.Color(0x5a6468)
   const rk = M.rockdark.clone(); rk.color = new THREE.Color(0x2a2824)
-  for (const [arr, mt] of [[stone, dark], [iron, darkI], [snow, pale], [rocks, rk]]) if (arr.length) { const geo = mergeLoose(arr); geo.computeVertexNormals(); worldUV(geo, 8); const m = new THREE.Mesh(geo, mt); m.name = 'valley'; g.add(m) }
+  for (const [arr, mt, mz] of [[stone, dark, 1], [iron, darkI, 0], [snow, pale, 0.4], [rocks, rk, -1]]) if (arr.length) { const geo = mergeLoose(arr); geo.computeVertexNormals(); worldUV(geo, 8); if (mz > 0) mottle(geo, base, base + 170, mz); if (mz) mt.vertexColors = true; const m = new THREE.Mesh(geo, mt); m.name = 'valley'; g.add(m) }
   g.userData.lights = lights
   scene.add(g)
   return g
@@ -1119,8 +1139,9 @@ void main(){ vec4 t = texture2D(map, vUv); vec3 c = t.rgb * col * t.a;
   gl_FragColor = vec4(c, 1.0); }`
 // 高さで変わる霧の濃さ（game.js の霧の部品と同じ式）。fogNear = 濃さ、fogFar = 霧が薄くなり始める高さ
 // 遠くまで指数で効き、最大でも 0.93（遠い塔の影が霧の中に残る）。今いる高さより下ほど濃い
-export const FOG_FACTOR = `float hk = exp( - max( 0.0, vFogW.y - fogFar ) * 0.035 );
-  float fogFactor = 0.93 * ( 1.0 - exp( - fogNear * ( 0.45 + 1.1 * hk ) * vFogDepth ) );`
+// v38: 下へ深いほどさらに濃く（谷の底が沈む）、上はより澄む。霧の層は足さず、式だけ
+export const FOG_FACTOR = `float fogDh = vFogW.y - fogFar; float hk = exp( - max( 0.0, fogDh ) * 0.04 ); float fogLo = 1.0 - exp( - max( 0.0, - fogDh ) * 0.022 );
+  float fogFactor = 0.93 * ( 1.0 - exp( - fogNear * ( 0.38 + 1.1 * hk + 0.85 * fogLo ) * vFogDepth ) );`
 export function buildFlames(scene, points, M) {
   const g = new THREE.Group(); g.name = 'flames'
   const mk = (tex, col) => {

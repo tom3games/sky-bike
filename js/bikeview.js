@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=37b'
+import { BIKE, basis, wheelCenter } from './physics.js?v=38'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)

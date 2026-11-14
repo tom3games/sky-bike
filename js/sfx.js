@@ -19,7 +19,7 @@ const Snd = {
     try {
       const c = this.ctx = new AC()
       this.master = c.createGain(); this.master.gain.value = this.muted ? 0 : 0.9
-      this.an = c.createAnalyser(); this.an.fftSize = 2048; this.master.connect(this.an); this.an.connect(c.destination)
+      this.an = c.createAnalyser(); this.an.fftSize = 2048; this.lim = c.createDynamicsCompressor(); { const L = this.lim; L.threshold.value = -6; L.knee.value = 4; L.ratio.value = 12; L.attack.value = 0.003; L.release.value = 0.15 } this.master.connect(this.lim); this.lim.connect(this.an); this.an.connect(c.destination) // v38 出口の軽いリミッター（エンジンを上げても音割れしない）
       this.sfxBus = c.createGain(); this.sfxBus.connect(this.master)
       this.bed = c.createGain(); this.bed.gain.value = 1; this.bed.connect(this.master)   // 環境音と BGM（duck で下げる）
       // こもらせる道（壁の向こう・ほかの音にかき消された時）

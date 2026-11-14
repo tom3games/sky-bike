@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=37b'
+import { hbeam } from './course.js?v=38'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -511,8 +511,14 @@ export function ruins(x) {
   { const s = orbit(0.6, 4.0, { mat: 'mud', mu: 0.3, kind: 'mud' }); s.mud = 60 }
   orbit(0.25, 0.75)
   orbit(0.6, 0.4)
-  B.mark('跳ね板'); B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false }) /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
-  B.mark('ウィリーの溝'); orbit(0.3, 0); B.road(3, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.wheelieGrooves(B, { hang: 1.6, n: 4 }); orbit(0.4, 0.4)
+  B.mark('跳ね板'); B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false, k0: 7.4, kv: 0, vxMax: 7.5 }) /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
+  B.mark('ウィリーの溝'); orbit(0.3, 0)
+  // v38 本人「最初の跳ね板の後の段差、横から落ちにくく」: 段の手前から段の上まで、両脇に低い縁石（高さ約 0.35m・丸い・当たりあり）。道幅・段の高さはそのまま
+  { const p0 = B.t.p.slice(), yaw = B.t.yaw, f = B.dir(yaw), R = B.right(yaw), w = 3.2, r = 0.2, off = w / 2 + r + 0.04
+    const curb = (a, b) => { for (const sg of [-1, 1]) B.cyl({ a: [a[0] + R[0] * sg * off, a[1] + 0.15, a[2] + R[2] * sg * off], b: [b[0] + R[0] * sg * off, b[1] + 0.15, b[2] + R[2] * sg * off], r, mat: 'ruinwall', tag: 'curb' }) }
+    const at = (d, h) => [p0[0] + f[0] * d, p0[1] + h, p0[2] + f[2] * d]
+    curb(at(0.3, 0), at(2.9, 0)); curb(at(3.15, 1.6), at(5.3, 1.6)) }
+  B.road(3, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.wheelieGrooves(B, { hang: 1.6, n: 3, land: 4 * 1.28 / 3 - 0.66, lip: 0.09 }); /* v38 本人「段差の後の凸凹が難しい」: 溝 4→3 本・間を広く・縁の鉄の帯 0.16→0.09m（溝の区間の長さは同じ） */ orbit(0.4, 0.4)
   B.tut('brk')
   B.mark('朽ちた木の橋')
   excursion({

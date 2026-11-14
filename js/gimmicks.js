@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=37b'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=38'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
