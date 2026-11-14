@@ -892,6 +892,9 @@ function sub(world, b, inpIn, ev) {
   if (vl2 > P.vmax + 6) { const k = (P.vmax + 6) / vl2; b.v[0] *= k; b.v[1] *= k; b.v[2] *= k }
   b.w += tau / P.Ip * H
   if (air) b.w *= 1 - 0.35 * H
+  // v32 上昇気流の中（天空城への大ジャンプ）で体重を動かしていない時は、車体がゆっくり着地坂の傾きへ戻る（何もしなくても前へ回りすぎない。後ろ体重を続ければ宙返りできる）
+  if (air && !b.crashed && Math.abs(b.lean) < 0.15) for (const wd of world.winds) { if (!wd.updraft || b.p[0] < wd.min[0] || b.p[0] > wd.max[0] || b.p[1] < wd.min[1] || b.p[1] > wd.max[1] || b.p[2] < wd.min[2] || b.p[2] > wd.max[2]) continue
+    let d = b.th - (wd.lvl ?? -0.35); d = Math.atan2(Math.sin(d), Math.cos(d)); b.w += (-d * 4 - b.w * 2.2) * H; break }
   b.w = clamp(b.w, -14, 14)
   // v29 前輪が段の面に当たった直後（0.8 秒）は、後ろへ回る勢いを 1.2 rad/s までにする（速いまま段に当たると跳ね上げられて後ろへ宙返りしていた。水の中の木箱）
   const wet = c => { const sh = c && world.shapes[c.id]; return !!(sh && (sh.flow || sh.flowR || sh.flowT)) } // 水の流れの中の段だけ（水の中の木箱。ほかの段・ジャンプ台の当たり方は変えない）

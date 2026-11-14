@@ -1,10 +1,11 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=31'
-import * as P16 from './parts16.js?v=31'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=31'
-import { lab16 } from './parts16.js?v=31'
-import * as P17 from './parts17.js?v=31'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=31'
+import * as Z from './zones.js?v=32'
+import * as P16 from './parts16.js?v=32'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=32'
+import { lab16 } from './parts16.js?v=32'
+import * as P17 from './parts17.js?v=32'
+import { finale } from './finale.js?v=32'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=32'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -697,9 +698,9 @@ export function stage1() {
   B.road(3, { w: 2.8, slope: 19 * DEG, mat: 'castle', thick: 0.9, kind: 'ramp' })
   B.road(3, { w: 2.8, mat: 'castle', thick: 0.9 }); B.torch(1, 1, { w: 2.8, down: 1 }); B.torch(-1, 1, { w: 2.8, down: 1 })
   for (let i = 0; i < 3; i++) { B.step(0.28); B.road(2.4, { w: 2.8, mat: 'castle', thick: 1.0, noOverlap: true }) }
-  B.road(6, { w: 4, mat: 'castle', thick: 2.6 })
-  B.road(8, { w: 6, mat: 'castle', thick: 2.6 })
-  B.cp('天空城 外門', { w: 6, finish: true })
+  finale(B) // v32 崩れ落ちる空中回廊・天空城への大ジャンプ（js/finale.js）
+  B.road(8, { w: 10, mat: 'castle', thick: 2.6 })
+  B.cp('天空城 外門', { w: 10, finish: true })
   B.road(12, { w: 10, mat: 'castle', thick: 3.0 })
   // 門の前の広場も「浮いた広場」として、下に岩・持ち送り・垂れる鎖を付ける
   for (const sh of B.shapes.slice(-12)) if (sh.type === 'box' && sh.tag === 'road' && sh.mat === 'castle' && sh.h[2] >= 2) B.plats.push({ c: [sh.c[0] + sh.ax[1][0] * sh.h[1], sh.c[1] + sh.h[1], sh.c[2] + sh.ax[1][2] * sh.h[1]], h: [sh.h[0], sh.h[2]], yaw: sh.base.yaw, zone: 'castle', thick: sh.h[1] * 2 })

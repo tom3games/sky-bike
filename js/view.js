@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=31'
+import { arcPoint } from './physics.js?v=32'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -319,6 +319,7 @@ export function updateMovers(movers, world, cam) {
       _m.makeBasis(_x.set(...s.ax[0]), _y.set(...s.ax[1]), _z.set(...s.ax[2]))
       let ox = 0, oy = 0
       if (s.mov.type === 'crumble' && s.touch > 0 && !s.gone) { ox = (Math.random() - 0.5) * 0.05 * s.touch / s.mov.delay; oy = (Math.random() - 0.5) * 0.04 }
+      else if (s.mov.type === 'crumble' && s.preWarn != null && !s.gone && world.time - s.preWarn < 4) { const k = Math.min(1, (world.time - s.preWarn) * 2); ox = (Math.random() - 0.5) * 0.04 * k; oy = -0.07 * k + (Math.random() - 0.5) * 0.03 } // v32 前の板: 先にひびが入って揺れ、少し沈む（見た目だけ）
       // v31: 崩れた板は、その場で消さずに 1.2 秒かけて回りながら落ちる（後ろで崩れ落ちるのが見える）
       const fa = s.mov.type === 'crumble' && s.gone && s.goneAt != null ? world.time - s.goneAt : -1
       if (fa >= 0 && fa < 1.2) { const k = s.id % 2 ? 1 : -1; _m.premultiply(_r.makeRotationAxis(_y.set(...s.ax[2]).normalize(), k * fa * 1.4)); oy -= 4.9 * fa * fa + fa * 0.6 }
@@ -326,7 +327,7 @@ export function updateMovers(movers, world, cam) {
       mesh.visible = !s.gone || (fa >= 0 && fa < 1.2)
     } else if (s.type === 'arc') {
       // 抜ける床・崩れる敷石: その場で、抜ける前はガタガタ揺れ、抜けたら消える
-      const sh = s.warnT != null && !s.gone ? 0.05 : (s.mov.type === 'crumble' && s.touch > 0 && !s.gone ? 0.04 * s.touch / s.mov.delay : 0)
+      const sh = s.warnT != null && !s.gone ? 0.05 : (s.mov.type === 'crumble' && s.touch > 0 && !s.gone ? 0.04 * s.touch / s.mov.delay : (s.mov.type === 'crumble' && s.preWarn != null && !s.gone && world.time - s.preWarn < 4 ? 0.06 : 0))
       const fa = s.mov.type === 'crumble' && s.gone && s.goneAt != null ? world.time - s.goneAt : -1 // v31: 崩れた敷石は 1.2 秒かけて落ちる
       _m.makeTranslation(sh ? (Math.random() - 0.5) * sh : 0, (sh ? -Math.random() * sh : 0) - (fa >= 0 && fa < 1.2 ? 4.9 * fa * fa + fa * 0.6 : 0), 0); mesh.visible = !s.gone || (fa >= 0 && fa < 1.2)
     } else if (s.type === 'sph') {

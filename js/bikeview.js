@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=31'
+import { BIKE, basis, wheelCenter } from './physics.js?v=32'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -21,6 +21,7 @@ function profile(pts, depth, bevel = 0.012) {
 }
 export class BikeView {
   // v28: ライトを光らせる（0..1）
+  flinch() { this._flinch = performance.now() }
   setLamp(k) { if (!this.lampM) return; this.lampM.emissiveIntensity = 0.05 + k * 6; this.lampLight.intensity = k * 600; this.lampGlow.visible = k > 0.02; this.lampGlow.material.opacity = Math.min(1, k) }
   constructor(scene, o = {}) {
     this.root = new THREE.Group(); this.root.name = o.ghost ? 'ghost' : 'bike'
@@ -192,7 +193,9 @@ export class BikeView {
     const crouch = Math.max(0, Math.min(1, (s.s[0] + s.s[1]) / (2 * P.travel) * 1.4 + this._kn * 0.6))
     const air = !b.g[0] && !b.g[1], wh = b.g[0] && !b.g[1] && s.th > 0.25
     const lean = Math.max(-1, Math.min(1, s.lean + (wh ? -0.35 : 0) + (!air && !wh ? Math.max(-0.3, Math.min(0.35, s.th * 0.9)) : 0)))
-    if (!this.fly) this.pose(lean, crouch, air)
+    // v32 カラスが当たった直後: 乗り手がのけぞる（0.7 秒。見た目だけ）
+    const fk = this._flinch ? Math.max(0, 1 - (performance.now() - this._flinch) / 700) : 0
+    if (!this.fly) this.pose(fk > 0 ? Math.max(-1, lean - 1.2 * Math.sin(fk * Math.PI)) : lean, crouch, air)
     if (this.nFill) { const n = Math.max(0.001, b.nitro ?? 1); this.nFill.scale.y = n; this.nFill.position.y = -0.16 * (1 - n); this.nFillM.emissiveIntensity = 0.5 + (b.nitroOn ? 1.2 : 0) }
     if (this.flame) {
       const on = !!b.nitroOn; this._fl = (this._fl || 0) + ((on ? 1 : 0) - (this._fl || 0)) * (on ? 0.5 : 0.25)

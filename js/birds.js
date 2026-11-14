@@ -2,6 +2,7 @@
 // 当たり判定なし（見た目と音だけ）。出し直したら、また止まっている。
 // 絵: Crow（Poly by Google・CC BY 3.0）を止まっている姿に、飛ぶ時は体を前へ倒して羽を 2 枚（翼の形の板）足して羽ばたかせる。
 // 全部の鳥を 1 つの InstancedMesh でまとめて描き、カメラから遠い群れ（130m 超）は描かない。
+import { strikerSpot } from './strike.js?v=32'
 import * as THREE from 'three'
 
 const FAR = 130
@@ -55,6 +56,8 @@ export class Birds {
     // v28: 中盤の道の真ん中に、近づいても飛ばない群れ（6 羽）。クラクションで飛ぶ（game.js）
     this.blocker = blockerSpot(course)
     if (this.blocker) this.flocks.push(this.blocker)
+    this.striker = strikerSpot(course); if (this.striker) this.striker.birds = [{ off: [0, 0], yaw: this.striker.yaw, ph: 0 }]
+    if (this.striker) this.flocks.push(this.striker)
     this.total = this.flocks.reduce((a, f) => a + f.birds.length, 0)
     this.ready = false
     this.reset()
@@ -80,7 +83,7 @@ export class Birds {
   }
   // 止まっている姿へ戻す（出し直し・コースの読み直し）
   reset() {
-    for (const f of this.flocks) { f.state = 'perch'; f.t = 0; for (const b of f.birds) { b.pos = [f.p[0] + Math.cos(f.yaw) * b.off[0] + Math.sin(f.yaw) * b.off[1], f.p[1], f.p[2] - Math.sin(f.yaw) * b.off[0] + Math.cos(f.yaw) * b.off[1]]; b.vel = [0, 0, 0]; b.fy = b.yaw; b.hop = 0 } }
+    for (const f of this.flocks) { f.state = f.strike ? 'wait' : 'perch'; f.t = 0; for (const b of f.birds) { b.pos = [f.p[0] + Math.cos(f.yaw) * b.off[0] + Math.sin(f.yaw) * b.off[1], f.p[1], f.p[2] - Math.sin(f.yaw) * b.off[0] + Math.cos(f.yaw) * b.off[1]]; b.vel = [0, 0, 0]; b.fy = b.yaw; b.hop = 0 } }
   }
   // 群れを飛び立たせる（クラクション。from: 鳴らした所）
   flush(f, from) {
@@ -88,13 +91,16 @@ export class Birds {
     f.state = 'fly'; f.t = 0
     for (const b of f.birds) { const ax = b.pos[0] - from[0], az = b.pos[2] - from[2], al = Math.hypot(ax, az) || 1, sp = 3 + Math.random() * 2.5, a = Math.atan2(az / al, ax / al) + (Math.random() - 0.5) * 1.6; b.vel = [Math.cos(a) * sp, 2.8 + Math.random() * 1.8, Math.sin(a) * sp]; b.delay = Math.random() * 0.25; b.fy = Math.atan2(-b.vel[2], b.vel[0]) }
   }
+  // 体当たりの 1 羽: from から to へ dur 秒でまっすぐ飛ぶ。当たったら strikeHit で、はじかれて落ちていく
+  strikeStart(from, to, dur) { const f = this.striker; if (!f || f.state !== 'wait') return; f.state = 'fly'; f.t = 0; f.hit = false; const b = f.birds[0]; b.pos = from.slice(); b.vel = [(to[0] - from[0]) / dur, (to[1] - from[1]) / dur, (to[2] - from[2]) / dur]; b.delay = 0; b.fy = Math.atan2(-b.vel[2], b.vel[0]); b.spin = 0 }
+  strikeHit(hx, hz) { const f = this.striker; if (!f || f.state !== 'fly') return null; f.hit = true; const b = f.birds[0]; b.vel = [-b.vel[0] * 0.25 + hx * 2, 3.2, -b.vel[2] * 0.25 + hz * 2]; return b.pos.slice() }
   dispose() { if (this.body) this.scene.remove(this.body, this.wings) }
   // bike: { p, speed }。cam: カメラの位置。返り: 飛び立った群れ（音を鳴らすため）
   update(dt, bike, cam) {
     this.time += dt
     const ev = []
     if (bike) for (const f of this.flocks) {
-      if (f.state !== 'perch' || f.block) continue // 居座る群れは近づいても飛ばない（クラクションで飛ぶ）
+      if (f.state !== 'perch' || f.block || f.strike) continue // 居座る群れは近づいても飛ばない（クラクションで飛ぶ）
       const d = Math.hypot(bike.p[0] - f.p[0], bike.p[2] - f.p[2]), dy = Math.abs(bike.p[1] - 0.8 - f.p[1])
       const R = 4 + Math.min(14, Math.max(0, bike.speed) * 0.75) // 速いほど遠くから気づく
       if (d < R && dy < 4) {
@@ -110,7 +116,7 @@ export class Birds {
     }
     for (const f of this.flocks) if (f.state === 'fly') {
       f.t += dt
-      for (const b of f.birds) { if (f.t < b.delay) continue; b.vel[1] += 1.6 * dt; for (let k = 0; k < 3; k++) b.pos[k] += b.vel[k] * dt }
+      for (const b of f.birds) { if (f.t < b.delay) continue; if (!f.strike || f.hit) b.vel[1] += (f.hit ? -4 : 1.6) * dt; if (f.hit) b.spin = (b.spin || 0) + dt * 9; for (let k = 0; k < 3; k++) b.pos[k] += b.vel[k] * dt }
       if (f.t > 9) f.state = 'gone'
     }
     if (!this.ready) return ev
@@ -120,7 +126,7 @@ export class Birds {
     for (const f of this.flocks) {
       const far = !cam || Math.hypot(cam.x - f.p[0], cam.z - f.p[2]) > FAR
       for (const b of f.birds) {
-        if (far || f.state === 'gone') { hide(); this.body.setMatrixAt(k++, m); this.wings.setMatrixAt(kw++, m); this.wings.setMatrixAt(kw++, m); continue }
+        if (far || f.state === 'gone' || f.state === 'wait') { hide(); this.body.setMatrixAt(k++, m); this.wings.setMatrixAt(kw++, m); this.wings.setMatrixAt(kw++, m); continue }
         const tt = this.time + b.ph
         if (f.state === 'perch' || f.t < b.delay) {
           // 止まっている: ときどき首を振る・向きを変える・小さく跳ねる
@@ -133,7 +139,7 @@ export class Birds {
         }
         // 飛んでいる: 体を前へ倒し、進む向きを向いて、翼を速く羽ばたかせる
         const ft = f.t - b.delay, fl = Math.sin(tt * 26 + ft * 4) * (0.9 - Math.min(0.4, ft * 0.08))
-        e.set(0, b.fy, -0.25 - Math.min(0.35, ft * 0.6)); q.setFromEuler(e)
+        e.set(f.hit ? (b.spin || 0) : 0, b.fy, f.hit ? (b.spin || 0) * 0.7 : -0.25 - Math.min(0.35, ft * 0.6)); q.setFromEuler(e)
         pos.set(b.pos[0], b.pos[1] + 0.12, b.pos[2])
         m.compose(pos, q, sc); this.body.setMatrixAt(k++, m)
         for (const side of [-1, 1]) {

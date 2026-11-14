@@ -8,15 +8,16 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=31'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=31'
-import { COURSES } from './course.js?v=31'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=31'
-import { BikeView, snap } from './bikeview.js?v=31'
-import { createBot, botInput, resetBot } from './bot.js?v=31'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=31'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=31'
-import { Birds } from './birds.js?v=31'
+import { buildGimmicks } from './gimmicks.js?v=32'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=32'
+import { COURSES } from './course.js?v=32'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=32'
+import { BikeView, snap } from './bikeview.js?v=32'
+import { createBot, botInput, resetBot } from './bot.js?v=32'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=32'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=32'
+import { Birds } from './birds.js?v=32'
+import { crowPush } from './strike.js?v=32'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -435,6 +436,7 @@ function placeBike(b) {
   if (G.birds) G.birds.reset() // 出し直したら、鳥はまた止まっている
   boomReset()
   G.horn = null; if (bikeView) bikeView.setLamp(0) // 出し直したら、群れはまた居座っている
+  G.strikeVis = false // 体当たりのカラスも戻る（バイクは新しく作るので、当たった印も消える）
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
   if (bikeView) bikeView.resetRider()
@@ -582,6 +584,25 @@ let whyT = 0
 function why(txt) { const el = $('why'); el.textContent = txt; el.classList.add('on'); clearTimeout(whyT); whyT = setTimeout(() => el.classList.remove('on'), 1800) }
 function flash(kind) { const f = $('flash'); f.className = kind; requestAnimationFrame(() => requestAnimationFrame(() => { f.className = '' })) }
 
+// v32 横から飛んできたカラスがライダーに当たる（js/strike.js。押す量はバイクの状態だけで決まるので、ゴーストも同じに押す）
+function strikeStep(b, main) {
+  const S = G.birds && G.birds.striker; if (!S || !G.course.climb) return
+  const r = crowPush(b, S); if (!r || !main) return
+  if (r.t === 'near' && !G.strikeVis && r.along > -Math.max(5, b.speed * 0.6)) {
+    G.strikeVis = true
+    const hx = Math.cos(S.yaw), hz = -Math.sin(S.yaw), rx = Math.sin(S.yaw), rz = Math.cos(S.yaw), dur = Math.max(0.35, -r.along / Math.max(1, b.speed))
+    const to = [S.p[0], S.p[1] + 1.7, S.p[2]], from = [to[0] + rx * S.side * 9 + hx * 2, to[1] + 1.2, to[2] + rz * S.side * 9 + hz * 2]
+    G.birds.strikeStart(from, to, dur); Snd.play('flap', { vol: 0.7, rate: 1.4 })
+  }
+  if (r.t === 'hit') {
+    G.strikeN = (G.strikeN || 0) + 1
+    const p = G.birds.strikeHit(r.h[0], r.h[1]) || [b.p[0], b.p[1] + 0.9, b.p[2]]
+    Snd.play('caw', { vol: 1, rate: 1.45 }); Snd.play('flap', { vol: 0.9, rate: 1.7 }); Snd.play('grunt', { vol: 0.8 })
+    dust.emit(p, 26, 2.6, { col: 0x1a1a1e, up: 1.5, size: 0.7 }) // 羽が散る
+    dust.emit(p, 10, 2.0, { col: 0x3a3a40, up: 0.8, size: 0.5 })
+    if (bikeView && bikeView.flinch) bikeView.flinch()
+  }
+}
 function fixedStep() {
   const b = G.bike, c = G.course
   const inp = gatherInput()
@@ -591,6 +612,7 @@ function fixedStep() {
   G.prev = snap(b)
   if (G.running) G.world.tick()
   stepBike(G.world, b, inp, ev)
+  strikeStep(b, true)
   if (G.running) { G.rec.inp.push(inp); G.steps++; G.time = G.steps * DT }
   if (G.ghost && G.running) stepGhost()
   for (const e of ev) {
@@ -612,7 +634,10 @@ function fixedStep() {
     if (e.t === 'thud') { const k = Math.min(1, e.v / 16); Snd.play('land', { vol: 0.7 + k * 0.3 }); Snd.play('clank', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.1 + k * 0.1); flash('bad'); if (b.cn[0]) dust.emit(b.cn[0].q, 14, 3.5) }
     if (e.t === 'crumble') { Snd.play('crack', { vol: e.fast ? 1 : 0.7 }); Snd.play('creak', { vol: 0.5 }); if (e.fast) Snd.play('rockfall', { vol: 0.7 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) { const h = [Math.cos(b.psi), 0, -Math.sin(b.psi)]; dust.emit([c0[0], c0[1] + 0.2, c0[2]], 26, 3, { col: 0x8a7a68, up: 2, size: 1.6 }); dust.emit([c0[0] + h[0] * 0.5, c0[1] + 0.1, c0[2] + h[2] * 0.5], 18, 4, { col: 0x5a4a3c, heavy: 1, up: 3, size: 0.8 }) } }
     // v31: 崩れる板に乗った瞬間（どの速さでも）: 大きくきしむ・ひびの音・砂ぼこり
-    if (e.t === 'crumbleTouch') { Snd.play('creak', { vol: 0.9, rate: 1.1 }); Snd.play('crack', { vol: 0.45, rate: 1.3 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) dust.emit([c0[0], c0[1] + 0.15, c0[2]], 14, 2.2, { col: 0x9a8a76, up: 1.2, size: 1.2 }) }
+    if (e.t === 'crumbleTouch') { Snd.play('creak', { vol: 0.9, rate: 1.1 }); Snd.play('crack', { vol: 0.45, rate: 1.3 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) dust.emit([c0[0], c0[1] + 0.15, c0[2]], 14, 2.2, { col: 0x9a8a76, up: 1.2, size: 1.2 })
+      // v32 これから乗る前の板（8m 先まで）にも先にひびが入り、揺れて沈み始める・破片が前と横へ飛ぶ（前を見ていて分かる）
+      if (c0) { const hx = Math.cos(b.psi), hz = -Math.sin(b.psi); G.crumbles = G.crumbles || G.world.shapes.filter(x => x.mov && x.mov.type === 'crumble')
+        for (const x of G.crumbles) { if (x.gone || x.preWarn != null && G.world.time - x.preWarn < 4) continue; const c1 = x.c || x.tc; if (!c1) continue; const dx = c1[0] - c0[0], dz = c1[2] - c0[2], al = dx * hx + dz * hz; if (al > 0.5 && al < 8 && Math.abs(-dx * hz + dz * hx) < 3 && Math.abs(c1[1] - c0[1]) < 1.5) { x.preWarn = G.world.time; dust.emit([c1[0], c1[1] + 0.1, c1[2]], 6, 2.4, { col: 0x6a5a48, heavy: 1, up: 2.2, size: 0.6 }) } } } }
     if (e.t === 'trapwarn') { Snd.play('pebbles', { vol: 0.9 }); Snd.play('creak', { vol: 0.6 }); dust.emit(e.p, 10, 1.5) }
     if (e.t === 'trapfall') { Snd.play('crack', { vol: 0.9 }); Snd.play('rockfall', { vol: 0.6 }); dust.emit(e.p, 22, 3) }
     if (e.t === 'break') { Snd.play('crack', { vol: 1 }); Snd.play('rockbreak', { vol: 0.7 }); G.shake = Math.max(G.shake, 0.12); dust.emit(b.p, 30, 5) }
@@ -654,6 +679,7 @@ function stepGhost() {
   if (!inp) return
   gh.prevSnap = snap(gh.bike)
   stepBike(G.world, gh.bike, inp)
+  strikeStep(gh.bike, false)
   gh.i++
 }
 function finish() {
@@ -933,6 +959,7 @@ function frame(now) {
       if (e.t === 'splash') Snd.play('splash', { vol: 0.8 })
       if (e.t === 'rockWarn') Snd.play('pebbles', { vol: v * 0.8 })
       if (e.t === 'rockFall') Snd.play('rockfall', { vol: v * 0.9 })
+      if (e.t === 'collapse') { Snd.play('rumble', { vol: Math.min(1, v * 1.2) }); setTimeout(() => Snd.play('rockbreak', { vol: v * 0.9 }), 600 + Math.random() * 300) }
       if (e.t === 'rockHit') { Snd.play('rockbreak', { vol: v }); if (d < 14) G.shake = Math.max(G.shake, 0.08 * v) }
     }
     updateFlames(built.flames, tm); updateFlames(built.farGlow, tm)

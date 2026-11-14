@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=31'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=32'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -158,6 +158,21 @@ export function buildGimmicks(course, scene, M) {
     const lt = new THREE.PointLight(0x5fb8ff, 3, 5, 2); lt.position.set(cn.p[0], cn.p[1] + 0.65, cn.p[2]); group.add(lt)
     group.add(g); return { cn, g, lt }
   })
+  // v32 崩れ落ちる空中回廊: 近づくと道の外へ倒れる塔・柱（見た目だけ。道には入らない）と、近づくと落ちる道の塊
+  const towerMat = M.tower || M.ruinwall || canMat, chunkMat = M.castle || M.ruinwall || canMat
+  const fallers = (course.decor || []).filter(d => d.kind === 'fallTower').map(d => {
+    const g = new THREE.Group(); g.position.set(d.p[0], d.p[1], d.p[2]); group.add(g)
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(d.r, d.r * 1.12, d.h, 14), towerMat); body.position.y = d.h / 2; body.castShadow = true; body.receiveShadow = true; g.add(body)
+    const crown = new THREE.Mesh(new THREE.CylinderGeometry(d.r * 1.25, d.r * 1.1, 0.7, 14), towerMat); crown.position.y = d.h + 0.35; crown.castShadow = true; g.add(crown)
+    for (let k = 0; k < 4; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(d.r * 0.5, 0.9, d.r * 0.5), towerMat); const a = k / 4 * Math.PI * 2; m.position.set(Math.cos(a) * d.r * 1.05, d.h + 1.1, Math.sin(a) * d.r * 1.05); g.add(m) } // 胸壁の欠片
+    const axis = new THREE.Vector3(d.fwd[0], 0, d.fwd[2]).normalize()
+    return { d, g, axis, t0: null }
+  })
+  const chunks = (course.decor || []).filter(d => d.kind === 'fallChunk').map(d => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(d.h[0] * 2, d.h[1] * 2, d.h[2] * 2), chunkMat); m.position.set(d.c[0], d.c[1], d.c[2]); m.rotation.y = d.yaw; m.castShadow = true; m.receiveShadow = true; group.add(m)
+    return { d, m, t0: null }
+  })
+  const updrafts = (course.decor || []).filter(d => d.kind === 'updraft')
   // 前輪を掛ける縁: 角に欠けかけた石の並び（見た目だけ）
   for (const d of (course.decor || []).filter(d => d.kind === 'hangLip')) {
     const ax = [d.b[0] - d.a[0], d.b[1] - d.a[1], d.b[2] - d.a[2]], L = Math.hypot(...ax), n = Math.max(2, Math.round(L / 0.45))
@@ -231,6 +246,21 @@ export function buildGimmicks(course, scene, M) {
       }
       this.gust = gustNear
       streak.update(dt)
+      // v32 倒れる塔・落ちる道の塊・上昇気流の粒
+      for (const F of fallers) {
+        const d = F.d
+        if (F.t0 == null && bike && Math.hypot(bike.p[0] - d.trig[0], bike.p[2] - d.trig[2]) < 9 && Math.abs(bike.p[1] - d.trig[1]) < 6) { F.t0 = tm; out.push({ t: 'collapse', p: [d.p[0], d.p[1] + 1.5, d.p[2]] }); for (let k = 0; k < 24; k++) dustP.emit([d.p[0], d.p[1] + 1.6, d.p[2]], [0, 1.5, 0], 3.5, 1.2, 0.7) }
+        if (F.t0 != null) { const t = tm - F.t0, ang = Math.min(2.2, 0.75 * t * t); F.g.quaternion.setFromAxisAngle(F.axis, d.side * ang); if (t > 0.9 && t < 1.0) for (let k = 0; k < 6; k++) pebbles.emit([d.p[0], d.p[1] + d.h * 0.6, d.p[2]], [0, 2, 0], 5, 9.8, 0.8); if (t > 4) F.g.position.y = d.p[1] - (t - 4) * (t - 4) * 4.9; F.g.visible = t < 7
+          if (t > 8 && bike && Math.hypot(bike.p[0] - d.p[0], bike.p[2] - d.p[2]) > 70) { F.t0 = null; F.g.quaternion.identity(); F.g.position.set(d.p[0], d.p[1], d.p[2]); F.g.visible = true } }
+      }
+      for (const K of chunks) {
+        const d = K.d
+        if (K.t0 == null && bike && Math.hypot(bike.p[0] - d.trig[0], bike.p[2] - d.trig[2]) < 6 && Math.abs(bike.p[1] - d.trig[1]) < 6) { K.t0 = tm; out.push({ t: 'collapse', p: d.c.slice() }); for (let k = 0; k < 30; k++) dustP.emit([d.c[0], d.c[1] + 0.8, d.c[2]], [0, 1.0, 0], 3.2, 1.0, 0.7); for (let k = 0; k < 20; k++) pebbles.emit([d.c[0], d.c[1] + 0.6, d.c[2]], [0, 3, 0], 5, 9.8, 0.9) }
+        if (K.t0 != null) { const t = tm - K.t0; K.m.position.y = d.c[1] - 4.9 * t * t; K.m.rotation.x = t * 0.6; K.m.rotation.z = t * 0.35; K.m.visible = t < 3.5
+          if (t > 6 && bike && Math.hypot(bike.p[0] - d.c[0], bike.p[2] - d.c[2]) > 60) { K.t0 = null; K.m.position.set(d.c[0], d.c[1], d.c[2]); K.m.rotation.set(0, d.yaw, 0); K.m.visible = true } }
+      }
+      for (const U of updrafts) { if (!camPos || Math.hypot(camPos.x - U.lip[0], camPos.z - U.lip[2]) > 160) continue
+        const n0 = Math.min(6, Math.floor(dt * 70 + Math.random())); for (let k = 0; k < n0; k++) { const al = 10 + Math.random() * 105, lat = (Math.random() - 0.5) * 22, y = U.lip[1] - 40 + Math.random() * 38; streak.emit([U.lip[0] + U.f[0] * al + Math.sin(U.yaw) * lat, y, U.lip[2] + U.f[2] * al + Math.cos(U.yaw) * lat], [0, 9, 0], 0.6, 0, 0.9) } }
       for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; c.lt.intensity = gone ? 0 : 3; if (!gone) c.g.rotation.y = tm * 1.4 }
       // 旗: なびき（布の端ほど大きく揺れる）。通った旗は明るくなる
       for (const fl of flags) {

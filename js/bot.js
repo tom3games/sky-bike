@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=31'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=31'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=32'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=32'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -15,7 +15,7 @@ export function createBot(course, o = {}) {
   for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
   return { fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
-export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.glPh = 0; bot.glGo = false }
+export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
 function nearest(bot, b, from, to) {
   let best = 1e9, bi = from
   const scan = (a, z) => { for (let i = Math.max(0, a); i < Math.min(bot.path.length, z); i++) {
