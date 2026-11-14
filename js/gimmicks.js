@@ -149,15 +149,18 @@ export function buildGimmicks(course, scene, M) {
   // 燃料の缶（ニトロ）: 赤い金属の携行缶と青い光の輪。拾うと消えて 25 秒で戻る
   const canGeo = new THREE.BoxGeometry(0.26, 0.36, 0.14), capGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.06, 10)
   const canMat = new THREE.MeshStandardMaterial({ color: 0x9a2a1e, roughness: 0.45, metalness: 0.6 }), ringMat = new THREE.MeshBasicMaterial({ color: 0x5fb8ff, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false })
+  const haloMat = new THREE.SpriteMaterial({ map: canvasT(64, 64, (g, w, h) => { const gr = g.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); gr.addColorStop(0, 'rgba(255,255,255,0.9)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.35)'); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h) }), color: 0x8fd0ff, transparent: true, opacity: 0.6, blending: THREE.AdditiveBlending, depthWrite: false })
   const cans = (course.cans || []).map(cn => {
     const g = new THREE.Group(); g.name = 'pickup'; g.position.set(cn.p[0], cn.p[1] + 0.45, cn.p[2]) // 拾う物（当たりなし。ghostwall は数えない）
     const body = new THREE.Mesh(canGeo, canMat); body.castShadow = true; g.add(body)
     const cap = new THREE.Mesh(capGeo, M.gold || canMat); cap.position.set(0.07, 0.21, 0); g.add(cap)
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 6, 32), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.4; g.add(ring)
-    // v29: 光は缶の組の外に置き、拾った時は明るさを 0 にするだけ（見えなくすると光の数が変わって、全部の材料のシェーダが作り直しになり、スマホで画面が止まっていた）
-    const lt = new THREE.PointLight(0x5fb8ff, 3, 5, 2); lt.position.set(cn.p[0], cn.p[1] + 0.65, cn.p[2]); group.add(lt)
-    group.add(g); return { cn, g, lt }
+    const halo = new THREE.Sprite(haloMat); halo.scale.set(1.2, 1.2, 1); halo.position.y = 0.3; g.add(halo) // 遠くからも光って見える（光の代わり）
+    group.add(g); return { cn, g, d: 0 }
   })
+  // v51 缶の光は 2 つだけ使い回す（缶ごとに光を持つと全部の材料が全部の光を毎画素計算して重い）。
+  // 光の数はずっと 2 のまま（数が変わると全部の材料のシェーダが作り直しになりスマホで止まる）。近い缶 2 つに付け、3 番目と入れ替わる所はなめらかに
+  const canLights = [0, 1].map(() => { const l = new THREE.PointLight(0x5fb8ff, 0, 5, 2); group.add(l); return l })
   // v32 崩れ落ちる空中回廊: 近づくと道の外へ倒れる塔・柱（見た目だけ。道には入らない）と、近づくと落ちる道の塊
   const towerMat = M.tower || M.ruinwall || canMat, chunkMat = M.castle || M.ruinwall || canMat
   const fallers = (course.decor || []).filter(d => d.kind === 'fallTower').map(d => {
@@ -267,7 +270,11 @@ export function buildGimmicks(course, scene, M) {
       }
       for (const U of updrafts) { if (!camPos || Math.hypot(camPos.x - U.lip[0], camPos.z - U.lip[2]) > 160) continue
         const n0 = Math.min(6, Math.floor(dt * 70 + Math.random())); for (let k = 0; k < n0; k++) { const al = 10 + Math.random() * 105, lat = (Math.random() - 0.5) * 22, y = U.lip[1] - 40 + Math.random() * 38; streak.emit([U.lip[0] + U.f[0] * al + Math.sin(U.yaw) * lat, y, U.lip[2] + U.f[2] * al + Math.cos(U.yaw) * lat], [0, 9, 0], 0.6, 0, 0.9) } }
-      for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; c.lt.intensity = gone ? 0 : 3; if (!gone) c.g.rotation.y = tm * 1.4 }
+      { const vp = bike ? bike.p : camPos ? [camPos.x, camPos.y, camPos.z] : null, near = []
+        for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; if (gone) continue; c.g.rotation.y = tm * 1.4; if (vp) { c.d = Math.hypot(c.cn.p[0] - vp[0], c.cn.p[1] - vp[1], c.cn.p[2] - vp[2]); near.push(c) } }
+        near.sort((a, b) => a.d - b.d)
+        const dn = near.length > canLights.length ? near[canLights.length].d : 1e9
+        canLights.forEach((l, k) => { const c = near[k]; if (!c) { l.intensity = 0; return } l.position.set(c.cn.p[0], c.cn.p[1] + 0.65, c.cn.p[2]); l.intensity = 3 * Math.min(1, (dn - c.d) / 4) * Math.max(0, Math.min(1, (70 - c.d) / 20)) }) }
       // 旗: なびき（布の端ほど大きく揺れる）。通った旗は明るくなる
       for (const fl of flags) {
         const reached = R && R.rest != null && fl.f.cp <= R.rest && (R.restSeen || {})[fl.f.cp]

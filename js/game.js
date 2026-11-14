@@ -141,7 +141,26 @@ const grade = new ShaderPass({
       gl_FragColor = c; }`,
 })
 composer.addPass(grade)
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() }) // composer.setSize が GTAO・ブルームも画素比どおりに合わせる
+// v51 解像度の自動調整: 1 コマの時間（なめらかにした値）が 1 秒続けて 20ms を超えたら画素比を一段下げ（1.75→1.5→1.25→1）、
+// 3 秒続けて余裕があれば一段戻す。戻してすぐ（6 秒以内）また下げた時は、次に戻すまでの待ちを倍に（行ったり来たりしない）。?ar=0 で止める
+const PR_MAX = Math.min(devicePixelRatio, lowEnd ? 1.25 : 1.75)
+const PR_STEPS = [PR_MAX, ...[1.5, 1.25, 1].filter(v => v < PR_MAX - 0.1)]
+const AR = window.__skyAR = { on: Q.get('ar') !== '0', steps: PR_STEPS, lv: 0, ema: 16.7, slow: 0, fast: 0, hold: 2, upWait: 3, lastUp: -99, t: 0, log: [], composer, gtao, bloom } // composer 等は検査用
+function setPR(pr) { renderer.setPixelRatio(pr); renderer.setSize(innerWidth, innerHeight); composer.setPixelRatio(pr) }
+function adaptRes(dt) {
+  AR.t += dt
+  if (!AR.on || document.hidden || !window.__skyReady || dt <= 0) return
+  if (AR.hold > 0) { AR.hold -= dt; return }
+  AR.ema += (Math.min(dt * 1000, 50) - AR.ema) * 0.05
+  if (AR.ema > 20) { AR.slow += dt; AR.fast = 0 } else if (AR.ema < 17.5) { AR.fast += dt; AR.slow = 0 } else { AR.slow = 0; AR.fast = 0 }
+  let to = AR.lv
+  if (AR.slow > 1 && AR.lv < PR_STEPS.length - 1) { to = AR.lv + 1; if (AR.t - AR.lastUp < 6) AR.upWait = Math.min(60, AR.upWait * 2) }
+  else if (AR.fast > AR.upWait && AR.lv > 0) { to = AR.lv - 1; AR.lastUp = AR.t }
+  if (to === AR.lv) return
+  AR.lv = to; setPR(PR_STEPS[to]); AR.slow = AR.fast = 0; AR.hold = 0.5; AR.ema = 17
+  AR.log.push([+AR.t.toFixed(1), PR_STEPS[to]]); if (AR.log.length > 40) AR.log.shift()
+}
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
 Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
@@ -1144,7 +1163,7 @@ function aimLights(p) {
   hemi.groundColor.setHex(0x2a2520).lerp(_c1.setHex(0x6a2a10), lava * 0.6)
   sky.position.copy(camera.position)
   // 近い火に光を付ける（近い順）
-  const pts = built.flamePts
+  const pts = built && built.flamePts // 読み込み中（built がまだ無い）のタイトルの1コマ目で落ちていた
   if (pts && pts.length) {
     if (!G._lt || G._lt-- <= 0) { G._lt = 6; G._near = pts.map((q, i) => [i, (q[0] - p.x) ** 2 + (q[1] - p.y) ** 2 * 1.5 + (q[2] - p.z) ** 2]).sort((a, b) => a[1] - b[1]).slice(0, torchLights.length); G.nearFire = G._near.length ? Math.sqrt(G._near[0][1]) : 99 }
     const tm = performance.now() / 1000
@@ -1293,6 +1312,7 @@ G.fps = 0
 function frame(now) {
   requestAnimationFrame(frame)
   let dt = Math.min(0.1, (now - last) / 1000); last = now
+  adaptRes(dt)
   frames++; fpsT += dt; if (fpsT > 1) { G.fps = frames / fpsT; frames = 0; fpsT = 0 }
   if (G.state === 'play' && !G.paused && !G.hold) { if (fallSkipStep(dt)) dt = 0; else dt = advance(dt) }
   const alpha = G.state === 'play' ? Math.min(1, G.acc / DT) : 1
