@@ -3,6 +3,7 @@
 //   燃料の缶で満タンにしてニトロで崩れる橋を渡り切る。倒れる物は道の外へ倒れる（道には入らない）。理不尽に落とさない
 // 2 天空城への大ジャンプ: 急な下りの助走路（缶あり）→ 踏み切り → 4〜6 秒飛んで、天空城の広い着地坂へ。
 //   着地坂は、ふつうの速さで飛んだ線に沿わせた形（まっすぐ着けば転ばない）。空中で後ろ体重を続ければ宙返りもできる
+import { drum } from './drum.js?v=35'
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 
@@ -60,6 +61,22 @@ export function finale(B) {
   B.crumbleRun(36, 14, 3.6, 0.32)
   B.road(8, { ...C, kind: 'landing' })
   B.closeMark()
+  // ---------------- v35 回る筒（廃工場の巨大な筒の内側を一周する。js/drum.js）
+  { const F = { w: 4.2, mat: 'grate', thick: 1.2 }
+    B.zone = 'factory'
+    B.road(6, F)
+    B.cp('回る筒の手前', { w: 4.2, rest: true })
+    B.mark('回る筒')
+    B.road(12, F)
+    B.can(4)
+    B.torch(1, -2, { w: 4.2, down: 1 }); B.torch(-1, -2, { w: 4.2, down: 1 })
+    B.road(26, { ...F, kind: 'drumRun' })
+    drum(B)
+    B.road(16, { ...F, back: 0 })
+    B.torch(1, -3, { w: 4.2, down: 1 }); B.torch(-1, -3, { w: 4.2, down: 1 })
+    B.road(4, F)
+    B.closeMark()
+    B.zone = 'castle' }
   // ---------------- 天空城への大ジャンプ
   B.road(6, C)
   B.cp('大ジャンプの助走', { w: 4.2, rest: true })

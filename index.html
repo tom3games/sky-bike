@@ -10,7 +10,7 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="SKY BIKE">
 <meta property="og:description" content="奈落の底から雲の上の城まで、崩れた塔をトライアルバイクで登る。振り子の鉄球、湧き水、跳ね橋、落石。落ちたら下の周から。">
-<meta property="og:image" content="https://tom3games.com/play/sky-bike/og.png?v=34">
+<meta property="og:image" content="https://tom3games.com/play/sky-bike/og.png?v=35">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="https://tom3games.com/play/sky-bike/">
@@ -20,7 +20,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=Shippori+Mincho+B1:wght@600;800&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=34">
+<link rel="stylesheet" href="style.css?v=35">
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
 </head>
 <body>
@@ -80,6 +80,8 @@
   <div id="toast"></div>
   <div id="why"></div>
   <div id="tut"><span id="tutKey"></span><span id="tutTxt"></span></div>
+  <div id="story"></div>
+  <div id="talk"><span id="talkTxt"></span><span class="nx" id="talkNx"></span></div>
   <div id="keysMini"></div>
   <div class="tbar">
     <button id="bCp" class="ic" aria-label="休憩所からやり直す"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 1 0 2.2-5.1" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 3.5v4.5h4.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -106,6 +108,7 @@
     <div class="tk-row"><span data-t="time">時間</span><b id="rTime">0:00.00</b></div>
     <div class="tk-row"><span data-t="faults">フォルト</span><b id="rFaults">0</b></div>
     <div class="tk-row"><span data-t="best">自己ベスト</span><b id="rBest">—</b></div>
+    <div class="tk-row tk-item" id="rItem" hidden><span data-t="items">持ち物</span><b><img id="rItemImg" alt=""><span id="rItemTxt"></span></b></div>
     <div class="stamp" id="rMedal">金</div>
     <div class="tk-btns">
       <button id="rRetry" class="go" data-t="retry">もう一回</button>
@@ -148,8 +151,9 @@
   },12000);
 })();
 </script>
-<script src="js/sfx.js?v=34"></script>
+<div id="letter"><p id="letterTxt"></p></div>
+<script src="js/sfx.js?v=35"></script>
 <script src="support.js?v=4" data-ja="ガソリン代" data-en="a tank of gas" data-follow="ktomo_dev" defer></script>
-<script type="module" src="js/game.js?v=34"></script>
+<script type="module" src="js/game.js?v=35"></script>
 </body>
 </html>

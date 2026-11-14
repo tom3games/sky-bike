@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=34'
+import { arcPoint } from './physics.js?v=35'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -176,7 +176,7 @@ function arcGeometry(s) {
 
 // コース全体のメッシュ。区間（zone）× 90m の升目 × 材料ごとにまとめる（升目ごとに画面外・影の外を省ける）。
 // 遠い升目は「影」用の軽いメッシュ（欠けなし・小物なし・模様なし・影なし）に切り替える。返り値の group は検査の光線にも使う
-const HIDE = new Set(['barrel', 'statue']) // 模型で見せる物（当たりは同じ大きさの円柱）
+const HIDE = new Set(['barrel', 'statue', 'drum']) // 模型で見せる物（当たりは同じ大きさの円柱）
 const CELL = 90
 const FAR_SKIP = new Set(['parapet', 'post', 'gate', 'sign', 'rail', 'log', 'web', 'flange', 'door', 'ball', 'pad', 'ceiling', 'pillar', 'barrel', 'statue', 'rock'])
 const cellOf = s => { const x = (s.min[0] + s.max[0]) / 2, z = (s.min[2] + s.max[2]) / 2; return Math.floor(x / CELL) + ',' + Math.floor(z / CELL) }

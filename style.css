@@ -138,3 +138,23 @@ html[lang=en] .stamp{font-size:15px}
 #nitroHud.on{filter:drop-shadow(0 0 10px rgba(130,200,255,.95))}
 /* 遊び方: ニトロの行が増えた分、背の低い画面では詰める（もどるボタンが画面に収まるように） */
 @media (max-height:940px){.how-lead{margin:6px 0 8px;font-size:13px}.keys th,.keys td{padding:2px 8px 2px 0}.tips{margin:6px 0}.tips li{margin:1px 0;font-size:12.5px;line-height:1.45}.credit{margin-top:4px;font-size:11px}.panel .go{margin-top:8px}}
+/* v35 兄の跡の一行（画面の下に小さく。走りを止めない） */
+#story{position:absolute;left:50%;bottom:calc(12% + var(--bot));transform:translateX(-50%);max-width:92vw;font:600 clamp(13px,1.6vw,16px) var(--min);letter-spacing:.1em;color:#d9d2c0;text-shadow:0 1px 10px rgba(0,0,0,.95),0 0 2px #000;opacity:0;transition:opacity 1.2s;white-space:nowrap;pointer-events:none}
+#story.on{opacity:.92;transition:opacity .6s}
+/* v35 廃墟の男の言葉: 汚れた紙切れ（破れた縁・しみ・折り目。角丸の板にしない） */
+#talk{position:absolute;left:50%;bottom:calc(24% + var(--bot));transform:translate(-50%,6px) rotate(-1.2deg);min-width:min(300px,80vw);max-width:88vw;padding:16px 26px 18px 24px;color:#2a2117;font:700 clamp(16px,2.1vw,21px) var(--min);letter-spacing:.06em;line-height:1.5;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;
+  background:radial-gradient(ellipse at 18% 30%,rgba(120,86,40,.28),rgba(120,86,40,0) 38%),radial-gradient(ellipse at 82% 76%,rgba(96,70,36,.32),rgba(96,70,36,0) 30%),radial-gradient(circle at 64% 18%,rgba(70,50,28,.2),rgba(70,50,28,0) 12%),linear-gradient(97deg,rgba(0,0,0,0) 48.6%,rgba(80,60,34,.18) 49.6%,rgba(0,0,0,0) 50.8%),linear-gradient(176deg,#cdbb8c,#b9a26f 60%,#a88e5c);
+  clip-path:polygon(0 7%,6% 2%,13% 5%,22% 0,31% 4%,42% 1%,50% 5%,61% 0,70% 3%,79% 0,88% 4%,96% 1%,100% 8%,98% 22%,100% 37%,97% 52%,100% 68%,98% 84%,100% 95%,92% 100%,83% 96%,72% 100%,63% 97%,52% 100%,41% 96%,30% 100%,20% 97%,9% 100%,0 94%,2% 78%,0 62%,3% 46%,0 30%,2% 16%);filter:drop-shadow(0 6px 14px rgba(0,0,0,.55))}
+#talk.on{opacity:1;transform:translate(-50%,0) rotate(-1.2deg)}
+#talk .nx{position:absolute;right:14px;bottom:6px;font:600 11px var(--goth);color:rgba(50,38,24,.55);letter-spacing:.1em}
+#talk img{display:block;width:96px;height:96px;margin:2px auto 6px}
+/* v35 兄の手紙（ゴールの門の前） */
+#letter{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,7,6,0);transition:background 2.2s;pointer-events:none;z-index:29}
+#letter p{font:700 clamp(18px,2.6vw,26px) var(--min);letter-spacing:.14em;color:#e6dcc4;text-shadow:0 2px 16px #000;opacity:0;transition:opacity 1.4s;padding:0 20px;text-align:center}
+#letter.on{background:rgba(6,7,6,.94)}
+#letter.on p{opacity:1}
+#letter.peek{background:linear-gradient(180deg,rgba(6,7,6,.95) 0,rgba(6,7,6,.6) 22%,rgba(6,7,6,0) 45%),radial-gradient(ellipse 55% 55% at 50% 66%,rgba(6,7,6,0),rgba(6,7,6,.85) 100%);transition:none}
+#letter.peek p{opacity:0;transition:none}
+#letter.on.quiet p{opacity:0;transition:opacity .4s}
+.tk-item{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
+.tk-item img{width:44px;height:44px}

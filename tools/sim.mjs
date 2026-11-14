@@ -6,9 +6,10 @@ import { spawnAtCp, judge, doRespawn } from '../js/run.js'
 export function runSim(cid, skill, o = {}) {
   const c = COURSES[cid](), w = new World(c.shapes); w.winds = c.winds || []
   const bot = createBot(c, { skill, react: o.react || 0, lat: o.lat || 0, vMul: o.vMul || 1 }); bot.world = w
-  const R = { cp: 0, rest: 0, hard: !!o.hard }
+  const st = o.start || 0 // v35: 途中の旗から（START=旗の番号）
+  const R = { cp: st, rest: st, hard: !!o.hard }
   let faults = 0, steps = 0, log = [], inputs = [], maxY = -1e9, nets = 0, lastGround = null
-  let b = spawnAtCp(w, c, 0); resetBot(bot, b)
+  let b = spawnAtCp(w, c, st); resetBot(bot, b)
   const maxSteps = (o.maxSec || 400) * 60
   const perCp = {}
   const brNx = {}; c.path.forEach(q => { if (q.branch && q.nx != null) brNx[q.br] = q.nx })
@@ -44,7 +45,7 @@ export function runSim(cid, skill, o = {}) {
 if ((process.argv[1] || '').endsWith('sim.mjs')) {
   const [cid = 'practice', skill = 'good', maxSec = 300] = process.argv.slice(2)
   const t0 = Date.now()
-  const r = runSim(cid, skill, { maxSec: +maxSec, react: +(process.env.REACT || 0), hard: !!process.env.HARD })
+  const r = runSim(cid, skill, { maxSec: +maxSec, react: +(process.env.REACT || 0), hard: !!process.env.HARD, start: +(process.env.START || 0) })
   const fails = {}; for (const l of r.log) { const k = l.cp + ':' + l.why; fails[k] = (fails[k] || 0) + 1 }
   console.log(cid, skill, 'finished', r.finished, 'time', r.time.toFixed(1), 'faults', r.faults, 'maxY', r.maxY.toFixed(1), r.finished ? '' : 'at cp ' + r.cp + ' ' + r.cpName, 'wall', Date.now() - t0, 'ms')
   console.log(' fails', JSON.stringify(fails))

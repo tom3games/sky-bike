@@ -257,7 +257,20 @@ function seesawPose(s) {
   s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa + R0[k] * kd * (1 - ca)); s.ax = nb.ax
 }
 // 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } }
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } resetDrums(world) }
+// v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
+export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world) }
+function setGates(world) { for (const s of world.moving) if (s.mov.type === 'gate') s.gone = s.mov.drumR.open ? s.mov.side === 'B' : s.mov.side === 'A' }
+function drumTrack(world, b, ev) {
+  for (const D of world.drums) {
+    const dx = b.p[0] - D.c[0], dy = b.p[1] - D.c[1], dz = b.p[2] - D.c[2], lat = dx * D.ax[0] + dz * D.ax[2]
+    const fw = dx * D.f[0] + dz * D.f[2], r = Math.sqrt(fw * fw + dy * dy)
+    if (Math.abs(lat) > D.hw + 1.5 || r > D.R + 1.5) { if (b._dph && b._dph.id === D.id) b._dph = null; continue }
+    const ph = datan2(fw, -dy), prev = b._dph && b._dph.id === D.id ? b._dph.ph : null
+    if (prev != null && !D.open && prev > 2.3 && ph < -2.3 && r > D.R - 2.0 && !b.crashed) /* 真上を面の近くで越えた（真上で一瞬浮いても数える。真ん中を落ちていく時は数えない） */ { D.open = true; setGates(world); if (ev) ev.push({ t: 'drumTurn', id: D.id }) }
+    b._dph = { id: D.id, ph }
+  }
+}
 // 乗ると一緒に運ばれる動く床の種類
 const CARRY = new Set(['lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge', 'wave', 'kick', 'shuttle', 'topple'])
 // v16: 床の加速を体に感じる（床の座標系の見かけの力）。止まる跳ね板から飛び出す・揺れる吊り橋から投げ出される
@@ -278,11 +291,12 @@ export class World {
     this.shapes = shapes
     this.grid = new Map()
     this.stamp = new Int32Array(shapes.length); this.st = 0
-    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.hangs = []; this.trigs = []; this.bridges = []; this.time = 0
+    this.big = []; this.moving = []; this.winds = []; this.traps = []; this.hangs = []; this.trigs = []; this.bridges = []; this.drums = []; this.time = 0
     shapes.forEach((s, id) => {
       s.id = id
       if (s.mov && s.mov.type === 'wave' && !this.bridges.includes(s.mov.br)) this.bridges.push(s.mov.br)
       if (s.hang) this.hangs.push(s)
+      if (s.mov && s.mov.type === 'gate' && !this.drums.includes(s.mov.drumR)) this.drums.push(s.mov.drumR) // v35 回る筒
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
         // 動く足場: 動く範囲を全部含む箱で当たりの候補に入れる
@@ -303,6 +317,7 @@ export class World {
     })
     this.buf = []
     this.setTime(0)
+    resetDrums(this)
   }
   // 時刻 t（秒）の位置に動く足場を置く。決まった式なので、同じ時刻なら同じ位置
   setTime(t) {
@@ -543,6 +558,7 @@ export function stepBike(world, b, inp, ev) {
   if (b.hang) { hangStep(world, b, inp, ev); b.steps++; return }
   for (let k = 0; k < SUB; k++) sub(world, b, inp, ev)
   if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
+  if (!b.ghost && world.drums.length) drumTrack(world, b, ev)
   if (!b.ghost) v16Track(world, b, ev)
   b.steps++
 }
@@ -729,7 +745,7 @@ function sub(world, b, inpIn, ev) {
 }
   // ---- 止まってブレーキを押し続けた時間（下がるかどうか）
   // 動く床の上か（床の速さに対する速さで止まっているかを見る。床の上では、止まっているブレーキは床と一緒に運ばれるだけ。下がるのは長押しした時だけ）
-  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; const still = sh => sh.mov.type === 'crumble' || sh.mov.type === 'brk' || (sh.mov.type === 'kick' && sh.mov.trig == null) // v29: 下りて止まっている跳ね板の上はふつうの床（ブレーキ長押しで下がれる）
+  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; const still = sh => sh.mov.type === 'crumble' || sh.mov.type === 'brk' || sh.mov.type === 'gate' || (sh.mov.type === 'kick' && sh.mov.trig == null) // v29: 下りて止まっている跳ね板の上はふつうの床（ブレーキ長押しで下がれる）
     b.onMov = !!((sh0 && sh0.mov && !still(sh0)) || (sh1 && sh1.mov && !still(sh1))) }
   const vr = b.vtRel != null ? b.vtRel : b.speed
   // v29 本人「ジャンプ台に乗ったままバックできない」: 登り坂（車体が 8 度より上を向いている）では、前体重のままでも・少し動いていても下がれる

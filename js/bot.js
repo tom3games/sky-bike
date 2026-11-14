@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=34'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=34'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=35'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=35'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -266,6 +266,8 @@ export function botInput(bot, b) {
     const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
     if (o) { thr = o.thr; brk = o.brk; lean = o.lean; if (o.steer != null) steer = o.steer; if (o.nitroOff) nitroNeed = false; bot.stuckT = 0; bot.backT = 0; bot.waiting = true }
   }
+  // v35 回る筒: 助走から筒を出るまで全開（人も同じ。遅いと真上で落ちる）
+  if (b._dph || cur.kind === 'drum' || cur.kind === 'drumRun' || SQ.slice(0, 30).some(j => path[j].kind === 'drum')) { thr = 1; brk = 0; lean = 0; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   const inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })

@@ -20,6 +20,7 @@
 - assets/moonless_golf_1k.hdr: Poly Haven / CC0 / https://polyhaven.com/a/moonless_golf
 - assets/models/Barrel_01・gothic_statue・large_iron_gate: Poly Haven / CC0 / https://polyhaven.com/models
 - assets/models/Rider.glb: Quaternius「Ultimate Modular Men」Swat（アニメを外した）/ CC0 / https://quaternius.com
+- assets/models/Hermit.glb: Quaternius「Ultimate Modular Men」Farmer（使うアニメ 5 本だけ残した。廃墟に住む男）/ CC0 / https://quaternius.com
 - snd/creak_a.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/creak_b.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/creak_c.mp3: 50 RPG sound effects / Kenney / CC0

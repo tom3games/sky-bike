@@ -2,7 +2,7 @@
 // 同じ高さで別の区間の道が交わる所（意図しない合流）を数える。node tools/overlap.mjs [stage1|practice]
 import { COURSES } from '../js/course.js'
 const c = COURSES[process.argv[2] || 'stage1']()
-const P = c.path.map((q, i) => ({ ...q, i })).filter(q => q.p && q.w > 0 && q.kind !== 'jump' && !q.branch) // 枝道（近道の着地坂）は、本線と重なるように作ってある
+const P = c.path.map((q, i) => ({ ...q, i })).filter(q => q.p && q.w > 0 && q.kind !== 'jump' && q.kind !== 'drum' && !(c.drums || []).some(D => Math.hypot(q.p[0] - D.c[0], q.p[2] - D.c[2]) < D.R + 1) && !q.branch) // v35: 回る筒の中の道は自分の助走路の上を通る（作りどおり）。枝道（近道の着地坂）は、本線と重なるように作ってある
 let ng = 0; const ex = []
 for (let a = 0; a < P.length; a++) for (let b = a + 1; b < P.length; b++) {
   const A = P[a], Bq = P[b]; if (Bq.i - A.i < 25) continue

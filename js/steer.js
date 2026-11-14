@@ -1,7 +1,7 @@
 // ハンドルは自動（Trials と同じく、人が操るのはアクセル・ブレーキ・重心の前後だけ）。
 // コースの線（path）をなぞる向きにハンドルを切る。ゲームと検査（bot）で同じものを使う。
 // 速すぎると曲がり切れずに外へふくらむ（ハンドルの切れる量は physics.js が速さで絞る）。だから曲がり角の前はブレーキ。
-import { STEER_DK } from './physics.js?v=34'
+import { STEER_DK } from './physics.js?v=35'
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 
 // 向きのずれ・目標点へのずれ・横のずれ・曲がりの先取り の重み（tools/steertest.mjs で決めた）
@@ -51,6 +51,7 @@ export function resetSteer(st, b) { st.i = 0; track(st, b); return st }
 // 返り: -1（左）..1（右）。lat はわざと道の中心から横へずらす量（検査で端を走らせる時）
 export function steerFor(st, b, lat = 0) {
   const path = st.path, i = track(st, b), sp = b.speed
+  if (path[i].kind === 'drum') return 0 // v35 回る筒の中: まっすぐ（逆さまの間にハンドルを切ると向きが逆に効く）
   if (sp < -0.15) return steerBack(st, b, i)
   let k = i, dist = 0
   const look = Math.max(2.5, Math.abs(sp) * 0.35)
