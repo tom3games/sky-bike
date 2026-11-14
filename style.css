@@ -41,6 +41,18 @@ button{background:none;border:0;cursor:pointer}
 .course:not(.main) b{font-size:clamp(17px,1.9vw,22px);color:var(--ash)}
 .course:hover,.course:focus-visible{outline:none;border-left-color:var(--fireHi)}
 .course:hover b,.course:focus-visible b{color:var(--fireHi)}
+/* v51 続きから: 開くと旗の行（区間の名前と高さ）。同じ左の線の字で、一段下げる */
+.t-cont{display:flex;flex-wrap:wrap;gap:0 4px;margin:-2px 0 4px 20px;max-width:min(560px,86vw)}
+.cpt{display:flex;align-items:baseline;gap:8px;padding:9px 12px 9px 10px;min-height:44px;border-left:2px solid rgba(194,122,64,.45);text-align:left;transition:border-color .2s,color .2s}
+.cpt b{font:700 clamp(15px,1.6vw,18px) var(--min);letter-spacing:.08em;color:var(--bone)}
+.cpt small{font-size:12px;color:var(--ash);letter-spacing:.04em}
+.cpt:hover,.cpt:focus-visible{outline:none;border-left-color:var(--fireHi)}.cpt:hover b,.cpt:focus-visible b{color:var(--fireHi)}
+.course.cont[aria-expanded=true]{border-left-color:var(--fireHi)}.course.cont[aria-expanded=true] b{color:var(--bone)}
+.course.cont b::after{content:'';display:inline-block;width:.32em;height:.32em;margin:0 0 .2em .45em;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);opacity:.6;transition:transform .2s}
+.course.cont[aria-expanded=true] b::after{transform:rotate(45deg)}
+.t-menu.cont-open .course[data-course]{display:none}
+@media (max-width:520px){.t-cont{flex-direction:column;gap:0}} /* 縦のスマホは 1 列（折り返しで 1 つだけ下に落ちない） */
+.norec{font-style:normal;font-size:11px;color:var(--ash);letter-spacing:.08em;padding:1px 6px;border:1px solid rgba(169,166,156,.4);align-self:center}
 .t-foot{display:flex;flex-wrap:wrap;gap:4px 18px}
 .link{font-size:13px;color:var(--ash);padding:8px 2px;letter-spacing:.04em}
 .link:hover{color:var(--bone)}
