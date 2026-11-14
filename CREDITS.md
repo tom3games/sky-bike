@@ -49,3 +49,4 @@
 - snd/crow_0.mp3: Crow / fvcalderan / CC0 / OpenGameArt
 - assets/models/crow.glb（道に止まるカラス）: Crow / Poly by Google / CC BY 3.0 / https://poly.pizza/m/1MIvWQ5Q3R9
 - 泥: zones の泥の坂から後輪が抜けた時に本人の声の「ブリュッ」（snd/mudfart_0〜2、高さ3種）。浮いた間は泥扱い・3秒に1回まで。録音者は本人なので CREDITS 不要
+- ニトロ切れ: ニトロを使い切った瞬間に本人の声の「プスッ」（snd/pusu_0〜2、高さ3種）とマフラーの白い煙
