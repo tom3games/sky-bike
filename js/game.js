@@ -8,18 +8,18 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=35'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=35'
-import { COURSES } from './course.js?v=35'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=35'
-import { BikeView, snap } from './bikeview.js?v=35'
-import { createBot, botInput, resetBot } from './bot.js?v=35'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=35'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=35'
-import { Birds } from './birds.js?v=35'
-import { crowPush } from './strike.js?v=35'
-import { buildV35, hankieDataURL } from './v35view.js?v=35'
-import { resetDrums } from './physics.js?v=35'
+import { buildGimmicks } from './gimmicks.js?v=35b'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=35b'
+import { COURSES } from './course.js?v=35b'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=35b'
+import { BikeView, snap } from './bikeview.js?v=35b'
+import { createBot, botInput, resetBot } from './bot.js?v=35b'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=35b'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=35b'
+import { Birds } from './birds.js?v=35b'
+import { crowPush } from './strike.js?v=35b'
+import { buildV35, hankieDataURL } from './v35view.js?v=35b'
+import { resetDrums } from './physics.js?v=35b'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -268,9 +268,13 @@ function loadCourse(id) {
   G.steer = createSteer(c.path)
   // v27: 序盤の赤いドラム缶のうち、道がいちばん先に近くを通る 1 個は、近くを通ると爆発する（見た目と音だけ。バイクには何もしない）
   G.boom = null
-  if (c.climb) { let best = null; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel') return; let bi = -1, bd = 1e9; c.path.forEach((q, i) => { if (!q.p || q.branch) return; const d = Math.hypot(q.p[0] - sh.a[0], q.p[2] - sh.a[2]); if (Math.abs(q.p[1] - sh.a[1]) < 1.5 && d < bd) { bd = d; bi = i } }); if (bd < 4.5 && (!best || bi < best.i)) best = { si, i: bi, a: sh.a.slice(), b: sh.b.slice() } }); G.boom = best
-    // v31 上に積んである缶（下の缶の上の面の上・横 0.8m 以内）も連鎖して爆発する
-    if (best) { best.ups = []; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel' || si === best.si) return; const dy = sh.a[1] - best.a[1]; if (dy > 0.5 && dy < 2.2 && Math.hypot(sh.a[0] - best.a[0], sh.a[2] - best.a[2]) < 0.8) best.ups.push({ si, a: sh.a.slice(), b: sh.b.slice(), delay: 0.2 + 0.2 * (best.ups.length % 2) + 0.12 * Math.floor(dy / 0.9) }) }) } }
+  // v36 本人「上の缶が爆発しない」: 積んである缶の山（横に並んだ缶・上に乗った缶）のうち、道がいちばん先に近くを通る山の一番下の缶が爆発し、山の缶は全部 0.2〜0.4 秒ずつ遅れて連鎖する
+  if (c.climb) { const cand = []; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel') return; let bi = -1, bd = 1e9; c.path.forEach((q, i) => { if (!q.p || q.branch) return; const d = Math.hypot(q.p[0] - sh.a[0], q.p[2] - sh.a[2]); if (Math.abs(q.p[1] - sh.a[1]) < 1.5 && d < bd) { bd = d; bi = i } }); if (bd < 4.5) cand.push({ si, i: bi, a: sh.a.slice(), b: sh.b.slice() }) })
+    const pile = x => { const out = [], todo = [x], seen = new Set([x.si]); while (todo.length) { const y = todo.pop(); c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel' || seen.has(si)) return; const dy = sh.a[1] - y.a[1]; if (dy > -0.3 && dy < 1.2 && Math.hypot(sh.a[0] - y.a[0], sh.a[2] - y.a[2]) < 1.0) { seen.add(si); const z = { si, a: sh.a.slice(), b: sh.b.slice() }; out.push(z); todo.push(z) } }) } return out }
+    cand.sort((p, q) => p.i - q.i)
+    let best = cand.find(x => pile(x).some(z => z.a[1] > x.a[1] + 0.5) && !pile(x).some(z => z.a[1] < x.a[1] - 0.3)) || cand[0] || null
+    if (best) { best.ups = pile(best).sort((p, q) => (p.a[1] - q.a[1]) || (Math.hypot(p.a[0] - best.a[0], p.a[2] - best.a[2]) - Math.hypot(q.a[0] - best.a[0], q.a[2] - best.a[2]))).map((z, k) => ({ ...z, delay: 0.2 + 0.18 * k })) }
+    G.boom = best }
   // v22: 道に止まっているカラス（近づくと飛び立つ。当たりなし）
   if (G.birds) G.birds.dispose()
   G.birds = c.climb ? new Birds(scene, c) : null
