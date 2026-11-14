@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=43'
+import { BIKE, basis, wheelCenter } from './physics.js?v=44'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -194,7 +194,8 @@ export class BikeView {
     this._kn = Math.max((this._kn || 0) * 0.86, Math.min(1, sv * 0.35))
     const crouch = Math.max(0, Math.min(1, (s.s[0] + s.s[1]) / (2 * P.travel) * 1.4 + this._kn * 0.6))
     const air = !b.g[0] && !b.g[1], wh = b.g[0] && !b.g[1] && s.th > 0.25
-    const lean = Math.max(-1, Math.min(1, s.lean + (wh ? -0.35 : 0) + (!air && !wh ? Math.max(-0.3, Math.min(0.35, s.th * 0.9)) : 0)))
+    let lean = Math.max(-1, Math.min(1, s.lean + (wh ? -0.35 : 0) + (!air && !wh ? Math.max(-0.3, Math.min(0.35, s.th * 0.9)) : 0)))
+    if (b.hang) lean = -0.85 // v44 本人「壁に体が埋まる」: 高い縁に前輪を掛けている間は、車体が立つので体を後ろへ反らせる（見た目だけ。前へ倒すと縁の面に頭と胴が入っていた）
     // v32 カラスが当たった直後: 乗り手がのけぞる（0.7 秒。見た目だけ）
     const fk = this._flinch ? Math.max(0, 1 - (performance.now() - this._flinch) / 700) : 0
     if (!this.fly) this.pose(fk > 0 ? Math.max(-1, lean - 1.2 * Math.sin(fk * Math.PI)) : lean, crouch, air)

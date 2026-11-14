@@ -39,6 +39,7 @@ export function buildLady(course, group, M, loader) {
         else if (/Skin/.test(n)) c.multiplyScalar(0.95) }
       if (o.isBone && o.name === 'Chest') { o.scale.set(1.06, 1.0, 1.14); for (const ch of o.children) if (ch.isBone) ch.scale.set(1 / 1.06, 1, 1 / 1.14) } // 胸まわりを少し豊かに（子の骨は元の大きさへ戻す）
     })
+    m.userData.bust = bust(m)
     const box = new THREE.Box3().setFromObject(m), s = 1.7 / (box.max.y - box.min.y); m.scale.setScalar(s)
     L.root = new THREE.Group(); L.root.add(m); group.add(L.root); L.root.visible = false
     L.mixer = new THREE.AnimationMixer(m)
@@ -66,4 +67,31 @@ export function buildLady(course, group, M, loader) {
     L.mixer.update(dt)
   }
   return L
+}
+
+// v44 本人「もっと爆乳に」: ドレスの胴の頂点を、胸の 2 つの中心から丸くふくらませる（骨に付いたまま動く。服は覆ったまま・肌は増やさない）
+export const BUST = { amt: 0.75, R: 0.95, up: 0.42, side: 0.6, inset: 0.45 }
+function bust(root) {
+  root.updateMatrixWorld(true)
+  let chest = null, neck = null; root.traverse(o => { if (o.isBone && o.name === 'Chest') chest = o; if (o.isBone && o.name === 'Neck') neck = o })
+  if (!chest || !neck) return 'no bone'
+  const B = { ...BUST, ...(globalThis.__bust || {}) }, info = { n: 0 }
+  const cw = new THREE.Vector3().setFromMatrixPosition(chest.matrixWorld), nw = new THREE.Vector3().setFromMatrixPosition(neck.matrixWorld), H = cw.distanceTo(nw)
+  root.traverse(o => {
+    if (!o.isSkinnedMesh || !/Body/.test(o.name + (o.parent ? o.parent.name : ''))) return
+    const g = o.geometry, p = g.attributes.position, mw = o.matrixWorld, inv = mw.clone().invert(), v = new THREE.Vector3(), d = new THREE.Vector3()
+    let front = -1e9; for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).applyMatrix4(mw); if (Math.abs(v.y - (cw.y + H * B.up)) < H * 0.3 && Math.abs(v.x - cw.x) < H * 0.9) front = Math.max(front, v.z) }
+    if (front < -1e8) return
+    const R = H * B.R, cs = [-1, 1].map(sg => new THREE.Vector3(cw.x + sg * H * B.side, cw.y + H * B.up, front - R * B.inset))
+    for (let i = 0; i < p.count; i++) {
+      v.fromBufferAttribute(p, i).applyMatrix4(mw)
+      let best = null, bk = 0
+      for (const c of cs) { d.subVectors(v, c); const dist = d.length(); if (dist >= R || d.z < -R * 0.15) continue; const u = 1 - (dist / R) ** 2, k = u * u; if (k > bk) { bk = k; best = c } }
+      if (!best) continue
+      d.subVectors(v, best); const len = d.length() || 1; d.multiplyScalar(1 / len); d.z = Math.max(d.z, 0.35); d.normalize()
+      v.addScaledVector(d, H * B.amt * bk); v.applyMatrix4(inv); p.setXYZ(i, v.x, v.y, v.z); info.n++
+    }
+    p.needsUpdate = true; g.computeVertexNormals(); g.computeBoundingSphere()
+  })
+  return info
 }

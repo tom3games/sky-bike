@@ -96,15 +96,20 @@ export function muralSpots(course) {
   for (let i = Math.floor(N * 0.86); i < N * 0.9; i++) { const q = P[i]; if (q.p && q.w >= 3 && ['road', 'orbit', 'pad'].includes(q.kind) && Math.abs(q.slope || 0) < 0.1) { out.push({ k: 3, i, wall: true, p: q.p.slice(), yaw: q.yaw, w: q.w }); break } }
   return out
 }
-export function buildMurals(course, scene) {
+export function buildMurals(course, scene, M) {
   const g = new THREE.Group(); g.name = 'murals'; scene.add(g)
   const spots = muralSpots(course)
   for (const s of spots) {
     if (s.wall) { // 崩れた壁の切れ端と、前の面の壁画（来る人の方へ少し向ける）
       const f = [Math.cos(s.yaw), 0, -Math.sin(s.yaw)], r = [Math.sin(s.yaw), 0, Math.cos(s.yaw)], at = [s.p[0] + f[0] * 9 + r[0] * (s.w / 2 + 1.6), s.p[1], s.p[2] + f[2] * 9 + r[2] * (s.w / 2 + 1.6)]
       const w = new THREE.Group(); w.position.set(...at); w.rotation.y = s.yaw - Math.PI / 2 + 0.55
-      const st = new THREE.Mesh(new THREE.BoxGeometry(7, 7.5, 0.8), new THREE.MeshStandardMaterial({ color: 0x5c5a52, roughness: 0.95 })); st.position.y = 1.6; st.castShadow = true; w.add(st)
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 3.9), new THREE.MeshStandardMaterial({ map: muralTexture(s.k), emissive: 0x3a3226, emissiveIntensity: 0.35, transparent: true, alphaTest: 0.4, roughness: 0.95 })); m.position.set(0, 3.1, 0.41); w.add(m)
+      // v44 本人「謎の壁画が浮いている」: 色だけの箱だった壁を、石積みの崩れた壁にして下へ 6m 伸ばす（道の脇の足場に根を下ろす）。上の端はぎざぎざ
+      const sg = new THREE.BoxGeometry(7, 13.5, 0.9, 8, 6, 1), sp = sg.attributes.position, su = sg.attributes.uv
+      for (let i = 0; i < sp.count; i++) { if (sp.getY(i) > 6.7) sp.setY(i, sp.getY(i) + Math.abs(Math.sin(sp.getX(i) * 1.7 + 0.6)) * 0.9 - 0.15) }
+      for (let i = 0; i < su.count; i++) su.setXY(i, su.getX(i) * 7 / 2.6, su.getY(i) * 13.5 / 2.6)
+      sg.computeVertexNormals()
+      const st = new THREE.Mesh(sg, (M && M.ruinwall) || new THREE.MeshStandardMaterial({ color: 0x5c5a52, roughness: 0.95 })); st.position.y = 5.35 - 6.75; st.castShadow = true; st.receiveShadow = true; w.add(st)
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 3.9), new THREE.MeshStandardMaterial({ map: muralTexture(s.k), emissive: 0x3a3226, emissiveIntensity: 0.35, transparent: true, alphaTest: 0.4, roughness: 0.95 })); m.position.set(0, 3.1, 0.47); w.add(m)
       g.add(w); continue
     }
     const Wm = 6.2, Hm = 3.9, r = s.T.r + 0.42, tl = Wm / r // 塔の柱（壁から 0.15m 出る）と石の凹凸より外

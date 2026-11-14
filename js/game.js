@@ -8,25 +8,25 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=43'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=43'
-import { COURSES } from './course.js?v=43'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=43'
-import { BikeView, snap } from './bikeview.js?v=43'
-import { createBot, botInput, resetBot } from './bot.js?v=43'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=43'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=43'
-import { Birds } from './birds.js?v=43'
-import { crowPush } from './strike.js?v=43'
-import { buildV35, hankieDataURL } from './v35view.js?v=43'
-import { buildV36 } from './v36view.js?v=43'
-import { buildLady } from './lady.js?v=43'
-import { buildBoulder } from './v41view.js?v=43'
-import { buildMotes } from './motes.js?v=43'
-import { buildMurals } from './murals.js?v=43'
-import { buildV37 } from './v37view.js?v=43'
-import { doorAng } from './traps.js?v=43'
-import { resetDrums } from './physics.js?v=43'
+import { buildGimmicks } from './gimmicks.js?v=44'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=44'
+import { COURSES } from './course.js?v=44'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=44'
+import { BikeView, snap } from './bikeview.js?v=44'
+import { createBot, botInput, resetBot } from './bot.js?v=44'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=44'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=44'
+import { Birds } from './birds.js?v=44'
+import { crowPush } from './strike.js?v=44'
+import { buildV35, hankieDataURL } from './v35view.js?v=44'
+import { buildV36 } from './v36view.js?v=44'
+import { buildLady } from './lady.js?v=44'
+import { buildBoulder } from './v41view.js?v=44'
+import { buildMotes } from './motes.js?v=44'
+import { buildMurals } from './murals.js?v=44'
+import { buildV37 } from './v37view.js?v=44'
+import { doorAng } from './traps.js?v=44'
+import { resetDrums } from './physics.js?v=44'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -268,7 +268,7 @@ function loadCourse(id) {
   G.bv = c.climb ? buildBoulder(c, G.ladyG, M) : null // v41 落石の坂の岩
   G.v36 = c.climb ? buildV36(c, scene, M, lateLoader()) : null // v36 罠と猿
   if (G.v36) G.v36.imps.onReady = () => setTimeout(warmShaders, 0)
-  G.murals = c.climb ? buildMurals(c, scene) : null // v36 塔の壁の古い壁画 4 枚
+  G.murals = c.climb ? buildMurals(c, scene, M) : null // v36 塔の壁の古い壁画 4 枚
   G.v37 = c.climb ? buildV37(c, scene, M) : null // v37 草原・風車
   LM.gim = Math.round(lt() - l0); l0 = lt()
   const spot = wide ? { q: c.path[spotI], side: -1 } : null
@@ -494,7 +494,7 @@ function hornUpdate(dt) {
 }
 function placeBike(b) {
   if (G.fallFrom) for (const n of [G.fallFrom.scream, G.fallFrom.crack]) if (n && n.stop) { try { n.stop() } catch (e) {} }
-  G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null
+  G.bike = b; G.prev = snap(b); G.camYaw = b.psi; G.fallFrom = null; if (G.skip && G.skip.ph !== 'in') { G.skip = { ph: 'in', t: 0 } }
   if (G.camOff) { G.camOff.yaw = 0; G.camOff.pitch = 0; G.camOff.idle = 9 } // v19: 出し直したら、マウスで回したカメラも後ろへ戻す（前を向いたまま後ろ向きのカメラで、前へ進むのが後ろへ下がって見えていた）
   if (G.steer) resetSteer(G.steer, b)
   if (G.birds) G.birds.reset() // 出し直したら、鳥はまた止まっている
@@ -545,7 +545,8 @@ function show(id) { if (id !== 'hud') unlockMouse(); for (const s of ['loading',
 // ------------------------------------------------------------ 入力（アクセル・ブレーキ・後ろ体重・前体重の4つ。ハンドルは自動）
 const KEYMAP = { ArrowUp: 'thr', ArrowDown: 'brk', KeyS: 'brk', ArrowLeft: 'back', KeyA: 'back', ArrowRight: 'fwd', KeyD: 'fwd', KeyW: 'nit' } // v38 本人「ニトロは W に」: W はニトロだけ（押すだけで全開）。Space・Shift・N は外した。アクセルは左クリックと ↑ // v17: Space もニトロ（走っている間だけ。結果の画面では「もう一回」）
 addEventListener('keydown', e => {
-  if (G.credits) { e.preventDefault(); if (!e.repeat && G._crSkip) G._crSkip(); return } // v39 エンドクレジットはキーで飛ばす（結果の「もう一回」は押さない）
+  if (G.credits) { e.preventDefault(); if (!e.repeat && G._crSkip) G._crSkip(); return }
+  if (!e.repeat && G.state === 'play' && G.fallFrom && fallSkipNow()) { e.preventDefault() } // 長い落下はキーで飛ばす // v39 エンドクレジットはキーで飛ばす（結果の「もう一回」は押さない）
   if (e.repeat) { if (KEYMAP[e.code]) e.preventDefault(); return }
   startAudio()
   if (KEYMAP[e.code]) { G.keys.add(KEYMAP[e.code]); e.preventDefault() }
@@ -607,6 +608,7 @@ document.querySelectorAll('.tb').forEach(btn => {
   btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up)
 })
 function gatherInput() {
+  if (G.skip && G.skip.ph === 'ff') return { thr: 0, brk: 0, lean: 0, steer: G.bike && !G.bike.crashed && G.steer ? steerFor(G.steer, G.bike) : 0, nitro: 0 } // 落下を飛ばしている間は手を離した入力
   if (G.testInput) { const ti = G.testInput(); if (Q.get('hm')) { hermitHold(ti); ladyHold(ti) } return ti }
   const K = G.keys, T = G.touch, pad = readPad()
   const M = G.mouse || {}
@@ -722,7 +724,7 @@ function drumSound(dt) {
   const cp = camera.position; let d = 1e9; for (const D of G.world.drums) d = Math.min(d, Math.hypot(cp.x - D.c[0], cp.y - D.c[1], cp.z - D.c[2]))
   if (d < 45) { Snd.play('rumble', { vol: Math.min(0.55, (1 - d / 45) * 0.7), rate: 0.7 }); drumSndT = 2.6 } else drumSndT = 1
 }
-addEventListener('pointerdown', e => { if (G.state === 'play' && talking() && isTouch) talkNext() })
+addEventListener('pointerdown', e => { if (G.state === 'play' && talking() && isTouch) talkNext(); if (G.state === 'play' && G.fallFrom) fallSkipNow() })
 // v41 落石の坂: 予告（地鳴り・小石がぱらぱら・坂の上の土煙）→ 転がる音 → 門で割れる（破片と土煙）/ はね飛ばされる
 let bRumbleT = 0
 function boulderFx(e, b) {
@@ -1196,6 +1198,30 @@ function hud() {
 }
 function saveAlt() { try { if (G.course && G.bestAlt != null) { const k = 'sky-alt5-' + G.course.id, o = +localStorage.getItem(k) || 0; if (G.bestAlt > o) localStorage.setItem(k, G.bestAlt) } } catch (e) {} }
 setInterval(saveAlt, 5000)
+// v44 本人「落下した時、ずっと下まで落ちるまで待たなあかん」: 長い落下（1.2 秒たっても、まだ 0.8 秒以上落ちそうな時）は、
+// 0.3 秒で暗くして、物理をそのまま早送り（着地・旗へ戻す などの結果は待った時と同じ）→ 明るくする。落ちている間にタップ/クリック/キーで、すぐ飛ばせる。
+// ジャンプ台・大ジャンプ（kicker から）は G.fallFrom が立たないので対象外。短い落下も対象外
+function fallRemain(b) { const r = G.world.rayDown(b.p[0], b.p[2], b.p[1] - 0.5, b.p[1] - 400); const vy = -b.v[1]; if (!isFinite(r.y)) return 99; const h = Math.max(0, b.p[1] - 0.8 - r.y), g = 9.81; return (-vy + Math.sqrt(vy * vy + 2 * g * h)) / g }
+function fallSkipWant(force) {
+  const F = G.fallFrom, b = G.bike; if (!F || !b || G.skip || G.state !== 'play' || G.noFallSkip) return false
+  if (F.t < (force ? 0.35 : 1.2)) return false
+  return fallRemain(b) > 0.8
+}
+function fallSkipStep(dt) {
+  const fd = $('fade')
+  if (!G.skip) { if (fallSkipWant(false)) { G.skip = { ph: 'out', t: 0 }; G.fallSkips = (G.fallSkips || 0) + 1 } else return false }
+  const S = G.skip; S.t += dt
+  if (S.ph === 'out') { fd.style.opacity = Math.min(1, S.t / 0.3); if (S.t < 0.3) return false; S.ph = 'ff' } // 暗くなる間は落ち続ける
+  if (S.ph === 'ff') {
+    fd.style.opacity = 1
+    const b0 = G.bike; let n = 0
+    while (n < 60 * 25 && G.state === 'play' && G.bike === b0 && G.fallFrom) { fixedStep(); n++ } // 着地するか、旗へ戻されるまで
+    G.acc = 0; G.prev = snap(G.bike); G.camPos.set(NaN, 0, 0); S.ph = 'in'; S.t = 0; S.n = n; return true
+  }
+  if (S.ph === 'in') { fd.style.opacity = Math.max(0, 1 - S.t / 0.3); if (S.t >= 0.3) { G.skip = null; fd.style.opacity = 0 } return false }
+  return false
+}
+function fallSkipNow() { if (fallSkipWant(true)) { G.skip = { ph: 'out', t: 0.2 }; G.fallSkips = (G.fallSkips || 0) + 1; G.fallSkipTap = (G.fallSkipTap || 0) + 1; return true } return false }
 // ------------------------------------------------------------ 主ループ（物理は固定 60Hz）
 let last = performance.now(), frames = 0, fpsT = 0
 G.fps = 0
@@ -1203,7 +1229,7 @@ function frame(now) {
   requestAnimationFrame(frame)
   let dt = Math.min(0.1, (now - last) / 1000); last = now
   frames++; fpsT += dt; if (fpsT > 1) { G.fps = frames / fpsT; frames = 0; fpsT = 0 }
-  if (G.state === 'play' && !G.paused && !G.hold) dt = advance(dt)
+  if (G.state === 'play' && !G.paused && !G.hold) { if (fallSkipStep(dt)) dt = 0; else dt = advance(dt) }
   const alpha = G.state === 'play' ? Math.min(1, G.acc / DT) : 1
   if (G.bike && bikeView) {
     bikeView.sync(G.bike, G.prev, alpha)
@@ -1257,7 +1283,7 @@ function frame(now) {
   if (G.state === 'play' || G.state === 'pause' || G.state === 'result') { if (!endingCam()) updateCamera(dt, alpha); if (G.state !== 'result') hud() }
   else if (G.state !== 'debug') titleCam(tm)
   ash.update(Math.min(dt, 0.05), camera.position, tm)
-  FOGT.value = tm // v43 霧の流れ
+  if (!G.fogFreeze) FOGT.value = tm // v43 霧の流れ（テストで止められる）
   { const zq = G.course && G.course.path[(G.steer && G.bike ? G.steer.i : G.titleI) || 0]; motes.update(Math.min(dt, 0.05), camera.position, tm, zq && zq.zone) } // v43 区間ごとに舞う粒
   soundUpdate(dt)
   renderer.info.reset()

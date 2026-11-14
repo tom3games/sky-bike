@@ -1,7 +1,7 @@
 // 先読みする bot（検査用）。物理が決まっているので、候補の入力を先に試して一番進めるものを選ぶ。
 // 1 回の判断 = 候補の入力を hold 秒続け、その後 roll 秒は普通の bot に任せた結果で比べる
-import { stepBike, BIKE } from './physics.js?v=43'
-import { createBot, botInput } from './bot.js?v=43'
+import { stepBike, BIKE } from './physics.js?v=44'
+import { createBot, botInput } from './bot.js?v=44'
 
 const clone = b => {
   const c = { ...b, p: b.p.slice(), v: b.v.slice(), s: b.s.slice(), sv: b.sv.slice(), g: b.g.slice(), cn: b.cn.slice(), side: b.side.slice(), wheelRot: b.wheelRot.slice(), frame: b.frame.slice() }

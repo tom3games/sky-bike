@@ -4,7 +4,7 @@
 // 割れたらもう一度登って先へ。同じ走りで 1 回（追いつかれて旗から出し直すと、岩はまた来る）。高さは上って下りて元へ戻す（先の道の高さを変えない）
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const DEG = Math.PI / 180
-export const ROCK = { lat: -8.5, laneW: 9.4, R: 2.1, vMax: 6.5, acc: 3.5, warn: 2.0, gateHalf: 1.95, slopeLen: 34, slopeDeg: 9, trigFrac: 0.45, catchD: 0.6 }
+export const ROCK = { lat: 0, R: 2.1, vMax: 6.5, acc: 3.5, warn: 2.0, gateHalf: 1.95, slopeLen: 34, slopeDeg: 9, trigFrac: 0.45, catchD: 0.6 }
 
 export function v41(B) {
   const D = { w: 4.2, mat: 'cobble', thick: 1.2 }
@@ -21,17 +21,11 @@ export function v41(B) {
     B.box({ c: [c[0], c[1] + 2.4, c[2]], h: [0.55, 2.4 + 0.6, 0.55], yaw, mat: 'ruinwall', tag: 'pillar' })
   }
   { const c = add3(gateP, R, 1.5); B.box({ c: [c[0], c[1] + 5.2, c[2]], h: [0.6, 0.35, 1.6], yaw, mat: 'ruinwall', tag: 'pillar' }) } // 片側だけ残ったまぐさ石（道の上 4.8m）
-  // v41b 岩の通り道（道の左に広げた石畳。カメラは道の右後ろにいるので、岩は左寄りを転がると画面の真ん中に来る）。門の左は壁で、岩はここで割れる
-  const laneC = -(D.w / 2 + ROCK.laneW / 2), lane = (p0, len, sl) => { const fr = B.dir(yaw, sl), up = B.upv(yaw, sl); B.box({ c: add3(add3(add3(p0, fr, len / 2), up, -0.6), R, laneC), h: [len / 2, 0.6, ROCK.laneW / 2], yaw, pitch: sl, mat: 'cobble', mu: 1.0, tag: 'road' }) }
-  { const c = add3(gateP, R, laneC - 0.4); B.box({ c: [c[0], c[1] + 1.8, c[2]], h: [0.6, 2.4, ROCK.laneW / 2], yaw, mat: 'ruinwall', tag: 'pillar' }) }
-  lane(add3(gateP, f, 0.6), 5.4, 0)
   B.road(6, D)
   B.mark('落石の坂')
   const slopeI0 = B.path.length, slopeP0 = B.t.p.slice()
-  lane(slopeP0, ROCK.slopeLen, ROCK.slopeDeg * DEG)
   B.road(ROCK.slopeLen, { ...D, slope: ROCK.slopeDeg * DEG, kind: 'road' })
   const slopeI1 = B.path.length
-  lane(B.t.p.slice(), 10, 0)
   B.road(10, D)
   const topI = B.path.length, topP = B.t.p.slice()
   // 坂の向こうは下り（高さを元へ戻す）

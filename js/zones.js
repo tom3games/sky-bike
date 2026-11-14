@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=43'
+import { hbeam } from './course.js?v=44'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -378,7 +378,7 @@ export function belfry(x) {
   orbit(0.4, 0.9)
   gauntlet(x, '鐘楼の回廊', ['gal', 'drop', 'hang', 'hop', 'whoop', 'steep', 'pinch', 'gal', 'drop', 'hop', 'wide'], { cpAt: 6, galMat: 'castle', hangHz: 'ball', T: 3.0, hangMax: 7 })
   B.cp('鐘楼の上', { w: W, rest: true })
-  B.mark('坂のウィリーの溝'); orbit(0.3, 0); B.road(3, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.wheelieGrooves(B, { hang: 1.6, n: 7, slope: 0.16 }); orbit(0.4, 0.3)
+  B.mark('坂のウィリーの溝'); orbit(0.3, 0); B.road(3, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); { const g2 = { hang: 1.2, lip: 0.07, depth: 0.25, n: 3, ...(globalThis.__g2 || {}) }; x.P.wheelieGrooves(B, { hang: g2.hang, n: g2.n, slope: 0.16, land: (7 * 0.66 + 6 * 0.62 - g2.n * 0.66) / (g2.n - 1), lip: g2.lip, depth: g2.depth }); orbit(0.4, 0.3 + 1.6 - g2.hang) } /* v44 本人「猿の後の壁に体が埋まる・その後の凸凹が完走できない」: 高い縁 1.6→1.2m（下げた 0.4m は後の坂で登る）・溝 7→3 本・間を広く・縁の帯 0.1→0.07m・溝の深さ 0.3→0.25m（区間の長さと先の高さは同じ） */
   // 3 シーソーで下りた先の扉（ゆっくり下りたあと、短い助走で扉を破る）
   B.mark('シーソーと扉')
   excursion({

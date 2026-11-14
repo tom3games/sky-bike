@@ -1,9 +1,9 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=43'
-import { ROCK as ROCK0 } from './v41.js?v=43'
-import { nextI } from './steer.js?v=43'
+import { createBike, stepBike, resetFallen } from './physics.js?v=44'
+import { ROCK as ROCK0 } from './v41.js?v=44'
+import { nextI } from './steer.js?v=44'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -120,7 +120,7 @@ export function judge(world, course, R, b, prevP) {
   // v36 小さな猿のような生き物の追いかけ（js/traps.js の chases）
   if (course.chases && course.chases.length && !b.ghost) chaseStep(world, course, R, b, out)
   if (course.boulder && !b.ghost) boulderStep(world, course, R, b, out)
-  if (b.crashed && b.crashed.why === 'boulder' && b.crashed.t < 1.6) return out // はね飛ばされた: 少し見せてから
+  if (b.crashed && b.crashed.why === 'boulder' && b.crashed.t < 4.5) return out // はね飛ばされた: 道の外へ飛んで落ちていく（長い落下は飛ばしで旗へ）
   if (b.crashed && b.crashed.why === 'monkey' && b.crashed.t < 2.4) return out // はたかれた: 乗り手が落ちていく間は待つ
   if (b.crashed && b.crashed.t > 0.8) {
     // 転んだら: 数秒前に車輪が着いていた安全な地点から出し直す（旗までは戻さない）。フォルト 1
@@ -211,7 +211,7 @@ export function boulderStep(world, course, R, b, out) {
   st.bi = bi
   if (st.ph === 'warn') {
     st.s = S[B.topI] + 1.5; st.v = 0
-    if (!b.crashed && st.s - ROCK.R - sb < ROCK.catchD) { st.ph = 'hit'; out.boulder = { ph: 'hit' }; const hx = Math.cos(b.psi), hz = -Math.sin(b.psi); b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }; b.v = [-hx * 5, 3.5, -hz * 5]; return } // 坂の上に止まっている岩へ突っ込んだ
+    if (!b.crashed && st.s - ROCK.R - sb < ROCK.catchD) { st.ph = 'hit'; out.boulder = { ph: 'hit' }; const hx = Math.cos(b.psi), hz = -Math.sin(b.psi); b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }; b.v = [Math.sin(b.psi) * 9 - hx * 3, 6, Math.cos(b.psi) * 9 - hz * 3]; return } // 坂の上に止まっている岩へ突っ込んだ
     if (world.time - st.t0 >= ROCK.warn) { st.ph = 'roll'; st.t1 = world.time; out.boulder = { ph: 'roll' } }
     return
   }
@@ -223,7 +223,7 @@ export function boulderStep(world, course, R, b, out) {
       st.ph = 'hit'; out.boulder = { ph: 'hit' }
       const hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
       b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }
-      b.v = [-hx * 7, 4.5, -hz * 7]
+      { const rx = Math.sin(b.psi), rz = Math.cos(b.psi); b.v = [rx * 9 - hx * 3, 6, rz * 9 - hz * 3] } // v44 道の外（右）へはね飛ばされて、谷へ落ちる
     }
   }
 }

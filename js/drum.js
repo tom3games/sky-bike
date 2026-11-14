@@ -4,7 +4,7 @@
 // 閉じていた B の板が筒と一緒に回って A をふさぐ（A が閉じ、B が開く）。そのまま一周して下へ戻れば、開いた B から前へ抜ける。
 // 遅いと真上の手前で面から離れて落ちる（転んで手前の旗から）。旗から全開で入れば回れる（半径 5.5m: 入る速さ約 9.5m/s 以上）。
 // 当たりは 48 枚の板（見た目は js/v35view.js が筒の形で描く。板は tag 'drum' で描かない）
-import { dsin, dcos } from './physics.js?v=43'
+import { dsin, dcos } from './physics.js?v=44'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 export const DRUM = { R: 5.5, W: 5.6, N: 48, TH: 0.5, GATE: 9 } // GATE: 口の板の枚数（9 枚 = 67.5 度）
 

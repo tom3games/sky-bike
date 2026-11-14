@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=43'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=44'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -165,8 +165,14 @@ export function buildGimmicks(course, scene, M) {
     const body = new THREE.Mesh(new THREE.CylinderGeometry(d.r, d.r * 1.12, d.h, 14), towerMat); body.position.y = d.h / 2; body.castShadow = true; body.receiveShadow = true; g.add(body)
     const crown = new THREE.Mesh(new THREE.CylinderGeometry(d.r * 1.25, d.r * 1.1, 0.7, 14), towerMat); crown.position.y = d.h + 0.35; crown.castShadow = true; g.add(crown)
     for (let k = 0; k < 4; k++) { const m = new THREE.Mesh(new THREE.BoxGeometry(d.r * 0.5, 0.9, d.r * 0.5), towerMat); const a = k / 4 * Math.PI * 2; m.position.set(Math.cos(a) * d.r * 1.05, d.h + 1.1, Math.sin(a) * d.r * 1.05); g.add(m) } // 胸壁の欠片
-    const axis = new THREE.Vector3(d.fwd[0], 0, d.fwd[2]).normalize()
-    return { d, g, axis, t0: null }
+    // v44 本人「崩れる回廊の柱の倒れる向きがおかしい」→ 本人の決め: 道の内側へ、目の前で道をまたぐように倒れる（少し前寄り）。
+    // 根元の内側の縁を軸に 0.8 秒で倒れきり、その後すぐ崩れて沈む（当たりは無し・演出だけ）
+    const R0 = [d.fwd[2] * -1, 0, d.fwd[0]] /* 道の右（B.right と同じ向き） */, inw = [-R0[0] * d.side, 0, -R0[2] * d.side]
+    const a = 15 * Math.PI / 180, D = [inw[0] * Math.cos(a) + d.fwd[0] * Math.sin(a), 0, inw[2] * Math.cos(a) + d.fwd[2] * Math.sin(a)]; { const L = Math.hypot(D[0], D[2]); D[0] /= L; D[2] /= L }
+    const axis = new THREE.Vector3(D[2], 0, -D[0]).normalize() // 上の向きを D へ倒す軸（up × D）
+    g.position.set(d.p[0] + D[0] * d.r, d.p[1], d.p[2] + D[2] * d.r); for (const ch of g.children) { ch.position.x -= D[0] * d.r; ch.position.z -= D[2] * d.r }
+    d.pivot = g.position.toArray()
+    return { d, g, axis, t0: null, D }
   })
   const chunks = (course.decor || []).filter(d => d.kind === 'fallChunk').map(d => {
     const m = new THREE.Mesh(new THREE.BoxGeometry(d.h[0] * 2, d.h[1] * 2, d.h[2] * 2), chunkMat); m.position.set(d.c[0], d.c[1], d.c[2]); m.rotation.y = d.yaw; m.castShadow = true; m.receiveShadow = true; group.add(m)
@@ -250,8 +256,8 @@ export function buildGimmicks(course, scene, M) {
       for (const F of fallers) {
         const d = F.d
         if (F.t0 == null && bike && Math.hypot(bike.p[0] - d.trig[0], bike.p[2] - d.trig[2]) < 9 && Math.abs(bike.p[1] - d.trig[1]) < 6) { F.t0 = tm; out.push({ t: 'collapse', p: [d.p[0], d.p[1] + 1.5, d.p[2]] }); for (let k = 0; k < 24; k++) dustP.emit([d.p[0], d.p[1] + 1.6, d.p[2]], [0, 1.5, 0], 3.5, 1.2, 0.7) }
-        if (F.t0 != null) { const t = tm - F.t0, ang = Math.min(2.2, 0.75 * t * t); F.g.quaternion.setFromAxisAngle(F.axis, d.side * ang); if (t > 0.9 && t < 1.0) for (let k = 0; k < 6; k++) pebbles.emit([d.p[0], d.p[1] + d.h * 0.6, d.p[2]], [0, 2, 0], 5, 9.8, 0.8); if (t > 4) F.g.position.y = d.p[1] - (t - 4) * (t - 4) * 4.9; F.g.visible = t < 7
-          if (t > 8 && bike && Math.hypot(bike.p[0] - d.p[0], bike.p[2] - d.p[2]) > 70) { F.t0 = null; F.g.quaternion.identity(); F.g.position.set(d.p[0], d.p[1], d.p[2]); F.g.visible = true } }
+        if (F.t0 != null) { const t = tm - F.t0, ang = Math.min(Math.PI / 2 + 0.08, 2.45 * t * t); F.g.quaternion.setFromAxisAngle(F.axis, ang); if (t > 1.0) { F.g.position.y = d.p[1] - (t - 1.0) * (t - 1.0) * 7; F.g.visible = t < 2.6 } // 倒れきったら崩れて沈む if (t > 0.9 && t < 1.0) for (let k = 0; k < 6; k++) pebbles.emit([d.p[0], d.p[1] + d.h * 0.6, d.p[2]], [0, 2, 0], 5, 9.8, 0.8);  F.g.visible = t < 7
+          if (t > 8 && bike && Math.hypot(bike.p[0] - d.p[0], bike.p[2] - d.p[2]) > 70) { F.t0 = null; F.g.quaternion.identity(); F.g.position.set(...d.pivot); F.g.visible = true } }
       }
       for (const K of chunks) {
         const d = K.d
