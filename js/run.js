@@ -1,9 +1,9 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=46'
-import { ROCK as ROCK0 } from './v41.js?v=46'
-import { nextI } from './steer.js?v=46'
+import { createBike, stepBike, resetFallen } from './physics.js?v=47'
+import { ROCK as ROCK0 } from './v41.js?v=47'
+import { nextI } from './steer.js?v=47'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -205,14 +205,14 @@ export function boulderStep(world, course, R, b, out) {
   if (st && (st.ph === 'broken' || st.ph === 'hit')) { if (st.ph === 'broken') return; return }
   const bi = nearI(course, b.p, st && st.bi != null ? st.bi : R.onI), sb = S[bi]
   if (!st) {
-    if (bi >= B.slopeI0 + Math.round((B.slopeI1 - B.slopeI0) * ROCK.trigFrac) && bi < B.topI && !b.crashed) { R.bo = st = { ph: 'warn', t0: world.time, bi }; out.boulder = { ph: 'warn' } }
+    if (bi >= B.slopeI0 + Math.round((B.slopeI1 - B.slopeI0) * (R.boTrig ?? ROCK.trigFrac)) && bi < B.topI && !b.crashed) { R.bo = st = { ph: 'warn', t0: world.time, bi, warn: R.boWarn ?? ROCK.warn }; out.boulder = { ph: 'warn' } }
     return
   }
   st.bi = bi
   if (st.ph === 'warn') {
     st.s = S[B.topI] + 1.5; st.v = 0
     if (!b.crashed && st.s - ROCK.R - sb < ROCK.catchD) { st.ph = 'hit'; out.boulder = { ph: 'hit' }; const hx = Math.cos(b.psi), hz = -Math.sin(b.psi); b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }; b.v = [Math.sin(b.psi) * 9 - hx * 3, 6, Math.cos(b.psi) * 9 - hz * 3]; return } // 坂の上に止まっている岩へ突っ込んだ
-    if (world.time - st.t0 >= ROCK.warn) { st.ph = 'roll'; st.t1 = world.time; out.boulder = { ph: 'roll' } }
+    if (world.time - st.t0 >= (st.warn ?? ROCK.warn)) { st.ph = 'roll'; st.t1 = world.time; out.boulder = { ph: 'roll' } }
     return
   }
   if (st.ph === 'roll') {
@@ -227,8 +227,24 @@ export function boulderStep(world, course, R, b, out) {
     }
   }
 }
+// v47 罠の間合いを、走りごと・旗からの出し直しごとに少し変える（覚えても、予告を見て合わせないと抜けられない）。予告の出方は今どおり
+//  鉄骨: 影が出てから落ちるまで 0.7〜1.3 倍（physics girderTrack）・落とし扉: 1 回ごとに閉じている長さ 2.2〜4.2 秒（traps doorAng）
+//  落石の坂: 岩が動き出す所（坂の 32〜58%）と予告の長さ（1.5〜2.5 秒）・落ちてくる石: 周期のずれ
+//  R.seed から決まる（同じ seed なら同じ。sim は TRAPSEED、ゲームは走りの始めに乱数）
+export function rerollTraps(world, R) {
+  if (globalThis.__noTrapRand) { world.rng = null; return }
+  if (R.seed == null) R.seed = 12345
+  const rnd = () => (R.seed = (R.seed * 16807) % 2147483647) / 2147483647
+  world.rng = rnd
+  for (const s of world.moving) { const m = s.mov
+    if (m.door) { m.seed = 1 + Math.floor(rnd() * 99991); if (m.ph0 == null) m.ph0 = m.ph || 0; m.ph = m.ph0 + rnd() * 6 }
+    if (m.type === 'girder') { if (m.T0 == null) m.T0 = m.T; m.Tn = +(m.T0 * (0.7 + 0.6 * rnd())).toFixed(2) }
+    if (m.type === 'drop') { if (m.ph0 == null) m.ph0 = m.ph || 0; m.ph = m.ph0 + rnd() * m.T } }
+  R.boTrig = 0.32 + rnd() * 0.26; R.boWarn = +(1.5 + rnd()).toFixed(2)
+}
 // respawn の指示から新しいバイクを作る
 export function doRespawn(world, course, R, rs) {
+  if (rs.cp != null && world.rng) rerollTraps(world, R) // v47 旗からの出し直しで、罠の間合いを変える
   if (R.ch) for (const k in R.ch) if (R.ch[k].ph !== 'done') delete R.ch[k] // 猿は元の場所へ
   if (R.bo && R.bo.ph !== 'broken') delete R.bo // 落石: 割れる前に出し直したら、また来る
   resetFallen(world) // 抜けた床・崩れた敷石を元に戻す（戻らないと登れなくなる）

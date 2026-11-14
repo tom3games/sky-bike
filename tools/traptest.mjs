@@ -6,7 +6,7 @@ if (process.env.GD2) globalThis.__gD2 = +process.env.GD2
 import { World, createBike, stepBike, resetFallen } from '../js/physics.js'
 import { COURSES } from '../js/course.js'
 import { createBot, botInput, resetBot } from '../js/bot.js'
-import { settle, pathS } from '../js/run.js'
+import { settle, pathS, rerollTraps } from '../js/run.js'
 const c = COURSES.stage1(), S = pathS(c)
 const POL = { 上手い: { skill: 'good' }, '人の速さ0.2秒': { skill: 'good', react: 12 }, '人0.25秒': { skill: 'good', react: 15 }, 全開だけ: { skill: 'bad', full: true } }
 const rows = []
@@ -16,7 +16,7 @@ for (const T of c.traps.filter(t => t.kind !== 'press' && (!process.env.ONLY || 
   for (const [name, o] of Object.entries(POL)) {
     const res = {}, tt = []
     for (let seed = 0; seed < 8; seed++) {
-      const w = new World(c.shapes); w.winds = c.winds; resetFallen(w); w.setTime(seed * 1.37)
+      const w = new World(c.shapes); w.winds = c.winds; resetFallen(w); w.setTime(seed * 1.37); if (!process.env.NORAND) rerollTraps(w, { seed: 1000 + seed * 7919 }) // v47 罠の間合いの乱数
       const q = c.path[i0], b = settle(w, createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw })); const f0 = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)]; b.v = [f0[0] * 8, 0, f0[2] * 8]
       const bot = createBot(c, { skill: o.skill, react: o.react || 0 }); bot.world = w; resetBot(bot, b)
       let r = '進めない'

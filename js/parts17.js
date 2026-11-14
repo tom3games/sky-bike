@@ -64,8 +64,8 @@ export function pegRow(B, o = {}) {
 }
 
 // ============================================================ 試しのコース（v17 の仕掛けを 1 つずつ）
-import { Builder } from './course.js?v=46'
-import { finish16 } from './parts16.js?v=46'
+import { Builder } from './course.js?v=47'
+import { finish16 } from './parts16.js?v=47'
 export function lab17() {
   const B = new Builder([0, 20, 0], 0)
   B.plats = []; B.props = []

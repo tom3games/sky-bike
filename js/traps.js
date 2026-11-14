@@ -7,8 +7,12 @@
 //  chase   小さな猿のような生き物の追いかけ（js/run.js の judge が動かす。ここは場所と速さだけ）
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 export const DOOR_CYC = { closed: 3.2, move: 0.35, open: 2.8 } // 閉じている 3.2 秒 → 0.35 秒で開く → 2.8 秒開いている → 0.35 秒で閉じる（v37: 2.4→3.2 秒）
+// v47 1 回ごとに閉じている長さを変える（周期は同じ。閉じている 2.2〜4.2 秒・開いている残り）。m.seed が無ければ前と同じ
+const doorH = (k, sd) => { let x = (k * 374761393 + sd * 668265263) | 0; x = Math.imul(x ^ (x >>> 13), 1274126177); x ^= x >>> 16; return (x >>> 0) / 4294967296 }
 export function doorAng(m, t) { // 0 = 閉じている、m.up = 開いた角度
-  const C = DOOR_CYC, P = C.closed + C.open + 2 * C.move, ph = ((t + (m.ph || 0)) % P + P) % P
+  const C0 = DOOR_CYC, P = C0.closed + C0.open + 2 * C0.move, u0 = t + (m.ph || 0), ph = (u0 % P + P) % P
+  const C = m.seed ? { ...C0, closed: C0.closed + (doorH(Math.floor(u0 / P), m.seed) - 0.5) * 2.0 } : C0
+  if (m.seed) C.open = P - 2 * C.move - C.closed
   if (ph < C.closed) return { a: 0, w: 0, at: 'lo', left: C.closed - ph }
   if (ph < C.closed + C.move) { const u = (ph - C.closed) / C.move; return { a: m.up * u, w: m.up / C.move, at: 'up' } }
   if (ph < C.closed + C.move + C.open) return { a: m.up, w: 0, at: 'hi', left: C.closed + C.move + C.open - ph }
@@ -45,7 +49,7 @@ export function v36traps(B) {
     B.traps.push({ kind: 'girder', i, p: q.p.slice(), yaw: q.yaw, w, T, shape: sh })
     // bot 用: 落ちてくる間と、落ちて道に転がっている間は危ない（落ちる前は安全）。遠くから見る（全開から止まれるように）
     const m = sh.mov
-    hz.push({ kind: 'girder', p: q.p.slice(), yaw: q.yaw, half: 0.8, w, vGo: 12, look: 62, m, unsafe: tt => m.t0 != null && tt > m.t0 + T - 0.25 && tt < m.t0 + T + 1.9, maybe: () => m.t0 == null })
+    hz.push({ kind: 'girder', p: q.p.slice(), yaw: q.yaw, half: 0.8, w, vGo: 12, look: 62, m, unsafe: tt => m.t0 != null && tt > m.t0 + m.T - 0.25 && tt < m.t0 + m.T + 1.9, maybe: () => m.t0 == null })
   }
   // ---------------- 開け閉めする落とし扉（道の 81%、氷の区間の直線の板）
   { const i = findFrom(P, Math.floor(N * 0.805), 120, k => P[k].kind === 'road' && straight(P, k - 6, 14) && (() => { const h = roadBoxAt(B, P[k]); return h && h.s.h[0] - Math.abs(h.x) > 3.7 })())

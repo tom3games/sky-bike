@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=46'
+import { doorAng } from './traps.js?v=47'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -295,7 +295,7 @@ function girderTrack(world, b, ev) {
     const m = s.mov; if (m.type !== 'girder') continue
     if (m.t0 == null && b && !b.ghost && !b.crashed) {
       const hx = dcos(m.yaw), hz = -dsin(m.yaw), dx = m.at[0] - b.p[0], dz = m.at[2] - b.p[2], ahead = dx * hx + dz * hz, lat = Math.abs(-dx * hz + dz * hx)
-      if (ahead > 0 && Math.hypot(dx, dz) < (m.trigD || girderReach(b.speed, m.trigT)) && lat < 14 && Math.abs(b.p[1] - 0.8 - m.at[1]) < 12) { m.t0 = world.time; if (ev) ev.push({ t: 'girderWarn', id: s.id }) }
+      if (ahead > 0 && Math.hypot(dx, dz) < (m.trigD || girderReach(b.speed, m.trigT)) * (m.Tn && m.T0 ? m.Tn / m.T0 : 1) && lat < 14 && Math.abs(b.p[1] - 0.8 - m.at[1]) < 12) { m.t0 = world.time; if (m.T0 == null) m.T0 = m.T; m.T = m.Tn || m.T0; m.Tn = world.rng ? +(m.T0 * (0.7 + 0.6 * world.rng())).toFixed(2) : null; if (ev) ev.push({ t: 'girderWarn', id: s.id }) } // v47 落ちるまでの秒は毎回 0.7〜1.3 倍（影が濃くなりきった時に落ちるのは同じ）。影が出る距離も同じ割合で変える（全開で着くと必ず重なる）
     }
     const g = girderPose(s, world.time), was = s.gone
     s.gone = g.gone

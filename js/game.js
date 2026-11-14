@@ -8,25 +8,25 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=46'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=46'
-import { COURSES } from './course.js?v=46'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=46'
-import { BikeView, snap } from './bikeview.js?v=46'
-import { createBot, botInput, resetBot } from './bot.js?v=46'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=46'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=46'
-import { Birds } from './birds.js?v=46'
-import { crowPush } from './strike.js?v=46'
-import { buildV35, hankieDataURL } from './v35view.js?v=46'
-import { buildV36 } from './v36view.js?v=46'
-import { buildLady } from './lady.js?v=46'
-import { buildBoulder } from './v41view.js?v=46'
-import { buildMotes } from './motes.js?v=46'
-import { buildMurals } from './murals.js?v=46'
-import { buildV37 } from './v37view.js?v=46'
-import { doorAng } from './traps.js?v=46'
-import { resetDrums } from './physics.js?v=46'
+import { buildGimmicks } from './gimmicks.js?v=47'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=47'
+import { COURSES } from './course.js?v=47'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=47'
+import { BikeView, snap } from './bikeview.js?v=47'
+import { createBot, botInput, resetBot } from './bot.js?v=47'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=47'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=47'
+import { Birds } from './birds.js?v=47'
+import { crowPush } from './strike.js?v=47'
+import { buildV35, hankieDataURL } from './v35view.js?v=47'
+import { buildV36 } from './v36view.js?v=47'
+import { buildLady } from './lady.js?v=47'
+import { buildBoulder } from './v41view.js?v=47'
+import { buildMotes } from './motes.js?v=47'
+import { buildMurals } from './murals.js?v=47'
+import { buildV37 } from './v37view.js?v=47'
+import { doorAng } from './traps.js?v=47'
+import { resetDrums } from './physics.js?v=47'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -516,6 +516,7 @@ function startRun(id) {
   G.cpIdx = 0; G.faults = 0; G.time = 0; G.running = false; G.steps = 0; G.acc = 0; G.maxAlt = 0
   G.R = { cp: 0, rest: 0, hard: G.hard && !!G.course.climb, restSeen: { 0: true } }
   G.world.setTime(0); for (const s of G.world.moving) { s.gone = false; s.touch = 0 }
+  G.R.seed = Q.get('trapseed') ? +Q.get('trapseed') : 1 + Math.floor(Math.random() * 2147483000); rerollTraps(G.world, G.R) // v47 罠の間合いを走りごとに変える
   resetDrums(G.world) // v35 回る筒の口を最初の形へ
   $('letter').classList.remove('on', 'quiet', 'peek'); G.ending = null; bgmStop(1.0); if (G.v35 && G.v35.tracks) G.v35.tracks.visible = false
   G.hank = false; G.hm = { ph: 'wait' }; G.ly = { ph: 'wait' }; G.ladyDone = false; G.story = { seen: {}, t0: G.course.climb ? 0.6 : null }; storyOff(); talkOff()

@@ -3,7 +3,7 @@
 import { World, stepBike } from '../js/physics.js'
 import { COURSES } from '../js/course.js'
 import { createBot, botInput, resetBot } from '../js/bot.js'
-import { spawnAtCp, judge, pathS } from '../js/run.js'
+import { spawnAtCp, judge, pathS , rerollTraps } from '../js/run.js'
 import { createSteer, steerFor, resetSteer } from '../js/steer.js'
 import { ROCK } from '../js/v41.js'
 const ROCKR = ROCK.R
@@ -18,7 +18,7 @@ for (const D of (process.env.DELAYS || '0.3,0.8,1.2,1.5,2.0').split(',').map(Num
     const b0 = spawnAtCp(w, c, ci); let b = b0
     const bot = createBot(c, { skill: 'good' }); bot.world = w; resetBot(bot, b)
     const st = createSteer(c.path); resetSteer(st, b)
-    const R = { cp: ci, rest: ci }; let tRoll = null, r = '岩が来ない', thrCap = 0.6 + (seed % 4) * 0.13
+    const R = { cp: ci, rest: ci }; if (!process.env.NORAND) { R.seed = 500 + seed * 7919; rerollTraps(w, R) } /* v47 */ let tRoll = null, r = '岩が来ない', thrCap = 0.6 + (seed % 4) * 0.13
     for (let s = 0; s < 60 * 60; s++) {
       let inp = botInput(bot, b)
       if (tRoll == null) inp = { ...inp, thr: Math.min(inp.thr, thrCap) } // 登る速さを人ごとに変える

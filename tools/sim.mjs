@@ -3,12 +3,12 @@ if (process.env.STEERNOW) globalThis.__steerNow = 1
 import { World, stepBike, DT, hashBike } from '../js/physics.js'
 import { COURSES } from '../js/course.js'
 import { createBot, botInput, resetBot } from '../js/bot.js'
-import { spawnAtCp, judge, doRespawn } from '../js/run.js'
+import { spawnAtCp, judge, doRespawn, rerollTraps } from '../js/run.js'
 export function runSim(cid, skill, o = {}) {
   const c = COURSES[cid](), w = new World(c.shapes); w.winds = c.winds || []
   const bot = createBot(c, { skill, react: o.react || 0, lat: o.lat || 0, vMul: o.vMul || 1 }); bot.world = w
   const st = o.start || 0 // v35: 途中の旗から（START=旗の番号）
-  const R = { cp: st, rest: st, hard: !!o.hard }; bot.R = R // v41 落石の坂: bot は岩の予告でバックする
+  const R = { cp: st, rest: st, hard: !!o.hard }; bot.R = R; R.seed = +(process.env.TRAPSEED || o.trapSeed || 1); if (!process.env.NOTRAPRAND) rerollTraps(w, R) // v47 // v41 落石の坂: bot は岩の予告でバックする
   let faults = 0, steps = 0, log = [], inputs = [], maxY = -1e9, nets = 0, lastGround = null
   let b = spawnAtCp(w, c, st); resetBot(bot, b)
   const maxSteps = (o.maxSec || 400) * 60
