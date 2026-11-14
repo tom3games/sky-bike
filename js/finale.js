@@ -3,8 +3,9 @@
 //   燃料の缶で満タンにしてニトロで崩れる橋を渡り切る。倒れる物は道の外へ倒れる（道には入らない）。理不尽に落とさない
 // 2 天空城への大ジャンプ: 急な下りの助走路（缶あり）→ 踏み切り → 4〜6 秒飛んで、天空城の広い着地坂へ。
 //   着地坂は、ふつうの速さで飛んだ線に沿わせた形（まっすぐ着けば転ばない）。空中で後ろ体重を続ければ宙返りもできる
-import { drum } from './drum.js?v=40'
-import { v37 } from './v37.js?v=40'
+import { drum } from './drum.js?v=41'
+import { v37 } from './v37.js?v=41'
+import { v41 } from './v41.js?v=41'
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 
@@ -78,7 +79,7 @@ export function finale(B) {
     B.road(4, F)
     B.closeMark()
     B.zone = 'castle' }
-  { const n0 = B.path.length; v37(B); B.v37added = B.path.length - n0 } // v37 真っ暗な通路・明るい草原・風車の羽根・ワイヤーの綱渡り（js/v37.js）
+  { const n0 = B.path.length; v37(B); v41(B); B.v37added = B.path.length - n0 } // v41 落石の坂（js/v41.js）も終盤に足した道として数える // v37 真っ暗な通路・明るい草原・風車の羽根・ワイヤーの綱渡り（js/v37.js）
   // ---------------- 天空城への大ジャンプ
   B.road(6, C)
   B.cp('大ジャンプの助走', { w: 4.2, rest: true })

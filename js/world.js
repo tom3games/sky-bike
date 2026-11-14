@@ -3,7 +3,7 @@
 //   塔のまわり（tower モード）: 塔の中心のまわりの円弧（1 周しない。塔ごとに 1 回だけ）
 //   自由な道（free モード）: 区間の向き hd に沿って、ゆるい S 字で進む円弧。excursion は外へ出て戻らず、そのまま先へ進む
 // 当たりと見た目は今まで通り同じ形の一覧（B.shapes）から作る。
-import { dsin, dcos } from './physics.js?v=40'
+import { dsin, dcos } from './physics.js?v=41'
 
 const DEG = Math.PI / 180
 const RM0 = 17.1 // v15 の周の道の半径（区間の長さは「角度 × これ」で決めてあった）

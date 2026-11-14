@@ -1,8 +1,9 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=40'
-import { nextI } from './steer.js?v=40'
+import { createBike, stepBike, resetFallen } from './physics.js?v=41'
+import { ROCK as ROCK0 } from './v41.js?v=41'
+import { nextI } from './steer.js?v=41'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -118,6 +119,8 @@ export function judge(world, course, R, b, prevP) {
   }
   // v36 小さな猿のような生き物の追いかけ（js/traps.js の chases）
   if (course.chases && course.chases.length && !b.ghost) chaseStep(world, course, R, b, out)
+  if (course.boulder && !b.ghost) boulderStep(world, course, R, b, out)
+  if (b.crashed && b.crashed.why === 'boulder' && b.crashed.t < 1.6) return out // はね飛ばされた: 少し見せてから
   if (b.crashed && b.crashed.why === 'monkey' && b.crashed.t < 2.4) return out // はたかれた: 乗り手が落ちていく間は待つ
   if (b.crashed && b.crashed.t > 0.8) {
     // 転んだら: 数秒前に車輪が着いていた安全な地点から出し直す（旗までは戻さない）。フォルト 1
@@ -194,9 +197,40 @@ function chaseStep(world, course, R, b, out) {
     }
   }
 }
+// v41 落石の坂: 坂を 6 割ほど登ると 2 秒の予告 → 坂の上から岩が転がってくる（道のりで動く。速さは vMax まで acc で上がる）。
+// バイクに追いつく（岩の前の端がバイクに触れる）とはね飛ばして転倒。門まで下がれば逃げ切り、岩は門で割れる。同じ走りで 1 回（割れた後は出ない）
+export function boulderStep(world, course, R, b, out) {
+  const B = course.boulder, S = pathS(course), ROCK = globalThis.__rock ? { ...ROCK0, ...globalThis.__rock } : ROCK0 // テストで速さを変えられる
+  let st = R.bo
+  if (st && (st.ph === 'broken' || st.ph === 'hit')) { if (st.ph === 'broken') return; return }
+  const bi = nearI(course, b.p, st && st.bi != null ? st.bi : R.onI), sb = S[bi]
+  if (!st) {
+    if (bi >= B.slopeI0 + Math.round((B.slopeI1 - B.slopeI0) * ROCK.trigFrac) && bi < B.topI && !b.crashed) { R.bo = st = { ph: 'warn', t0: world.time, bi }; out.boulder = { ph: 'warn' } }
+    return
+  }
+  st.bi = bi
+  if (st.ph === 'warn') {
+    st.s = S[B.topI] + 1.5; st.v = 0
+    if (!b.crashed && st.s - ROCK.R - sb < ROCK.catchD) { st.ph = 'hit'; out.boulder = { ph: 'hit' }; const hx = Math.cos(b.psi), hz = -Math.sin(b.psi); b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }; b.v = [-hx * 5, 3.5, -hz * 5]; return } // 坂の上に止まっている岩へ突っ込んだ
+    if (world.time - st.t0 >= ROCK.warn) { st.ph = 'roll'; st.t1 = world.time; out.boulder = { ph: 'roll' } }
+    return
+  }
+  if (st.ph === 'roll') {
+    st.v = Math.min(ROCK.vMax, st.v + ROCK.acc / 60); st.s -= st.v / 60
+    const gateS = S[B.gateI]
+    if (st.s - ROCK.R <= gateS + 0.6) { st.ph = 'broken'; st.s = gateS + 0.6 + ROCK.R; out.boulder = { ph: 'broken' }; return } // 門の柱に挟まって割れる
+    if (!b.crashed && bi > B.gateI && st.s - ROCK.R - sb < ROCK.catchD) {
+      st.ph = 'hit'; out.boulder = { ph: 'hit' }
+      const hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
+      b.crashed = { why: 'boulder', v: 0, t: 0, at: b.p.slice(), side: 1 }
+      b.v = [-hx * 7, 4.5, -hz * 7]
+    }
+  }
+}
 // respawn の指示から新しいバイクを作る
 export function doRespawn(world, course, R, rs) {
   if (R.ch) for (const k in R.ch) if (R.ch[k].ph !== 'done') delete R.ch[k] // 猿は元の場所へ
+  if (R.bo && R.bo.ph !== 'broken') delete R.bo // 落石: 割れる前に出し直したら、また来る
   resetFallen(world) // 抜けた床・崩れた敷石を元に戻す（戻らないと登れなくなる）
   for (const s of world.moving) if (s.mov.type === 'seesaw') { s.mov.ang = s.mov.ang0 || 0; s.mov.w = 0 } // 傾いたままのシーソーも元へ（出し直した所の先で、上がった端に当たらない）
   if (rs.safe) { const b = spawnAt(world, { p: rs.safe.p, yaw: rs.safe.yaw }); if (rs.safe.nitro != null) b.nitro = rs.safe.nitro; if (!b.crashed) return b; R.safe = []; return spawnAtCp(world, course, R.rest || 0) } // 出した所で転んでいたら旗から

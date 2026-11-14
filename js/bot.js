@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=40'
-import { doorAng } from './traps.js?v=40'
-import { BLADE } from './v37.js?v=40'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=40'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=41'
+import { doorAng } from './traps.js?v=41'
+import { BLADE } from './v37.js?v=41'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=41'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -15,7 +15,7 @@ export function createBot(course, o = {}) {
   const path = o.path || course.path
   // 道を選ぶ床: 枝道の始まりの番号（finish の後に決まる）
   for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
-  return { fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
+  return { course, fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
 export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
 function nearest(bot, b, from, to) {
@@ -312,6 +312,9 @@ export function botInput(bot, b) {
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
   if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1]) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
   if (bot.oilOn) inp = { ...inp, thr: 0, ab: 0, brk: 0, lean: 0 } // 油の上では何も押さない（手前で速さを落としてあるので自動の減速も入らない）
+  // v41 落石の坂: 予告（地鳴り）が始まったら、門まで真っすぐバック（ブレーキを押し続ける。ハンドルは自動のバックの線）
+  { const Bo = bot.course && bot.course.boulder, st = bot.R && bot.R.bo
+    if (Bo && st && (st.ph === 'warn' || st.ph === 'roll')) inp = bot.i > Bo.gateI - 2 ? { thr: 0, brk: 1, lean: 0, steer: Math.round(steerFor(bot.st, b) * 16) / 16, nitro: 0 } : { thr: b.speed < -0.4 ? 0.5 : 0, brk: 0, lean: 0, steer: Math.round(steerFor(bot.st, b) * 16) / 16, nitro: 0 } } // 門の外へ出たら止まって、岩が割れるのを待つ
   // 反応の遅れ（人の速さ）
   // v39: STEERNOW（globalThis.__steerNow）で、ハンドルだけ遅らせない人の bot（ゲームのハンドルは自動なので人の遅れが乗らない）。ふだんは今までどおり全部遅らせる（これまでの数字と比べられるように）
   if (bot.react > 0) { bot.queue.push(inp); const st = globalThis.__steerNow ? inp.steer : null; if (bot.queue.length > bot.react) { const d = bot.queue.shift(); return st == null ? d : { ...d, steer: st } } return { thr: 0, brk: 0, lean: 0, steer: st ?? 0 } }
