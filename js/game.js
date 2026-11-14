@@ -154,7 +154,7 @@ function soundUpdate(dt) {
     G.prevThr = thr
     let wob = 0; if (G.burble > 0) { G.burble -= dt; wob = (Math.random() - 0.5) * 0.09 * G.burble }
     G.shiftT = Math.max(0, (G.shiftT || 0) - dt)
-    const on = playing && !b.crashed, cut = G.shiftT > 0 ? 0.35 : 1, r = G.rpm
+    const on = playing && !b.crashed, cut = (G.shiftT > 0 ? 0.35 : 1) * 1.4, r = G.rpm // v26 本人「バイクの音少し小さい」: エンジンの2つの音を 1.4 倍
     L.engine.node.playbackRate.setTargetAtTime(0.6 + r * 0.75 + wob, c, 0.025)
     L.engine.g.gain.setTargetAtTime(on ? (0.1 + (1 - Math.min(1, r)) * 0.12) * cut : 0.0001, c, 0.04)
     if (L.engineHi && L.engineHi.node) { L.engineHi.node.playbackRate.setTargetAtTime(0.62 + r * 0.55 + wob, c, 0.025); L.engineHi.g.gain.setTargetAtTime(on ? Math.max(0.0001, (r - 0.25) * 0.24 * (0.5 + thr * 0.5)) * cut : 0.0001, c, 0.04) }
@@ -749,10 +749,11 @@ function surfaceFx(b, dt) {
   const sf = sh ? (sh.mud ? SURF.mud : sh.flowR || sh.flowT ? SURF.water : SURF[sh.mat] || [0x6a6660, 0.5]) : null
   const hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
   // 泥から後輪が抜けた瞬間に「ブリュッ」（本人の声。v24）
-  const onMud = !!(sh && sh.mud); b._mudT = onMud ? (b._mudT || 0) + dt : b._mudT || 0
-  if (b._wasMud && sh && !sh.mud && b._mudT > 0.4 && sp > 0.8 && !(G._mudFartT > performance.now() / 1000 - 3)) { G.mudFarts = (G.mudFarts || 0) + 1; Snd.play('mudfart', { vol: 0.9, rate: 0.95 + Math.random() * 0.1 }); G._mudFartT = performance.now() / 1000; if (cn) dust.emit(cn.q, 8, 1.6, { col: SURF.mud[0], heavy: 1.6, up: 2.5, size: 0.8 }) }
-  if (!onMud && b.g[0]) b._mudT = 0
-  if (sh) b._wasMud = onMud // 跳ねて浮いた間は泥にいたまま扱い（1回の泥で2回鳴らない）
+  const onMud = !!(sh && sh.mud); b._mudT = onMud || (!sh && b._wasMud) ? (b._mudT || 0) + dt : b._mudT || 0 // 泥の上で跳ねた間も泥の時間に数える
+  b._offMud = onMud ? 0 : sh ? (b._offMud || 0) + dt : b._offMud || 0 // 浮いている間は数えない
+  if (b._wasMud && sh && !sh.mud && b._mudT > 0.3 && sp > 0.8 && !(G._mudFartT > performance.now() / 1000 - 3)) { G.mudFarts = (G.mudFarts || 0) + 1; Snd.play('mudfart', { vol: 0.9, rate: 0.95 + Math.random() * 0.1 }); G._mudFartT = performance.now() / 1000; if (cn) dust.emit(cn.q, 8, 1.6, { col: SURF.mud[0], heavy: 1.6, up: 2.5, size: 0.8 }) }
+  if (b._offMud > 0.3) b._mudT = 0 // 泥の上で一瞬だけ別の面に触れても数え直さない
+  if (sh && (onMud || b._offMud > 0.12)) b._wasMud = onMud // 跳ねて浮いた間は泥にいたまま扱い（1回の泥で2回鳴らない）
   if (sf) {
     const thr = G.inp.thr, acc = thr > 0 ? Math.min(1, 0.3 + thr * (sp < 6 ? 1 : 0.5)) : 0
     const nAcc = acc * (b.nitroOn ? 2.5 : 1) * dt * (sp < 3 ? 28 : 16)
