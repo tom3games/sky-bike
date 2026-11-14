@@ -44,3 +44,7 @@
 - snd/gravel1〜3.mp3（砂利を巻き上げる・滑る）: 100 CC0 SFX #2 / rubberduck / CC0
 - snd/fall_ahhh.mp3（長く落ちる時の叫び声。声を低くするために 0.82 倍の速さに変えた）: UncleSigmund - ahhh (cc0) / UncleSigmund（Freesound 30988）/ CC0 1.0 / https://commons.wikimedia.org/wiki/File:UncleSigmund_-_ahhh_(cc0)_(freesound).mp3 （v15 で使った Wilhelm の叫びは、1951 年の映画の効果音の録音を切り出した物で、新しく録った物ではないため使うのをやめた）
 - snd/grunt1〜3.mp3（着地の「うっ」）: Little Grunts / crueltyinc / CC0
+- snd/flap.mp3（鳥が飛び立つ羽音）: Dragon Flap / VishwaJai / CC0 / OpenGameArt
+- snd/crow_caw.mp3: Crow caw / zeroisnotnull / CC0 / OpenGameArt
+- snd/crow_0.mp3: Crow / fvcalderan / CC0 / OpenGameArt
+- assets/models/crow.glb（道に止まるカラス）: Crow / Poly by Google / CC BY 3.0 / https://poly.pizza/m/1MIvWQ5Q3R9

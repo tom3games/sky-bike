@@ -12,13 +12,14 @@ const ledges = []
 for (let i = 1; i < P.length; i++) if (P[i].kind === 'hang' && !P[i].branch) ledges.push(i)
 const use = process.env.ONLY ? process.env.ONLY.split(',').map(Number) : ledges.slice(0, +(process.env.N || ledges.length)).map((_, k) => k)
 const markOf = i => { let n = '-'; for (const m of c.marks) if (i >= m.i0 && i <= m.i1) n = m.name; return n }
-const POL = { 上手い: 0, '遅れ0.15': 9, '遅れ0.2（人の速さ）': 12, '遅れ0.25': 15 }
+const POL = { 上手い: 0, '遅れ0.15': 9, '遅れ0.2（人の速さ）': 12, '遅れ0.25': 15, '遅れ0.3': 18 }
 const rows = [], jumpsAll = { 位置: 0, 角度: 0, 前輪: 0, 後輪: 0, '掛かり中の1刻み5cm超': 0, '掛かり中の1刻み3度超': 0 }, examples = []
 function run(li, react, seed) {
   const q = P[li], f = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)]
   // 縁の 9m 手前の道の点から
   let k = li, d = 0; while (k > 0 && d < 9 && P[k - 1].p && P[k - 1].w) { d += Math.hypot(P[k].p[0] - P[k - 1].p[0], P[k].p[2] - P[k - 1].p[2]); k-- }
-  while (k > 0 && ['crumble', 'trap'].includes(P[k].kind) && P[k - 1].p && P[k - 1].w) k-- // 崩れる床・抜ける床の上からは始めない（止まった所から始めると落ちる）
+  while (k > 0 && ['crumble', 'trap'].includes(P[k].kind) && P[k - 1].p && P[k - 1].w) k--
+  if (P[k - 1] && !P[k - 1].w) k = Math.min(li - 1, k + 2) // 段のすぐ後ろ（縁の上）からは始めない // 崩れる床・抜ける床の上からは始めない（止まった所から始めると落ちる）
   const s0 = P[k]
   const w = new World(c.shapes); w.winds = c.winds || []; w.setTime(seed * 1.37)
   const b = settle(w, createBike({ p: [s0.p[0], s0.p[1] + 0.79, s0.p[2]], yaw: s0.yaw }))

@@ -1,10 +1,10 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=19'
-import * as P16 from './parts16.js?v=19'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=19'
-import { lab16 } from './parts16.js?v=19'
-import * as P17 from './parts17.js?v=19'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=19'
+import * as Z from './zones.js?v=22'
+import * as P16 from './parts16.js?v=22'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=22'
+import { lab16 } from './parts16.js?v=22'
+import * as P17 from './parts17.js?v=22'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=22'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -375,7 +375,7 @@ export class Builder {
     const e = t.p.slice()
     const thick = o.thick ?? (h + 0.6)
     const s = this.road(len, { w, mat: o.mat || 'stone', thick, noOverlap: true, back: 0, kind: 'road' })
-    s.hang = { a: add3(e, R, -w / 2 + 0.2), b: add3(e, R, w / 2 - 0.2), n: [-f[0], 0, -f[2]], max: o.max ?? 8 }
+    s.hang = { a: add3(e, R, -w / 2 + 0.2), b: add3(e, R, w / 2 - 0.2), n: [-f[0], 0, -f[2]], max: o.max ?? 8, easy: !!o.easy }
     // 角の石（欠けていく縁の見た目。当たりなし）
     this.decor.push({ kind: 'hangLip', a: s.hang.a, b: s.hang.b, n: s.hang.n })
     return s
@@ -528,10 +528,16 @@ export function stage1() {
   B.torch(1, 4, { down: 3 }); B.torch(-1, 4, { down: 3 })
   B.log(2.5, 0.16, 4.6); B.log(5.5, 0.16, 4.6); B.road(8, L)
   // 高い段（車輪の径くらい）: ゆっくりウィリーで前輪を段の上へ掛け、前体重＋アクセルで後輪を引き上げる
+  // v22 本人「出だしの段差やさしくして」: 高い縁の前に、低い順に段を 2 つ（0.5m はふつうのウィリーで、0.75m は前輪を掛ける練習。どちらも降りて元の高さへ）
+  B.mark('低い段の練習')
+  B.road(3, L)
+  B.step(0.5); B.road(5, { ...L, noOverlap: true }); B.step(-0.5); B.road(5, { ...L, noOverlap: true })
+  B.step(0.75); B.road(5, { ...L, noOverlap: true }); B.step(-0.75); B.road(4, { ...L, noOverlap: true })
   B.tut('climb')
+  B.cp('高い縁の前', { w: 5, rest: true }) // 失敗してもすぐここから
   B.road(6, L)
   B.mark('高い段をよじ登る')
-  B.hangLedge(1.6, 10, { w: 5, mat: 'cobble', max: 12 }) // v15: 高い縁（1.6m）。前輪を掛けて耐え、前体重＋アクセルで登る（歩く人では登れない）
+  B.hangLedge(1.6, 10, { w: 5, mat: 'cobble', max: 20, easy: true }) // v15: 高い縁（1.6m）。前輪を掛けて耐え、前体重＋アクセルで登る（歩く人では登れない）。v22: 最初の縁だけ、掛かる幅・釣り合い・ずり落ち・欠けるまでの時間に余裕
   B.cp('高い段の上', { w: 5, rest: true })
   B.road(6, L)
   // 振り子の鉄球（1つ）: 道を横切って振れる。当たると横へ弾き飛ばされる。振れる間を見て通り抜ける

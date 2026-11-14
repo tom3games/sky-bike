@@ -959,7 +959,8 @@ function hangCatch(world, b, inp, ev) {
     const dh = (fc[0] - e[0]) * H.n[0] + (fc[2] - e[2]) * H.n[2], dv = fc[1] - e[1]
     const into = -(B.h[0] * H.n[0] + B.h[2] * H.n[2])
     // v17: 掛かる幅を少し広く（前輪が縁の角の少し下・少し手前でも掛かる）。縁より下から近づく時だけ
-    if (into < 0.6 || dh < -0.16 || dh > 0.72 || dv < -0.62 || dv > 0.36 || rc[1] > e[1] - 0.15) continue
+    const ez = H.easy ? 1.35 : 1 // v22: 最初の縁は掛かる幅をさらに広く
+    if (into < (H.easy ? 0.45 : 0.6) || dh < -0.16 * ez || dh > 0.72 * ez || dv < -0.62 * ez || dv > 0.36 * ez || rc[1] > e[1] - 0.15) continue
     const lat = Math.abs((fc[0] - e[0]) * H.n[2] - (fc[2] - e[2]) * H.n[0]); if (lat > 3) continue
     // 掛かった瞬間の車体の位置・角度・向きを覚え、HANG_BLEND 秒かけて縁の姿勢へ移す（1 刻みで飛ばさない）
     b.hang = { id: sh.id, t: 0, x: clamp((b.w || 0) * -0.15, -0.3, 0.3), xv: 0, slip: 0, climb: 0, psi: Math.atan2(H.n[2], -H.n[0]), warned: false, bl: 0, th0: b.th, psi0: b.psi, fc0: fc.slice(), s0: b.s.slice() }
@@ -1086,13 +1087,13 @@ function hangStep(world, b, inp, ev) {
     for (const wd of world.winds) if (b.p[0] > wd.min[0] - 2 && b.p[0] < wd.max[0] + 2 && b.p[2] > wd.min[2] - 2 && b.p[2] < wd.max[2] + 2 && b.p[1] > wd.min[1] - 3 && b.p[1] < wd.max[1] + 3) dist += (wd.pulse ? gustK(wd, world.time) : 0.5) * 2.2 * (wd.f[0] * H.n[0] + wd.f[2] * H.n[2] >= 0 ? -1 : 1)
     for (const s2 of world.moving) if (s2.knock && !s2.gone && s2.c) { const d = Math.hypot(s2.c[0] - b.p[0], s2.c[1] - b.p[1], s2.c[2] - b.p[2]); if (d < 3.5) dist += (3.5 - d) * 0.9 * Math.sign(dsin(world.time * 5 + s2.id)) }
     // 体の釣り合い（放っておくと倒れる）。前体重で前へ、後ろ体重で後ろへ。掛かった直後（姿勢を移している間）は倒れない
-    if (hg.bl >= 1) { hg.xv += (2.2 * hg.x + 2.6 * b.lean + dist * 0.6 - 1.6 * hg.xv) * DT; hg.x += hg.xv * DT }
+    if (hg.bl >= 1) { const ez = H.easy ? 0.55 : 1; hg.xv += (2.2 * ez * hg.x + 2.6 * b.lean + dist * 0.6 * ez - 1.6 * hg.xv) * DT; hg.x += hg.xv * DT } // v22: 最初の縁は倒れていくのがゆっくり
     // ブレーキを離すと、前輪がずり落ちる
     // ブレーキを離すと、前輪がずり落ちる（v17: 0.28 → 0.22/秒。少しだけ余裕）
-    if (inp.brk > 0.5) hg.slip = Math.max(0, hg.slip - 0.05 * DT); else hg.slip += 0.22 * DT
+    if (inp.brk > 0.5) hg.slip = Math.max(0, hg.slip - 0.05 * DT); else hg.slip += (H.easy ? 0.1 : 0.22) * DT // v22: 最初の縁はずり落ちがゆっくり
     if (!hg.warned && hg.t > max - 2) { hg.warned = true; if (ev) ev.push({ t: 'hangWarn', p: b.cn[1] ? b.cn[1].q.slice() : b.p.slice() }) }
     // 登る: 前体重＋アクセル（釣り合いがとれている時）。v17: 釣り合いの幅を広く（0.75→0.85）、ずり落ちかけでも（0.35→0.42）
-    if (inp.lean > 0.5 && inp.thr > 0.5 && Math.abs(hg.x) < 0.85 && hg.slip < 0.42 && hg.bl >= 1) { startClimb(world, b); hg.climb = DT / CLIMB_T; hangPose(world, b) }
+    if (inp.lean > 0.5 && inp.thr > 0.5 && Math.abs(hg.x) < (H.easy ? 0.95 : 0.85) && hg.slip < 0.42 && hg.bl >= 1) { startClimb(world, b); hg.climb = DT / CLIMB_T; hangPose(world, b) }
     else if (hg.x > 1) exit('front')
     else if (hg.x < -1) exit('back')
     else if (hg.slip > 0.5) exit('slip')
