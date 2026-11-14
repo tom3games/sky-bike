@@ -125,7 +125,7 @@ composer.addPass(grade)
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); composer.setSize(innerWidth, innerHeight); if (gtao) gtao.setSize(innerWidth, innerHeight); grade.uniforms.res.value.set(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix() })
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'] })
+Snd.def({ mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'] })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -747,6 +747,11 @@ function surfaceFx(b, dt) {
   const cn = b.cn[0], sh = cn && b.g[0] ? G.world.shapes[cn.id] : null, sp = Math.abs(b.speed)
   const sf = sh ? (sh.mud ? SURF.mud : sh.flowR || sh.flowT ? SURF.water : SURF[sh.mat] || [0x6a6660, 0.5]) : null
   const hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
+  // 泥から後輪が抜けた瞬間に「ブリュッ」（本人の声。v24）
+  const onMud = !!(sh && sh.mud); b._mudT = onMud ? (b._mudT || 0) + dt : b._mudT || 0
+  if (b._wasMud && sh && !sh.mud && b._mudT > 0.4 && sp > 0.8 && !(G._mudFartT > performance.now() / 1000 - 3)) { G.mudFarts = (G.mudFarts || 0) + 1; Snd.play('mudfart', { vol: 0.9, rate: 0.95 + Math.random() * 0.1 }); G._mudFartT = performance.now() / 1000; if (cn) dust.emit(cn.q, 8, 1.6, { col: SURF.mud[0], heavy: 1.6, up: 2.5, size: 0.8 }) }
+  if (!onMud && b.g[0]) b._mudT = 0
+  if (sh) b._wasMud = onMud // 跳ねて浮いた間は泥にいたまま扱い（1回の泥で2回鳴らない）
   if (sf) {
     const thr = G.inp.thr, acc = thr > 0 ? Math.min(1, 0.3 + thr * (sp < 6 ? 1 : 0.5)) : 0
     const nAcc = acc * (b.nitroOn ? 2.5 : 1) * dt * (sp < 3 ? 28 : 16)
