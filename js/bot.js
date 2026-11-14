@@ -1,6 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=29'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=29'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=30'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=30'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）

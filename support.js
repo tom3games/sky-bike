@@ -50,7 +50,7 @@
   var script = document.currentScript
   var ja = '作者に' + script.getAttribute('data-ja') + 'をおごる'
   var en = 'Buy the dev ' + script.getAttribute('data-en')
-  var again = document.getElementById('bAgain') || document.getElementById('btnAgain')
+  var again = document.getElementById('bAgain') || document.getElementById('btnAgain') || document.getElementById('rRetry') // SKY BIKE は rRetry
   if (!again || document.getElementById('tmSupport')) return
 
   var a = document.createElement('a')
@@ -71,7 +71,7 @@
   home.target = '_top'
   home.style.cssText = 'display:block;align-self:center;flex:none;width:fit-content;max-width:100%;margin:2px auto 0;padding:4px 12px;border-radius:99px;background:rgba(18,16,14,.5);color:#F4EEE2;font-family:inherit;font-size:12px;font-weight:600;line-height:1.3;text-align:center;text-decoration:underline;text-underline-offset:3px;position:relative;z-index:2;pointer-events:auto;opacity:0;transition:opacity .5s ease .5s'
   function show() {
-    function on() { a.style.opacity = '1'; a.style.transform = 'none'; home.style.opacity = '.92' }
+    function on() { a.style.opacity = '1'; a.style.transform = 'none'; home.style.opacity = '.92'; if (f) f.style.opacity = '.92' } // f: 作者をフォロー（あれば。透明のまま見えていなかった）
     if (!('IntersectionObserver' in window)) return on()
     // 結果画面が開いて見えた時に1回だけ
     var io = new IntersectionObserver(function (es) { if (es.some(function (e) { return e.isIntersecting })) { io.disconnect(); requestAnimationFrame(on) } })
@@ -97,5 +97,17 @@
   var slot = document.querySelector('[data-home-slot]')
   if (slot) { home.style.margin = '0'; home.style.padding = '2px 10px'; slot.appendChild(home) }
   else a.parentElement.insertBefore(home, a.nextSibling)
+  // 2026-11-14 SKY BIKE だけ: data-follow があれば、一番下に「作者をフォロー」（X のフォロー画面）
+  var fw = script.getAttribute('data-follow')
+  if (fw) {
+    var f = document.createElement('a')
+    f.id = 'tmFollow'
+    f.href = 'https://x.com/intent/follow?screen_name=' + encodeURIComponent(fw)
+    f.target = '_blank'; f.rel = 'noopener'
+    f.style.cssText = home.style.cssText + ';margin-top:4px'
+    var setF = function () { var jp = /[ぁ-んァ-ヶ一-龠]/.test(again.textContent) || !again.textContent.trim(); f.textContent = jp ? '作者をフォロー（X @' + fw + '）' : 'Follow the dev on X @' + fw }
+    setF(); new MutationObserver(setF).observe(again, { childList: true, characterData: true, subtree: true })
+    home.parentElement.insertBefore(f, home.nextSibling)
+  }
   show()
 })()
