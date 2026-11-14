@@ -17,7 +17,7 @@ export function spotNear(world, course, at, maxI = 1e9) {
   let best = null, bd = 1e9
   for (let i = 0; i < Math.min(course.path.length, maxI + 1); i++) {
     const q = course.path[i]
-    if (!q.p || !q.w || q.kind === 'jump' || q.kind === 'crumble' || q.kind === 'trap' || q.kind === 'lift' || q.kind === 'lip' || Math.abs(q.slope || 0) > 0.3) continue
+    if (!q.p || !q.w || q.kind === 'jump' || q.kind === 'blast' || q.kind === 'spike' || q.kind === 'crumble' || q.kind === 'trap' || q.kind === 'lift' || q.kind === 'lip' || Math.abs(q.slope || 0) > 0.3) continue
     const dx = q.p[0] - at[0], dz = q.p[2] - at[2], dy = q.p[1] - at[1]
     if (dy > 1.5 || dy < -6) continue
     const d = dx * dx + dz * dz + dy * dy * 0.5
@@ -37,8 +37,8 @@ function nearI(course, p, from) {
   return bi
 }
 // 出し直してよい道の点か: すぐ先 16 m に跳ぶ所・抜ける床・崩れる板が無く、真下が動かない床で、急な坂でない
-const NOSPAWN = new Set(['sense', 'jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'landing', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'drum'])
-const NOAHEAD = new Set(['sense', 'jump', 'lip', 'trap', 'crumble', 'kick', 'fork'])
+const NOSPAWN = new Set(['spike', 'blast', 'sense', 'jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'landing', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'drum'])
+const NOAHEAD = new Set(['spike', 'blast', 'sense', 'jump', 'lip', 'trap', 'crumble', 'kick', 'fork'])
 export function goodSpot(world, course, i) {
   const P = course.path, q = P[i]
   if (!q || !q.p || !q.w || NOSPAWN.has(q.kind) || Math.abs(q.slope || 0) > 0.25) return false
@@ -113,7 +113,7 @@ export function judge(world, course, R, b, prevP) {
   R.safeT = (R.safeT || 0) + 1
   if (!b.crashed && b.g[0] && b.g[1] && R.safeT >= 15 && R.onI != null) {
     const q = course.path[R.onI]
-    if (q && q.p && q.w && !['sense', 'jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'drum'].includes(q.kind) && Math.abs(b.th - (q.slope || 0)) < 0.35 && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.2) {
+    if (q && q.p && q.w && !['spike', 'blast', 'sense', 'jump', 'lip', 'crumble', 'lift', 'seesaw', 'spin', 'slide', 'water', 'draw', 'trap', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'drum'].includes(q.kind) && Math.abs(b.th - (q.slope || 0)) < 0.35 && Math.abs(b.p[1] - 0.79 - q.p[1]) < 1.2) {
       R.safe = R.safe || []; R.safe.push({ p: q.p.slice(), yaw: q.yaw, t: world.time, i: R.onI, nitro: b.nitro }); if (R.safe.length > 24) R.safe.shift(); R.safeT = 0
     }
   }

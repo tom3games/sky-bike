@@ -336,7 +336,8 @@ export function updateMovers(movers, world, cam) {
       if (s.mov.type === 'crumble' && s.touch > 0 && !s.gone) { ox = (Math.random() - 0.5) * 0.05 * s.touch / s.mov.delay; oy = (Math.random() - 0.5) * 0.04 }
       else if (s.mov.type === 'crumble' && s.preWarn != null && !s.gone && world.time - s.preWarn < 4) { const k = Math.min(1, (world.time - s.preWarn) * 2); ox = (Math.random() - 0.5) * 0.04 * k; oy = -0.07 * k + (Math.random() - 0.5) * 0.03 } // v32 前の板: 先にひびが入って揺れ、少し沈む（見た目だけ）
       // v31: 崩れた板は、その場で消さずに 1.2 秒かけて回りながら落ちる（後ろで崩れ落ちるのが見える）
-      const fa = s.mov.type === 'crumble' && s.gone && s.goneAt != null ? world.time - s.goneAt : -1
+      const fa = (s.mov.type === 'crumble' || s.mov.type === 'blast') && s.gone && s.goneAt != null ? world.time - s.goneAt : -1
+      if (fa >= 0 && fa < 1.2 && s.mov.type === 'blast') { const k = s.id % 2 ? 1 : -1; _m.premultiply(_r.makeRotationAxis(_y.set(...s.ax[2]).normalize(), k * fa * 1.6)); oy -= 9.8 * fa * fa + fa * 2.5 } else // v51 爆発した床は割れて下へ崩れ落ちる（破片と煙は game.js）
       if (fa >= 0 && fa < 1.2) { const k = s.id % 2 ? 1 : -1; _m.premultiply(_r.makeRotationAxis(_y.set(...s.ax[2]).normalize(), k * fa * 1.4)); oy -= 4.9 * fa * fa + fa * 0.6 }
       _m.setPosition(s.c[0] + ox, s.c[1] + oy, s.c[2])
       mesh.visible = !s.gone || (fa >= 0 && fa < 1.2)

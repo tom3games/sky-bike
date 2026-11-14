@@ -26,6 +26,7 @@ import { buildBoulder } from './v41view.js?v=50'
 import { buildMotes } from './motes.js?v=50'
 import { buildMurals } from './murals.js?v=50'
 import { buildV37 } from './v37view.js?v=50'
+import { buildV51 } from './v51view.js?v=50'
 import { buildEpi } from './v48view.js?v=50'
 import { buildSenseLamps } from './v49view.js?v=50'
 import { doorAng } from './traps.js?v=50'
@@ -274,6 +275,7 @@ function loadCourse(id) {
   if (G.v36) G.v36.imps.onReady = () => setTimeout(warmShaders, 0)
   G.murals = c.climb ? buildMurals(c, scene, M) : null // v36 塔の壁の古い壁画 4 枚
   G.v37 = c.climb ? buildV37(c, scene, M) : null // v37 草原・風車
+  if (G.v51) scene.remove(G.v51.group); G.v51 = c.climb ? buildV51(c, scene) : null // v51 黄色いレーザーの床・爆発で消える床
   if (G.epiV) scene.remove(G.epiV.group); G.epiV = c.epi ? buildEpi(c, scene, M) : null // v48 下山の終わりの小屋
   if (G.lampV) scene.remove(G.lampV.group); G.lampV = buildSenseLamps(c, scene) // v50 後輪で乗る台のランプ
   LM.gim = Math.round(lt() - l0); l0 = lt()
@@ -302,7 +304,7 @@ function loadCourse(id) {
   const farGlow = buildFlames(scene, farLights.concat(...crowns.map(cr => cr.flames)), M)
   const flames = buildFlames(scene, flamePts, M)
   LM.rest = Math.round(lt() - l0); l0 = lt()
-  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.ladyG, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, G.v37 && G.v37.group, G.v37 && G.v37.daySky, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
+  built = { more, riser, group, signs, M, objs: [...G.gim.objs, G.ladyG, G.v35 && G.v35.group, G.v36 && G.v36.group, G.murals && G.murals.group, G.v37 && G.v37.group, G.v37 && G.v37.daySky, G.v51 && G.v51.group, riser, group, crownG, farGlow.group, decor.group, signs, chains, under, far, lava, fogL.group, flames.group], movers, M, lava, fogL, flames, farGlow, flamePts, ctr, props: null, chunkMap, decos: [], tasks: [] }
   G.castleAt = c.castleAt
   if (wide) {
     // 準備完了の後の仕事（1 コマに 1 つ、今のカメラに近い物から）
@@ -740,6 +742,7 @@ function v37Step(dt, tm) {
   if (!G.v37 || !G.course) return
   const zq = G.course.path[(G.steer && G.bike ? G.steer.i : 0) || 0], zone = zq && zq.zone
   G.v37.update(dt, tm, camera.position, G.world, G.state === 'play' || G.state === 'pause' ? zone : null)
+  if (G.v51) G.v51.update(dt, G.world, camera.position)
   const k = G.v37.meadowK
   moon.color.copy(G.zlc ? G.zlc.moon : MOONC).lerp(SUNC, k); moon.intensity = 1.7 + 1.3 * k; fill.intensity = 0.55 + 0.4 * k
   { const u = sky.material.uniforms; if (!G.skyOrig) G.skyOrig = { top: u.top.value.clone(), mid: u.mid.value.clone(), bot: u.bot.value.clone() }
@@ -881,6 +884,8 @@ function fixedStep() {
     if (e.t === 'hangBreak') { Snd.play('rockbreak', { vol: 0.8 }); dust.emit(e.p, 20, 2, { col: 0x8a8278, heavy: 1 }) }
     if (e.t === 'hangUp') Snd.play('spring', { vol: 0.4 })
     if (e.t === 'thud') { const k = Math.min(1, e.v / 16); Snd.play('land', { vol: 0.7 + k * 0.3 }); Snd.play('clank', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.1 + k * 0.1); flash('bad'); if (b.cn[0]) dust.emit(b.cn[0].q, 14, 3.5) }
+    if (e.t === 'spike') { Snd.play('clank', { vol: 1 }); Snd.play('crack', { vol: 0.8, rate: 0.8 }); const sh = G.world.shapes[e.id], c0 = sh && sh.mov && sh.mov.beam; if (c0) dust.emit([c0[0], c0[1] + 0.3, c0[2]], 22, 3, { col: 0x8a7a68, up: 4, size: 1.4 }) } // v51 レーザーの床が突き上がる
+    if (e.t === 'blast') { Snd.play('boom', { vol: 1 }); setTimeout(() => Snd.play('rockfall', { vol: 0.7 }), 250); const p = e.p; dust.emit([p[0], p[1] + 0.4, p[2]], 40, 6, { col: 0xff7a2a, up: 6, size: 2.0 }); dust.emit([p[0], p[1] + 0.3, p[2]], 30, 3, { col: 0x2e2c2a, up: 3, size: 2.6 }); dust.emit([p[0], p[1] + 0.2, p[2]], 26, 7, { col: 0x6a5a48, heavy: 1, up: 5, size: 1.0 }); if (G.v51) G.v51.blast(p); G.shake = Math.max(G.shake || 0, 0.35) } // v51 目の前で床が爆発
     if (e.t === 'crumble') { Snd.play('crack', { vol: e.fast ? 1 : 0.7 }); Snd.play('creak', { vol: 0.5 }); if (e.fast) Snd.play('rockfall', { vol: 0.7 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) { const h = [Math.cos(b.psi), 0, -Math.sin(b.psi)]; dust.emit([c0[0], c0[1] + 0.2, c0[2]], 26, 3, { col: 0x8a7a68, up: 2, size: 1.6 }); dust.emit([c0[0] + h[0] * 0.5, c0[1] + 0.1, c0[2] + h[2] * 0.5], 18, 4, { col: 0x5a4a3c, heavy: 1, up: 3, size: 0.8 }) } }
     // v31: 崩れる板に乗った瞬間（どの速さでも）: 大きくきしむ・ひびの音・砂ぼこり
     if (e.t === 'crumbleTouch') { Snd.play('creak', { vol: 0.9, rate: 1.1 }); Snd.play('crack', { vol: 0.45, rate: 1.3 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) dust.emit([c0[0], c0[1] + 0.15, c0[2]], 14, 2.2, { col: 0x9a8a76, up: 1.2, size: 1.2 })

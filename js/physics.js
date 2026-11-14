@@ -261,7 +261,29 @@ function seesawPose(s) {
 // 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
 // v51 追ってくる崩れの表（0.1 秒ごとの後輪の進み）を τ 秒で引く。表の先は最後の速さで進む
 export function chaseTab(T, tau) { const k = tau * 10, i = Math.floor(k); if (i < 0) return T[0]; if (i + 1 >= T.length) { const n = T.length - 1; return T[n] + (T[n] - T[n - 1]) * (k - n) } return T[i] + (T[i + 1] - T[i]) * (k - i) }
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
+// v51 黄色いレーザーの床: 光を切ってから 0.08 秒で rise まで突き上がり、1.4 秒そのまま、0.4 秒で下がる。2.6 秒でまた光る
+export function spikeK(m, t) { if (m.t0 == null) return 0; const u = t - m.t0; return u < 0 ? 0 : u < 0.08 ? u / 0.08 : u < 1.4 ? 1 : u < 1.8 ? 1 - (u - 1.4) / 0.4 : 0 }
+// 光を切ったか: 車輪（外径 0.36）が、光の線（道の面から m.h の高さ・道の幅）にかかったら。前輪で切った時、後輪が突き上がる床の上にいれば車体ごと突き上げられて前へ回る
+// v51 目の前で爆発して消える床: 前輪が床の始まりの trig m 手前に来たら（前へ進んでいる時）、床の箱を全部消す
+function blastTrack(world, b, ev) {
+  for (const G of world.blasts) { if (G.t0 != null || b.ghost || b.crashed || b.speed < 1) continue
+    const B = basis(b), c = wheelCenter(b, B, 1, 0), d = [c[0] - G.start[0], c[1] - G.start[1], c[2] - G.start[2]], al = d[0] * G.f[0] + d[2] * G.f[2], la = Math.abs(-d[0] * G.f[2] + d[2] * G.f[0])
+    if (al < -G.trig || al > 0.5 || la > G.w / 2 + 1 || Math.abs(d[1]) > 2.5) continue
+    G.t0 = world.time; for (const s of G.boxes) { s.gone = true; s.goneAt = world.time } if (G.lip) G.lip.gone = false
+    if (ev) ev.push({ t: 'blast', p: [G.start[0] + G.f[0] * G.len / 2, G.start[1], G.start[2] + G.f[2] * G.len / 2] })
+  }
+}
+function spikeTrack(world, b, ev) {
+  for (const s of world.spikes) { const m = s.mov; if (m.t0 != null || b.ghost || b.crashed) continue
+    const B = basis(b)
+    for (let i = 1; i >= 0; i--) { const c = wheelCenter(b, B, i, 0), d = [c[0] - m.beam[0], c[1] - m.beam[1], c[2] - m.beam[2]], al = d[0] * m.f[0] + d[2] * m.f[2], la = Math.abs(-d[0] * m.f[2] + d[2] * m.f[0])
+      if (Math.abs(al) > 0.36 || la > m.w / 2 || d[1] - 0.36 > m.h || d[1] < -0.6) continue
+      m.t0 = world.time; if (ev) ev.push({ t: 'spike', id: s.id, wheel: i })
+      if (i === 1) { const r = wheelCenter(b, B, 0, 0), dr = [r[0] - m.beam[0], r[2] - m.beam[2]], ar = dr[0] * m.f[0] + dr[1] * m.f[2]; if (ar > -m.back - 0.3 && ar < -0.2 && b.g[0]) { b.v[1] += m.kick; b.w -= m.spin; b.spiked = world.time } }
+      break }
+  }
+}
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'spike') m.t0 = null; if (m.type === 'blast') { m.G.t0 = null; s.gone = false } if (m.type === 'blastLip') s.gone = true; if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
 // v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
@@ -372,6 +394,9 @@ export class World {
       if (s.mov && s.mov.type === 'gate' && !this.drums.includes(s.mov.drumR)) this.drums.push(s.mov.drumR) // v35 回る筒
       if (s.mov && s.mov.type === 'girder') this.girders = true
       if (s.mov && s.mov.type === 'blade') this.blades = true
+      if (s.mov && s.mov.type === 'spike') { (this.spikes = this.spikes || []).push(s); s.mov.t0 = null }
+      if (s.mov && s.mov.type === 'blastLip') { s.gone = true }
+      if (s.mov && s.mov.type === 'blast') { this.blasts = this.blasts || []; if (!this.blasts.includes(s.mov.G)) this.blasts.push(s.mov.G); s.mov.G.t0 = null; (s.mov.G.boxes = s.mov.G.boxes || []).includes(s) || s.mov.G.boxes.push(s) }
       if (s.mov && s.mov.type === 'sense') { (this.senses = this.senses || []).push(s); s.mov.st = 'wait'; s.mov.load = 0; s.mov.idle = 0; s.mov.t0 = 0 }
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
@@ -418,10 +443,14 @@ export class World {
       else if (m.type === 'drop') { const st = dropState(m, t); s.c = [B0.c[0], B0.c[1] + st.y, B0.c[2]]; s.gone = st.hidden; s.min = s.c.map(v => v - s.r); s.max = s.c.map(v => v + s.r) }
       else if (m.type === 'trap') { if (t === 0) { s.gone = false; s.warnT = null } }
       else if (m.type === 'crumble') { if (t === 0) { s.gone = false; s.touch = 0; s.goneAt = -1e9 } }
+      else if (m.type === 'blastLip') { s.gone = m.G.t0 == null || t - m.G.t0 > m.G.back }
+      else if (m.type === 'blast') { if (t === 0 || (m.G.t0 != null && t - m.G.t0 > m.G.back)) { if (s.gone || m.G.t0 != null) { s.gone = false } } if (t === 0) m.G.t0 = null }
+      else if (m.type === 'spike') { if (t === 0) m.t0 = null; const k = spikeK(m, t); s.c = [B0.c[0] + m.up[0] * m.rise * k, B0.c[1] + m.up[1] * m.rise * k, B0.c[2] + m.up[2] * m.rise * k]; if (m.t0 != null && t - m.t0 > 2.6) m.t0 = null } // v51 レーザーで突き上がる床
       else if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle' || m.type === 'topple') v16Pose(s, t, dtT)
       if (m.type === 'crumble') { if (s.gone && t - s.goneAt > m.back) { s.gone = false; s.touch = 0 } else if (!s.gone && s.touch > 0 && s.lastTouch !== undefined && t - s.lastTouch > 1.5) s.touch = 0 }
     }
-    for (const G of this.chases || []) { if (t === 0 || (G.t0 != null && t - G.t0 > G.reset)) G.t0 = null } // v51 追ってくる崩れ: 崩れ終わって板が戻ったら、また待つ
+    for (const G of this.chases || []) { if (t === 0 || (G.t0 != null && t - G.t0 > G.reset)) G.t0 = null }
+    for (const G of this.blasts || []) if (G.t0 != null && t - G.t0 > G.back) G.t0 = null // v51 爆発で消えた床が戻る // v51 追ってくる崩れ: 崩れ終わって板が戻ったら、また待つ
   }
   tick() {
     // シーソー: 前の 1 コマにバイクから受けた回す力で、8 回に分けて傾ける（重さで傾く。乗っていなければゆっくり元へ戻る）
@@ -646,6 +675,8 @@ export function stepBike(world, b, inp, ev) {
   if (!b.ghost && world.girders) girderTrack(world, b, ev)
   if (!b.ghost && world.senses) senseTrack(world, b, ev)
   if (!b.ghost && world.blades) bladeTrack(world, b)
+  if (!b.ghost && world.spikes) spikeTrack(world, b, ev)
+  if (!b.ghost && world.blasts) blastTrack(world, b, ev)
   if (!b.ghost) v16Track(world, b, ev)
   b.steps++
 }

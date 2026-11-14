@@ -335,7 +335,19 @@ export function botInput(bot, b) {
   // v35 回る筒: 助走から筒を出るまで全開（人も同じ。遅いと真上で落ちる）
   if (b._dph || cur.kind === 'drum' || cur.kind === 'drumRun' || SQ.slice(0, 30).some(j => path[j].kind === 'drum')) { thr = 1; brk = 0; lean = 0; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 }
   { let ch = null; for (let j = bot.i; j < Math.min(path.length, bot.i + 45); j++) { if (path[j].chase) { ch = j; break } if (path[j].kind === 'jump' || path[j].kind === 'lip') break } /* 曲がりは自動の減速（assist）に任せて、アクセルは離さない（人も全開のまま角を抜ける） */ if (bot.skill === 'good' && ch != null && !air) { thr = 1; brk = 0; if (path[ch].chase.nitro) nitroNeed = true; if (path[bot.i].chase || ch - bot.i < 4) lean = b.th > 0.3 ? 0.6 : 0 } } // v51 追ってくる崩れの上は全開（全開の時の後輪の進みに合わせて崩れが追ってくる）
-  const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
+  // v51 黄色いレーザーの床: 5m/s ほどに落として、前輪が光の 2.6m 手前でウィリーを始め、前輪を光の上に通す。後輪が光を越えたら前体重で下ろす
+  if (bot.skill === 'good' && !air) { let sp0 = null; for (let j = Math.max(0, bot.i - 3); j < Math.min(path.length, bot.i + 14); j++) if (path[j].spike) { sp0 = path[j].spike; break }
+    if (sp0 && sp0.t0 == null) { const Bq = basis(b), fw = wheelCenter(b, Bq, 1, 0), rw = wheelCenter(b, Bq, 0, 0), fa = (fw[0] - sp0.beam[0]) * sp0.f[0] + (fw[2] - sp0.beam[2]) * sp0.f[2], ra = (rw[0] - sp0.beam[0]) * sp0.f[0] + (rw[2] - sp0.beam[2]) * sp0.f[2]
+      const vA = +(globalThis.__lzV ?? 5), pop = +(globalThis.__lzPop ?? 3.4) + (bot.react || 0) / 60 * vA
+      if (ra > 0.6) { lean = b.th > 0.08 ? 1 : 0; thr = 1; brk = 0 }
+      else if (fa > -pop) { thr = b.th > 0.62 ? 0.2 : 1; brk = 0; lean = b.th < 0.42 ? -1 : b.th > 0.62 ? 0.3 : -0.4 }
+      else if (fa > -12) { thr = sp < vA - 0.4 ? 1 : 0; brk = sp > vA + 0.6 ? 0.5 : 0; lean = 0 }
+      bot.waiting = true; bot.stuckT = 0 }
+    else if (sp0 && sp0.t0 != null && path[bot.i].spike) { lean = b.th > 0.08 ? 1 : 0; thr = 1; brk = 0 } }
+  // v51 爆発で消える床: 手前 30m からは全開。爆発したら（G.t0）すぐニトロ
+  let blastNit = false
+  if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } }
+  const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
   if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach')) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
