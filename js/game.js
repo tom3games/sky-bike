@@ -8,24 +8,25 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=42'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=42'
-import { COURSES } from './course.js?v=42'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=42'
-import { BikeView, snap } from './bikeview.js?v=42'
-import { createBot, botInput, resetBot } from './bot.js?v=42'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=42'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=42'
-import { Birds } from './birds.js?v=42'
-import { crowPush } from './strike.js?v=42'
-import { buildV35, hankieDataURL } from './v35view.js?v=42'
-import { buildV36 } from './v36view.js?v=42'
-import { buildLady } from './lady.js?v=42'
-import { buildBoulder } from './v41view.js?v=42'
-import { buildMurals } from './murals.js?v=42'
-import { buildV37 } from './v37view.js?v=42'
-import { doorAng } from './traps.js?v=42'
-import { resetDrums } from './physics.js?v=42'
+import { buildGimmicks } from './gimmicks.js?v=43'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=43'
+import { COURSES } from './course.js?v=43'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=43'
+import { BikeView, snap } from './bikeview.js?v=43'
+import { createBot, botInput, resetBot } from './bot.js?v=43'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=43'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=43'
+import { Birds } from './birds.js?v=43'
+import { crowPush } from './strike.js?v=43'
+import { buildV35, hankieDataURL } from './v35view.js?v=43'
+import { buildV36 } from './v36view.js?v=43'
+import { buildLady } from './lady.js?v=43'
+import { buildBoulder } from './v41view.js?v=43'
+import { buildMotes } from './motes.js?v=43'
+import { buildMurals } from './murals.js?v=43'
+import { buildV37 } from './v37view.js?v=43'
+import { doorAng } from './traps.js?v=43'
+import { resetDrums } from './physics.js?v=43'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -38,7 +39,10 @@ const Q = new URLSearchParams(location.search)
 // v16 広い世界: 遠くまで指数で効き、最大 0.93 で止める（次の塔・来た道の影が霧の中に残る）
 THREE.ShaderChunk.fog_pars_vertex = '#ifdef USE_FOG\n varying float vFogDepth; varying vec3 vFogW;\n#endif'
 THREE.ShaderChunk.fog_vertex = '#ifdef USE_FOG\n vFogDepth = - mvPosition.z; vFogW = (inverse(viewMatrix) * mvPosition).xyz;\n#endif'
-THREE.ShaderChunk.fog_pars_fragment = '#ifdef USE_FOG\n uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogW;\n #ifdef FOG_EXP2\n uniform float fogDensity;\n #else\n uniform float fogNear; uniform float fogFar;\n #endif\n#endif'
+THREE.ShaderChunk.fog_pars_fragment = '#ifdef USE_FOG\n uniform vec3 fogColor; varying float vFogDepth; varying vec3 vFogW;\n #ifdef FOG_EXP2\n uniform float fogDensity;\n #else\n uniform float fogNear; uniform float fogFar; uniform float fogTime;\n #endif\n#endif'
+// v43 霧をゆっくり流す: 霧の式の濃さに、時間で流れる模様を掛ける。時間はすべての材料で同じ物を共有する（Material の既定の onBeforeCompile で配る）
+const FOGT = { value: 0 }
+THREE.Material.prototype.onBeforeCompile = function (sh) { sh.uniforms.fogTime = FOGT }
 THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
  #ifdef FOG_EXP2
   float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
@@ -1084,6 +1088,7 @@ function aimLights(p) {
 const _c1 = new THREE.Color()
 
 // 灰（ゆっくり降る）と火の粉（下ほど多い）
+const motes = buildMotes(scene, lowEnd) // v43
 const ash = (() => {
   const N = lowEnd ? 350 : 800, geo = new THREE.BufferGeometry(), pos = new Float32Array(N * 3), kind = new Float32Array(N)
   for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 50; pos[i * 3 + 1] = (Math.random() - 0.5) * 30; pos[i * 3 + 2] = (Math.random() - 0.5) * 50; kind[i] = Math.random() < 0.08 ? 1 : 0 }
@@ -1252,6 +1257,8 @@ function frame(now) {
   if (G.state === 'play' || G.state === 'pause' || G.state === 'result') { if (!endingCam()) updateCamera(dt, alpha); if (G.state !== 'result') hud() }
   else if (G.state !== 'debug') titleCam(tm)
   ash.update(Math.min(dt, 0.05), camera.position, tm)
+  FOGT.value = tm // v43 霧の流れ
+  { const zq = G.course && G.course.path[(G.steer && G.bike ? G.steer.i : G.titleI) || 0]; motes.update(Math.min(dt, 0.05), camera.position, tm, zq && zq.zone) } // v43 区間ごとに舞う粒
   soundUpdate(dt)
   renderer.info.reset()
   if (G.noPost) renderer.render(scene, camera); else composer.render(dt)

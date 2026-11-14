@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=42'
+import { arcPoint } from './physics.js?v=43'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -1141,7 +1141,8 @@ void main(){ vec4 t = texture2D(map, vUv); vec3 c = t.rgb * col * t.a;
 // 遠くまで指数で効き、最大でも 0.93（遠い塔の影が霧の中に残る）。今いる高さより下ほど濃い
 // v38: 下へ深いほどさらに濃く（谷の底が沈む）、上はより澄む。霧の層は足さず、式だけ
 export const FOG_FACTOR = `float fogDh = vFogW.y - fogFar; float hk = exp( - max( 0.0, fogDh ) * 0.04 ); float fogLo = 1.0 - exp( - max( 0.0, - fogDh ) * 0.022 );
-  float fogFactor = 0.93 * ( 1.0 - exp( - fogNear * ( 0.38 + 1.1 * hk + 0.85 * fogLo ) * vFogDepth ) );`
+  float fogDr = 0.5 + 0.25 * sin( vFogW.x * 0.021 + fogTime * 0.11 ) * sin( vFogW.z * 0.017 - fogTime * 0.08 ) + 0.25 * sin( ( vFogW.x + vFogW.z ) * 0.009 + vFogW.y * 0.03 + fogTime * 0.06 );
+  float fogFactor = 0.93 * ( 1.0 - exp( - fogNear * ( 0.38 + 1.1 * hk + 0.85 * fogLo ) * ( 0.78 + 0.44 * fogDr ) * vFogDepth ) );`
 export function buildFlames(scene, points, M) {
   const g = new THREE.Group(); g.name = 'flames'
   const mk = (tex, col) => {
