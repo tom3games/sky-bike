@@ -805,7 +805,7 @@ function sub(world, b, inpIn, ev) {
   if (!b.crashed && b.g[1] && !b.g[0] && b.cn[1]) {
     const n = b.cn[1].nw || b.cn[1].n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する前の傾き（負＝突っ込む）
     // ブレーキだけの浮きは速さの分だけ（遅くなると戻る）。前体重＋ブレーキは、遅い時は約 37 度で保つ（ジャックナイフ）が、速い時（4m/s 超）は守らない（前へ回って転ぶ）
-    const lim = inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, Math.min(0.8, 0.057 * Math.abs(b.speed) + 0.03), 0.77 * clamp(((b.brkV0 || 0) - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1) * clamp(1.3 - (b.brkT || 0), 0, 1)) /* v20: 全速（13m/s）からの急ブレーキで後輪が約50度まで浮く（本人「全速からの急ブレーキは50度で」） */
+    const lim = (b.brkV0 || 0) > 14.5 && inp.brk > 0.5 ? -9 : inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, Math.min(0.8, 0.057 * Math.abs(b.speed) + 0.03), 0.77 * clamp(((b.brkV0 || 0) - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1) * clamp(1.3 - (b.brkT || 0), 0, 1)) /* v20: 全速（13m/s）からの急ブレーキで後輪が約50度まで浮く（本人「全速からの急ブレーキは50度で」） */
     b.noseT = rel < -0.94 && b.w < 0.3 ? (b.noseT || 0) + H : 0
     if (b.noseT > 0.12) crash(b, 'front', 0, ev) // 前輪だけで、地面から 70 度より前へ傾いたまま（前へ回っていく）
     if (rel < lim) { tau += (lim - rel) * 9000; if (b.w < 0) tau -= b.w * 1400 }
@@ -815,8 +815,9 @@ function sub(world, b, inpIn, ev) {
   //      前輪が着いている間だけ毎秒約 90 度で後輪を持ち上げる。速さが落ちると上の lim が下がって戻る
   if (!b.crashed && inp.brk > 0.5 && inp.thr <= 0.05 && inp.lean <= 0.3 && b.g[1]) {
     if (Math.abs(b.speed) > (b.brkV0 || 0) + 0.05) { b.brkV0 = Math.abs(b.speed); b.brkT = 0 } else b.brkT = (b.brkT || 0) + H // 速さが上がった時（止まったまま押していた後に押し出された等）は数え直す
-    const tgt = clamp(1.3 - b.brkT, 0, 1) * 0.873 * clamp((b.brkV0 - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1)
-    { const wT = Math.min(1.6, (b.th + tgt) * 5); if (b.th < -0.2 && b.th > -tgt && b.w > -wT) tau -= (b.w + wT) * 1400 } /* 自然に 11 度以上浮いた時だけ（氷・濡れた石では浮かない）。目標に近づくほどゆっくり */
+    const flip = b.brkV0 > 14.5 // v20b: ニトロ並みの速さ（最高速度13.5を超えた）からの急ブレーキは、ゆっくり前へ回って転ぶ（本人「ニトロ中の急ブレーキはゆっくり転ぶように」）
+    const tgt = flip ? 1.5 : clamp(1.3 - b.brkT, 0, 1) * 0.873 * clamp((b.brkV0 - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1)
+    { const wT = flip ? 0.6 : Math.min(1.6, (b.th + tgt) * 5); if (flip && b.w < -wT) tau += (-wT - b.w) * 1600 /* ゆっくり回る（約1.5秒で転ぶ） */; if (flip && b.th < -1.3) crash(b, 'front', 0, ev) /* 約75度で転ぶ */; if ((flip || b.th < -0.2) && b.th > -tgt && b.w > -wT) tau -= (b.w + wT) * 1400 } /* 自然に 11 度以上浮いた時だけ（氷・濡れた石では浮かない）。目標に近づくほどゆっくり */
   } else { b.brkV0 = 0; b.brkT = 0 }
   // ---- 止まったままのウィリー（トライアルのスタンディングウィリー）: 速さがほぼ 0・アクセルなしで後ろ体重なら、
   //      前輪を約 33 度まで持ち上げてそこで保つ。前体重＋ブレーキなら、前輪で立って約 33 度まで前へ傾けて保つ。
