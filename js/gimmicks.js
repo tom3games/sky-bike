@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=28'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=29'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -154,8 +154,9 @@ export function buildGimmicks(course, scene, M) {
     const body = new THREE.Mesh(canGeo, canMat); body.castShadow = true; g.add(body)
     const cap = new THREE.Mesh(capGeo, M.gold || canMat); cap.position.set(0.07, 0.21, 0); g.add(cap)
     const ring = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.025, 6, 32), ringMat); ring.rotation.x = Math.PI / 2; ring.position.y = -0.4; g.add(ring)
-    const lt = new THREE.PointLight(0x5fb8ff, 3, 5, 2); lt.position.y = 0.2; g.add(lt)
-    group.add(g); return { cn, g }
+    // v29: 光は缶の組の外に置き、拾った時は明るさを 0 にするだけ（見えなくすると光の数が変わって、全部の材料のシェーダが作り直しになり、スマホで画面が止まっていた）
+    const lt = new THREE.PointLight(0x5fb8ff, 3, 5, 2); lt.position.set(cn.p[0], cn.p[1] + 0.65, cn.p[2]); group.add(lt)
+    group.add(g); return { cn, g, lt }
   })
   // 前輪を掛ける縁: 角に欠けかけた石の並び（見た目だけ）
   for (const d of (course.decor || []).filter(d => d.kind === 'hangLip')) {
@@ -230,7 +231,7 @@ export function buildGimmicks(course, scene, M) {
       }
       this.gust = gustNear
       streak.update(dt)
-      for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; if (!gone) c.g.rotation.y = tm * 1.4 }
+      for (const c of cans) { const gone = c.cn.t != null && T - c.cn.t < 25 && T >= c.cn.t; c.g.visible = !gone; c.lt.intensity = gone ? 0 : 3; if (!gone) c.g.rotation.y = tm * 1.4 }
       // 旗: なびき（布の端ほど大きく揺れる）。通った旗は明るくなる
       for (const fl of flags) {
         const reached = R && R.rest != null && fl.f.cp <= R.rest && (R.restSeen || {})[fl.f.cp]
@@ -246,6 +247,95 @@ export function buildGimmicks(course, scene, M) {
   }
 }
 
+// ============================================================ v29 錆びた鋳鉄の歯車の形と材料
+// 歯の輪: 歯の付け根 R-0.02・先 R+0.3、内側 R-0.3。上から見た形を押し出す（y が厚み。上が 0、下へ -th）。面取り（bevel）で角が光る
+function gearRingGeo(R, th, plain = false) {
+  const nT = Math.max(16, Math.round(R * 2 * Math.PI / 0.46)), rr = R - 0.02, rt = R + 0.28, ri = R - 0.3
+  const sh = new THREE.Shape()
+  for (let k = 0; k < nT; k++) {
+    const a0 = k / nT * Math.PI * 2, da = Math.PI * 2 / nT
+    const pts = [[rr, a0], [rr, a0 + da * 0.18], [rt, a0 + da * 0.32], [rt, a0 + da * 0.68], [rr, a0 + da * 0.82]]
+    for (const [r, a] of pts) { const x = Math.cos(a) * r, y = Math.sin(a) * r; if (k === 0 && r === rr && a === a0) sh.moveTo(x, y); else sh.lineTo(x, y) }
+  }
+  sh.closePath()
+  const hole = new THREE.Path(); hole.absarc(0, 0, ri, 0, Math.PI * 2, true); sh.holes.push(hole)
+  const bv = plain ? 0 : 0.03
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: th - bv * 2, bevelEnabled: !plain, bevelThickness: bv, bevelSize: bv, bevelSegments: 1, curveSegments: plain ? 16 : 32 })
+  // 押し出しの向き（+z）を下（-y）へ。上の面が y=0
+  geo.rotateX(Math.PI / 2); geo.translate(0, -bv, 0)
+  // 錆の絵: 側面は周の長さと高さ、上下の面は位置で
+  const P = geo.attributes.position, N = geo.attributes.normal, uv = geo.attributes.uv
+  for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i); if (Math.abs(N.getY(i)) > 0.7) uv.setXY(i, x / 1.6, z / 1.6); else uv.setXY(i, Math.atan2(z, x) * R / 1.6, y / 1.6) }
+  // 歯の付け根は暗く（油と錆の溜まり）、先は擦れて明るい
+  const col = new Float32Array(P.count * 3); for (let i = 0; i < P.count; i++) { const r = Math.hypot(P.getX(i), P.getZ(i)), k = Math.min(1, Math.max(0, (r - rr) / (rt - rr))), v = 0.45 + k * 0.85 + (Math.abs(N.getY(i)) > 0.7 ? 0 : 0.1 * k); col[i * 3] = v * 1.02; col[i * 3 + 1] = v; col[i * 3 + 2] = v * 0.95 }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3))
+  return geo
+}
+// 平らな輪（上の面に置く盛り上がり。面取りあり）: r0..r1、高さ h
+function ringGeo(r0, r1, h, bv) {
+  const sh = new THREE.Shape(); sh.absarc(0, 0, r1 - bv, 0, Math.PI * 2, false)
+  if (r0 > 0) { const ho = new THREE.Path(); ho.absarc(0, 0, r0 + bv, 0, Math.PI * 2, true); sh.holes.push(ho) }
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.001, h - bv), bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 1, curveSegments: 48 })
+  geo.rotateX(-Math.PI / 2)
+  const P = geo.attributes.position, uv = geo.attributes.uv; for (let i = 0; i < P.count; i++) uv.setXY(i, P.getX(i) / 2.2, P.getZ(i) / 2.2)
+  return geo
+}
+// 面取りした棒（スポーク）: 長さ L（x）・幅 w・高さ h
+function barGeo(L, w, h, bv) {
+  const sh = new THREE.Shape(); sh.moveTo(-L / 2 + bv, -w / 2 + bv); sh.lineTo(L / 2 - bv, -w / 2 + bv); sh.lineTo(L / 2 - bv, w / 2 - bv); sh.lineTo(-L / 2 + bv, w / 2 - bv); sh.closePath()
+  const geo = new THREE.ExtrudeGeometry(sh, { depth: Math.max(0.001, h - bv), bevelEnabled: true, bevelThickness: bv, bevelSize: bv, bevelSegments: 1 })
+  geo.rotateX(-Math.PI / 2)
+  const P = geo.attributes.position, uv = geo.attributes.uv; for (let i = 0; i < P.count; i++) uv.setXY(i, P.getX(i) / 2.2, P.getZ(i) / 2.2)
+  return geo
+}
+let GMcache = null
+function gearMats(M, rust, iron, edge) {
+  if (GMcache) return GMcache
+  const base = M.rust || rust, met = M.iron || iron
+  // 鋳鉄: 錆の絵（色・法線・ラフネス）を暗い鉄の色で。金属度は錆の所で下がるよう中くらい
+  const cast = base.clone(); cast.color = new THREE.Color(0x6e5546); cast.metalness = 0.45; cast.roughness = 0.75; cast.normalScale = new THREE.Vector2(1.6, 1.6)
+  const face = base.clone(); face.color = new THREE.Color(0xb08870); face.metalness = 0.3; face.roughness = 0.8; face.normalScale = new THREE.Vector2(1.3, 1.3)
+  const teeth = base.clone(); teeth.color = new THREE.Color(0x8a7060); teeth.metalness = 0.6; teeth.roughness = 0.5; teeth.vertexColors = true; teeth.normalScale = new THREE.Vector2(1.5, 1.5)
+  const rim = base.clone(); rim.color = new THREE.Color(0xb49884); rim.metalness = 0.6; rim.roughness = 0.45
+  const hub = met.clone(); hub.color = new THREE.Color(0x4a4440); hub.roughness = 0.45
+  const ed = (M.edgesteel || edge).clone(); ed.color = new THREE.Color(0x8a827a); ed.roughness = 0.35
+  // 面の汚れ: スポークの間のくぼみを暗く・擦れた縁を明るく（透明の絵）
+  const dirtT = canvasT(512, 512, (g, w, h) => {
+    seed = 41; const cx = w / 2, cy = h / 2, R = w / 2
+    for (let k = 0; k < 6; k++) { const a0 = k / 6 * Math.PI * 2 - 0.26 + 0.09, a1 = (k + 1) / 6 * Math.PI * 2 - 0.26 - 0.09
+      const gr = g.createRadialGradient(cx, cy, R * 0.25, cx, cy, R * 0.9); gr.addColorStop(0, 'rgba(12,9,7,0.12)'); gr.addColorStop(1, 'rgba(12,9,7,0.28)'); g.fillStyle = gr
+      g.beginPath(); g.arc(cx, cy, R * 0.86, a0, a1); g.arc(cx, cy, R * 0.26, a1, a0, true); g.closePath(); g.fill() }
+    // 擦れて光る外の縁（タイヤが通る所）
+    g.lineWidth = R * 0.06; g.strokeStyle = 'rgba(225,205,175,0.4)'; g.beginPath(); g.arc(cx, cy, R * 0.955, 0, 7); g.stroke()
+    for (let i = 0; i < 260; i++) { const a = rnd() * 7, r = R * (0.9 + rnd() * 0.09); g.fillStyle = `rgba(225,200,170,${0.08 + rnd() * 0.18})`; g.fillRect(cx + Math.cos(a) * r, cy + Math.sin(a) * r, 2 + rnd() * 9, 1 + rnd() * 2) }
+    // 板の継ぎ目の溝（スポークの間の板を 2 枚に分ける細い黒い線）
+    g.strokeStyle = 'rgba(10,8,6,0.7)'; g.lineWidth = 3; for (let k = 0; k < 6; k++) { const a = (k + 0.5) / 6 * Math.PI * 2 - 0.26; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.3, cy + Math.sin(a) * R * 0.3); g.lineTo(cx + Math.cos(a) * R * 0.86, cy + Math.sin(a) * R * 0.86); g.stroke() }
+    g.beginPath(); g.arc(cx, cy, R * 0.6, 0, 7); g.lineWidth = 2; g.stroke()
+    // 錆の斑
+    for (let i = 0; i < 90; i++) { const x = rnd() * w, y = rnd() * h, r = 6 + rnd() * 40, sg = g.createRadialGradient(x, y, 0, x, y, r); sg.addColorStop(0, `rgba(${120 + rnd() * 40},${55 + rnd() * 20},${20},${0.18 + rnd() * 0.2})`); sg.addColorStop(1, 'rgba(120,55,20,0)'); g.fillStyle = sg; g.fillRect(x - r, y - r, r * 2, r * 2) }
+    // 円の外は透明
+    g.globalCompositeOperation = 'destination-in'; g.beginPath(); g.arc(cx, cy, R - 1, 0, 7); g.fill()
+  })
+  const dirt = new THREE.MeshStandardMaterial({ map: dirtT, transparent: true, depthWrite: false, roughness: 0.85, metalness: 0.2, polygonOffset: true, polygonOffsetFactor: -1 })
+  // 軸のまわりの油（黒く濡れて光る。外へ伸びる筋）
+  const oilT = canvasT(256, 256, (g, w, h) => {
+    seed = 57; const cx = w / 2, cy = h / 2, R = w / 2
+    const gr = g.createRadialGradient(cx, cy, R * 0.3, cx, cy, R * 0.85); gr.addColorStop(0, 'rgba(6,5,4,0.85)'); gr.addColorStop(0.6, 'rgba(8,6,4,0.45)'); gr.addColorStop(1, 'rgba(8,6,4,0)'); g.fillStyle = gr; g.fillRect(0, 0, w, h)
+    for (let i = 0; i < 14; i++) { const a = rnd() * 7, L = R * (0.5 + rnd() * 0.45); g.strokeStyle = `rgba(6,5,4,${0.3 + rnd() * 0.35})`; g.lineWidth = 2 + rnd() * 6; g.beginPath(); g.moveTo(cx + Math.cos(a) * R * 0.4, cy + Math.sin(a) * R * 0.4); g.quadraticCurveTo(cx + Math.cos(a + 0.2) * L * 0.8, cy + Math.sin(a + 0.2) * L * 0.8, cx + Math.cos(a + 0.12) * L, cy + Math.sin(a + 0.12) * L); g.stroke() }
+  })
+  const oil = new THREE.MeshStandardMaterial({ map: oilT, transparent: true, depthWrite: false, roughness: 0.12, metalness: 0.6, polygonOffset: true, polygonOffsetFactor: -2 })
+  // 縁から垂れる錆（側面の帯。上から下へ細くなる筋）
+  const dripT = canvasT(1024, 64, (g, w, h) => {
+    seed = 63
+    for (let i = 0; i < 70; i++) { const x = rnd() * w, L = h * (0.3 + rnd() * 0.7), wd = 2 + rnd() * 6, gr = g.createLinearGradient(0, 0, 0, L); gr.addColorStop(0, `rgba(${130 + rnd() * 40},${58 + rnd() * 20},22,${0.55 + rnd() * 0.35})`); gr.addColorStop(1, 'rgba(110,50,20,0)'); g.fillStyle = gr; g.beginPath(); g.moveTo(x - wd, 0); g.lineTo(x + wd, 0); g.lineTo(x + wd * 0.3, L); g.lineTo(x - wd * 0.3, L); g.fill() }
+    g.fillStyle = 'rgba(30,20,14,0.35)'; g.fillRect(0, 0, w, 3)
+  })
+  dripT.wrapS = THREE.RepeatWrapping; dripT.repeat.set(3, 1)
+  const drip = new THREE.MeshStandardMaterial({ map: dripT, transparent: true, depthWrite: false, roughness: 0.8, metalness: 0.2, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -1 })
+  GMcache = { cast, face, teeth, rim, hub, edge: ed, dirt, oil, drip }
+  return GMcache
+}
+
 // ============================================================ v16 の仕掛けの見た目（当たりは physics.js。歯は歯車の円の外の側面だけで、上の面より下）
 function buildV16(course, group, M, chainMat, unitCyl) {
   const d16 = (course.decor || [])
@@ -255,23 +345,56 @@ function buildV16(course, group, M, chainMat, unitCyl) {
   const rod = (r, mat = chainMat) => { const m = new THREE.Mesh(unitCyl, mat); m.castShadow = true; m.userData.r = r; group.add(m); return m }
   const snd = () => (typeof Snd !== 'undefined' ? Snd : null)
   // ---- 歯車: 側面の歯（上の面より 0.12 下まで）・上の面の放射状の帯（面に貼るだけ）・中心の軸。円板と一緒に回す
+  // v29: 錆びた鋳鉄の歯車。当たりは今のまま（円柱）。見た目だけ: 面取りした歯の輪・縁（リム）・スポーク・ハブ・ボルト・鋳造の段・
+  // 擦れて光る縁・軸のまわりの油・縁から垂れる錆。遠く（40m より先）は軽い形に切り替える（LOD）
+  const GM = gearMats(M, rust, iron, edge)
   const gears = d16.filter(d => d.kind === 'gear').map(d => {
     const g = new THREE.Group(); g.position.set(d.c[0], d.c[1], d.c[2]); group.add(g)
-    // 円板の上の面と下の面（当たりの円柱と同じ。側面はコースのメッシュ）
+    // 円板の上の面と下の面（当たりの円柱と同じ高さ。側面はコースのメッシュ）
     const topG = new THREE.CircleGeometry(d.R, 64); topG.rotateX(-Math.PI / 2)
-    { const uv = topG.attributes.uv, P = topG.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / 2.4, P.getZ(i) / 2.4) }
-    const top = new THREE.Mesh(topG, M.grate || rust); top.receiveShadow = true; g.add(top)
-    const bot = new THREE.Mesh(topG, rust); bot.rotation.x = Math.PI; bot.position.y = -d.thick; g.add(bot)
-    const nT = Math.max(16, Math.round(d.R * 2 * Math.PI / 0.42)), th = Math.min(0.55, d.thick - 0.14)
-    const tg = new THREE.BoxGeometry(0.24, th, 0.22), tm = new THREE.InstancedMesh(tg, iron, nT); tm.castShadow = true
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), ps = new THREE.Vector3()
-    for (let k = 0; k < nT; k++) { const a = k / nT * Math.PI * 2; ps.set(Math.cos(a) * (d.R + 0.1), -0.14 - th / 2, -Math.sin(a) * (d.R + 0.1)); q.setFromAxisAngle(_up, a); m4.compose(ps, q, sc); tm.setMatrixAt(k, m4) }
-    g.add(tm)
-    // 上の面の帯（6 本の太い帯と輪。面から 5mm 上。回っているのが見える）
-    const bandMat = new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 0.5, metalness: 0.7 })
-    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2, b = new THREE.Mesh(new THREE.BoxGeometry(d.R * 0.82, 0.01, 0.34), bandMat); b.position.set(Math.cos(a) * d.R * 0.5, 0.005, -Math.sin(a) * d.R * 0.5); b.rotation.y = a; b.receiveShadow = true; g.add(b) }
-    const ring = new THREE.Mesh(new THREE.RingGeometry(d.R - 0.32, d.R - 0.14, 48), bandMat); ring.rotation.x = -Math.PI / 2; ring.position.y = 0.006; g.add(ring)
-    const hub = new THREE.Mesh(new THREE.CircleGeometry(0.62, 24), edge); hub.rotation.x = -Math.PI / 2; hub.position.y = 0.007; g.add(hub)
+    { const uv = topG.attributes.uv, P = topG.attributes.position; for (let i = 0; i < uv.count; i++) uv.setXY(i, P.getX(i) / 2.2, P.getZ(i) / 2.2) }
+    const top = new THREE.Mesh(topG, GM.face); top.receiveShadow = true; g.add(top)
+    const bot = new THREE.Mesh(topG, GM.cast); bot.rotation.x = Math.PI; bot.position.y = -d.thick; g.add(bot)
+    // 面の汚れ（スポークの間のくぼみの影・擦れた縁・軸の油）: 面のすぐ上に貼る絵
+    const decG = new THREE.CircleGeometry(d.R, 48); decG.rotateX(-Math.PI / 2)
+    const dirt = new THREE.Mesh(decG, GM.dirt); dirt.position.y = 0.003; dirt.receiveShadow = true; g.add(dirt)
+    const oil = new THREE.Mesh(decG, GM.oil); oil.position.y = 0.005; oil.scale.setScalar(Math.min(1, 1.35 / d.R)); g.add(oil)
+    const th = Math.min(0.55, d.thick - 0.14)
+    const hi = new THREE.Group(), lo = new THREE.Group()
+    // 歯の輪（面取りあり）。上の面より 0.14 下から
+    const teeth = new THREE.Mesh(gearRingGeo(d.R, th), GM.teeth); teeth.position.y = -0.14; teeth.castShadow = true; teeth.receiveShadow = true; hi.add(teeth)
+    // 鋳造の段（歯の下に少し細い輪）と、側面の上の帯の錆の垂れ
+    const step = new THREE.Mesh(new THREE.CylinderGeometry(d.R + 0.06, d.R + 0.06, 0.12, 64, 1, true), GM.cast); step.position.y = -0.14 - th - 0.06; hi.add(step)
+    const drip = new THREE.Mesh(new THREE.CylinderGeometry(d.R + 0.004, d.R + 0.004, 0.14, 64, 1, true), GM.drip); drip.position.y = -0.07; hi.add(drip)
+    const drip2 = new THREE.Mesh(new THREE.CylinderGeometry(d.R + 0.07, d.R + 0.07, 0.34, 64, 1, true), GM.drip); drip2.position.y = -0.14 - th - 0.12 - 0.17; drip2.rotation.y = 1.3; hi.add(drip2)
+    // 上の面: 縁（リム）と 6 本のスポーク（面から 1cm の盛り上がり・角は面取り）・ハブとボルト
+    const rim = new THREE.Mesh(ringGeo(d.R - 0.34, d.R - 0.04, 0.02, 0.008), GM.rim); rim.castShadow = false; rim.receiveShadow = true; hi.add(rim)
+    const spokeG = barGeo(d.R - 0.34 - 0.7, 0.32, 0.02, 0.008)
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.26, s = new THREE.Mesh(spokeG, GM.rim); s.position.set(Math.cos(a) * (0.7 + (d.R - 1.04) / 2), 0, -Math.sin(a) * (0.7 + (d.R - 1.04) / 2)); s.rotation.y = a; s.receiveShadow = true; hi.add(s) }
+    const hub = new THREE.Mesh(ringGeo(0, 0.72, 0.025, 0.012), GM.hub); hub.receiveShadow = true; hi.add(hub)
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.34, 0.05, 24), GM.edge); cap.position.y = 0.05; hi.add(cap)
+    const nSp = Math.max(3, Math.floor((d.R - 1.2) / 0.32)), boltG = new THREE.CylinderGeometry(0.045, 0.05, 0.035, 6), bolts = new THREE.InstancedMesh(boltG, GM.edge, 6 + 12 + 6 * nSp * 2)
+    { const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 1, 1), ps = new THREE.Vector3(); let n = 0
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2; ps.set(Math.cos(a) * 0.52, 0.04, -Math.sin(a) * 0.52); q.setFromAxisAngle(_up, a); m4.compose(ps, q, sc); bolts.setMatrixAt(n++, m4) }
+      for (let k = 0; k < 12; k++) { const a = (k + 0.5) / 12 * Math.PI * 2; ps.set(Math.cos(a) * (d.R - 0.19), 0.03, -Math.sin(a) * (d.R - 0.19)); q.setFromAxisAngle(_up, a * 3); m4.compose(ps, q, sc); bolts.setMatrixAt(n++, m4) }
+      // スポークの両脇の鋲
+      for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.26, ca = Math.cos(a), sa = -Math.sin(a); for (let j = 0; j < nSp; j++) { const rr = 0.95 + j * 0.32; for (const sd of [-0.1, 0.1]) { ps.set(ca * rr - sa * sd, 0.028, sa * rr + ca * sd); q.setFromAxisAngle(_up, a + j); m4.compose(ps, q, sc); bolts.setMatrixAt(n++, m4) } } } }
+    hi.add(bolts)
+    // 下の面: 6 本のリブとハブの塊（下から見上げた時の鋳物らしさ）
+    const ribG = new THREE.BoxGeometry(d.R - 0.9, 0.22, 0.16)
+    for (let k = 0; k < 6; k++) { const a = k / 6 * Math.PI * 2 + 0.26, r = new THREE.Mesh(ribG, GM.cast); r.position.set(Math.cos(a) * (0.75 + (d.R - 0.9) / 2), -d.thick - 0.11, -Math.sin(a) * (0.75 + (d.R - 0.9) / 2)); r.rotation.y = a; hi.add(r) }
+    const boss = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.3, 24), GM.cast); boss.position.y = -d.thick - 0.15; hi.add(boss)
+    // 遠く: 面取りなしの歯の輪だけ
+    const loT = new THREE.Mesh(gearRingGeo(d.R, th, true), GM.teeth); loT.position.y = -0.14; lo.add(loT)
+    const lod = new THREE.LOD(); lod.addLevel(hi, 0); lod.addLevel(lo, 40); g.add(lod)
+    // 回らない所: 軸の上の軸受けの箱（ボルト付き）と、軸から円板の下へ斜めの支え 4 本（重さを受けて見えるように）
+    { const st = new THREE.Group(); st.position.copy(g.position); group.add(st)
+      const yb = -d.thick - 0.3 - 0.05
+      const house = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.5, 1.5), GM.cast); house.position.y = yb - 0.25; house.castShadow = true; st.add(house)
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.08, 1.8), GM.hub); plate.position.y = yb - 0.54; st.add(plate)
+      for (const [sx, sz] of [[1, 1], [1, -1], [-1, 1], [-1, -1]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.06, 6), GM.edge); b.position.set(sx * 0.78, yb - 0.47, sz * 0.78); st.add(b)
+        const a = new THREE.Vector3(sx * 0.6, yb - 1.9, sz * 0.6), e = new THREE.Vector3(sx * Math.min(1.7, d.R * 0.5), yb, sz * Math.min(1.7, d.R * 0.5)), dv = e.clone().sub(a)
+        const br = new THREE.Mesh(new THREE.BoxGeometry(0.16, dv.length(), 0.22), GM.cast); br.position.copy(a.clone().add(e).multiplyScalar(0.5)); br.quaternion.setFromUnitVectors(_up, dv.normalize()); br.castShadow = true; st.add(br) } }
     return { d, g }
   })
   // ---- 揺れる吊り橋: 板の両端の下の鎖（板と一緒に動く）・柱の上から垂れる主の鎖（道の幅の外）と吊り鎖
@@ -290,6 +413,19 @@ function buildV16(course, group, M, chainMat, unitCyl) {
     for (let k = 1; k < 5; k++) { const x = -d.L / 2 + d.L * k / 5, b = new THREE.Mesh(new THREE.BoxGeometry(0.16, d.T + 0.04, d.W + 0.04), rust); b.position.set(x, 0, 0); b.castShadow = true; g.add(b) }
     const hole = new THREE.Mesh(new THREE.PlaneGeometry(d.T * 0.7, d.W * 0.7), sootMat); hole.position.set(d.L / 2 + 0.01, 0, 0); hole.rotation.y = Math.PI / 2; g.add(hole)
     const lip = new THREE.Mesh(new THREE.BoxGeometry(0.3, d.T + 0.12, d.W + 0.12), M.castle || rust); lip.position.set(d.L / 2 - 0.15, 0, 0); g.add(lip)
+    // v29: 帯の鋲（4 面に 3 つずつ）と、口のまわりの煤（口へ向かって黒くなる）
+    { const GMc = gearMats(M, rust, iron, edge), rv = new THREE.InstancedMesh(new THREE.SphereGeometry(0.05, 8, 5), GMc.edge, 4 * 4 * 3), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(1, 0.6, 1), ps = new THREE.Vector3(); let n = 0
+      for (let k = 1; k < 5; k++) { const x = -d.L / 2 + d.L * k / 5
+        for (const [ay, az, ny, nz] of [[1, 0, 1, 0], [-1, 0, -1, 0], [0, 1, 0, 1], [0, -1, 0, -1]]) for (const s of [-0.3, 0, 0.3]) {
+          const y = ay ? ay * ((d.T + 0.04) / 2 + 0.01) : s * d.T, z = az ? az * ((d.W + 0.04) / 2 + 0.01) : s * d.W
+          ps.set(x, y, z); q.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, ny, nz)); m4.compose(ps, q, sc); rv.setMatrixAt(n++, m4) } }
+      g.add(rv)
+      const sootT = canvasT(256, 64, (cx, w, h) => { const gr = cx.createLinearGradient(0, 0, w, 0); gr.addColorStop(0, 'rgba(8,7,6,0)'); gr.addColorStop(0.5, 'rgba(8,7,6,0.45)'); gr.addColorStop(1, 'rgba(6,5,4,0.92)'); cx.fillStyle = gr; cx.fillRect(0, 0, w, h); seed = 71; for (let i = 0; i < 30; i++) { cx.fillStyle = `rgba(6,5,4,${0.2 + rnd() * 0.3})`; cx.fillRect(w * 0.4 + rnd() * w * 0.6, rnd() * h, 10 + rnd() * 50, 2 + rnd() * 5) } })
+      const sootM = new THREE.MeshStandardMaterial({ map: sootT, transparent: true, depthWrite: false, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -1 }), none = new THREE.MeshBasicMaterial({ visible: false })
+      const sl = d.L * 0.35, sg = new THREE.BoxGeometry(sl, d.T + 0.012, d.W + 0.012)
+      // -z の面は絵の左右が逆なので、口の側が黒くなるよう u を反転
+      { const uv = sg.attributes.uv, gz = sg.groups[5]; for (let i = gz.start; i < gz.start + gz.count; i++) { const vi = sg.index.getX(i); uv.setX(vi, 1 - uv.getX(vi)) } }
+      const sb = new THREE.Mesh(sg, [none, none, sootM, sootM, sootM, sootM]); sb.position.set(d.L / 2 - 0.3 - sl / 2, 0, 0); g.add(sb) }
     return { d, g, was: null }
   })
   // ---- 跳ね板: 板の下のバネ（穴の底から板の裏まで伸び縮み）

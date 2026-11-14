@@ -1,8 +1,8 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=28'
-import { nextI } from './steer.js?v=28'
+import { createBike, stepBike, resetFallen } from './physics.js?v=29'
+import { nextI } from './steer.js?v=29'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -134,6 +134,10 @@ export function judge(world, course, R, b, prevP) {
     out.respawn = k != null ? { safe: { p: course.path[k].p.slice(), yaw: course.path[k].yaw, nitro: b.nitro } } : { cp: R.rest || 0 }
     return out
   }
+  // v29 出発の広場（道の外）に降りて 1.5 秒動けない時は休憩所へ（ジャンプ台の横や切れ目の横に落ちて、道へ戻れずに止まったまま）
+  { let onP = [0, 1].some(i => b.cn[i] && world.shapes[b.cn[i].id].plaza) && Math.abs(b.speed) < 0.4
+    if (onP) for (let k = 0; k < Math.min(course.path.length, 120); k++) { const q = course.path[k]; if (q.p && q.w && Math.hypot(q.p[0] - b.p[0], q.p[2] - b.p[2]) < q.w / 2 + 0.4 && Math.abs(q.p[1] + 0.79 - b.p[1]) < 1) { onP = false; break } } // 道の上（広場と同じ高さの出発の道）なら数えない
+    R.plazaT = onP ? (R.plazaT || 0) + 1 / 60 : 0; if (R.plazaT > 1.5) { R.plazaT = 0; out.respawn = { cp: R.rest || 0 }; return out } }
   // 道から地面に落ちたら（地面に車輪が着いて 0.5 秒）、休憩所へ
   if (course.groundKill) { const on = [0, 1].some(i => b.cn[i] && world.shapes[b.cn[i].id].tag === 'ground'); R.groundT = on ? (R.groundT || 0) + 1 / 60 : 0; if (R.groundT > 0.5) { R.groundT = 0; out.respawn = { cp: R.rest || 0, fell: true }; out.net = true; return out } }
   // 下から上がってくる溶岩（追われて登る）: 始まりの点を過ぎると上がり始め、追いつかれたら休憩所へ。休憩所から出し直すと最初から

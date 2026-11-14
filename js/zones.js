@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=28'
+import { hbeam } from './course.js?v=29'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -511,7 +511,7 @@ export function ruins(x) {
   { const s = orbit(0.6, 4.0, { mat: 'mud', mu: 0.3, kind: 'mud' }); s.mud = 60 }
   orbit(0.25, 0.75)
   orbit(0.6, 0.4)
-  B.mark('跳ね板'); B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, {}); orbit(0.35, 0.3); otorch()
+  B.mark('跳ね板'); B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false }) /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
   B.mark('ウィリーの溝'); orbit(0.3, 0); B.road(3, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.wheelieGrooves(B, { hang: 1.6, n: 4 }); orbit(0.4, 0.4)
   B.tut('brk')
   B.mark('朽ちた木の橋')

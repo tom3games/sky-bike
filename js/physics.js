@@ -518,6 +518,10 @@ export function framePts(b, B) { return BIKE.frame.map(([x, y, r]) => ({ c: body
 
 // 入力 inp = { thr 0..1, brk 0..1, lean -1(後ろ)..1(前), steer -1(左)..1(右) }
 export function stepBike(world, b, inp, ev) {
+  // v29 登り坂で止まりかけてブレーキを押している時は、前体重を効かせない（前輪で立たず、そのまま下がれる。本人「ジャンプ台に乗ったままバックできない」）
+  { const cn = b.cn[0] || b.cn[1], hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
+    b._upBrk = !!(cn && inp.brk > 0 && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.14)
+    if (b._upBrk && inp.lean > 0) inp = { ...inp, lean: 0 } }
   // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
   if (!b.ghost && world.traps.length) for (const s of world.traps) {
     if (s.gone) { if (world.time - s.goneAt > 12) { s.gone = false; s.warnT = null } continue }
@@ -621,6 +625,7 @@ function sub(world, b, inpIn, ev) {
         // ウィリーの上限（v12）: 後輪だけで 34 度を超えたら、アクセルの押す力を弱めて 35〜45 度あたりで止まるようにする（後ろへ宙返りしない）
         b.vxAcc = (b.vxAcc || 0) + Math.max(0, Math.min(fdFree, lim) - Math.min(fd, lim))
         if (b.creep && b.standOn) fd *= clamp((1.2 - vt) * 2, 0, 1) * 0.6 // ゆっくり進むウィリーは歩く速さまで
+        if (b.wasRev && vt < -0.3) fd = 0 // v29: ブレーキで下がっている間にアクセルを押した時は、まず止めるだけ（後ろへ下がりながら全開で押すと、前輪が跳ね上がって後ろへ宙返りしていた）
         Ft += fd
         // ウィリーで 26 度を超えたら、アクセルで後ろへ起き上がる回す力を弱める（前へ進む力はそのまま）。後ろへ回っていく速さが遅くなり、保てる角度の幅が少し広がる
         if (!b.g[1] && b.th > 0.45) { const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2], F = [t[0] * fd, t[1] * fd, t[2] * fd]; tau -= P.wheelieEase * ((ry * F[2] - rz * F[1]) * B.R[0] + (rz * F[0] - rx * F[2]) * B.R[1] + (rx * F[1] - ry * F[0]) * B.R[2]) }
@@ -631,7 +636,7 @@ function sub(world, b, inpIn, ev) {
     // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
     const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -((b.brkV0 || 0) > 0 ? Math.max(0.2, Math.min(1.15, 0.067 * Math.max(spd, (b.brkT || 0) < 1.3 ? b.brkV0 : 0))) : Math.max(0.2, Math.min(0.5, 0.034 * spd))) /* v20: 全速で約50度まで前輪を効かせる。v23: 急ブレーキ（押し続けた時）だけ。ふつうのブレーキは v19 のまま */ ? 0 : 0.85 + 0.15 * Math.min(1, spd / 15)) // v15: 前輪をしっかり効かせる（遅い時に前が少し沈んだだけで前ブレーキが抜けていた） // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
     // v27: 下がっている時にアクセルを押したら、両輪で後ろへの動きをすぐ止める（ブレーキで下がった後、アクセルを押しても 0.5 秒前へ出なかった）
-    if (inp.thr > 0 && vt < -0.15 && b.wasRev) Ft += clamp(-vt * 3000, 0, 1) * 1.0 * lim * inp.thr // ブレーキで下がっていた時だけ（段に当たって戻された時などは今まで通り）
+    if (inp.thr > 0 && vt < -0.15 && b.wasRev) Ft += clamp(-vt * 3000, 0, 1) * 0.7 * lim * inp.thr // ブレーキで下がっていた時だけ（段に当たって戻された時などは今まで通り）
     // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
     if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
@@ -721,9 +726,12 @@ function sub(world, b, inpIn, ev) {
 }
   // ---- 止まってブレーキを押し続けた時間（下がるかどうか）
   // 動く床の上か（床の速さに対する速さで止まっているかを見る。床の上では、止まっているブレーキは床と一緒に運ばれるだけ。下がるのは長押しした時だけ）
-  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; b.onMov = !!((sh0 && sh0.mov && sh0.mov.type !== 'crumble' && sh0.mov.type !== 'brk') || (sh1 && sh1.mov && sh1.mov.type !== 'crumble' && sh1.mov.type !== 'brk')) }
+  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; const still = sh => sh.mov.type === 'crumble' || sh.mov.type === 'brk' || (sh.mov.type === 'kick' && sh.mov.trig == null) // v29: 下りて止まっている跳ね板の上はふつうの床（ブレーキ長押しで下がれる）
+    b.onMov = !!((sh0 && sh0.mov && !still(sh0)) || (sh1 && sh1.mov && !still(sh1))) }
   const vr = b.vtRel != null ? b.vtRel : b.speed
-  if (inp.brk > 0 && inp.thr <= 0 && inp.lean <= 0.3 && b.g[0] && b.g[1] && vr < 0.6 && (b.revT > 0 || Math.abs(vr) < 0.6)) b.revT = (b.revT || 0) + H; else b.revT = 0
+  // v29 本人「ジャンプ台に乗ったままバックできない」: 登り坂（車体が 8 度より上を向いている）では、前体重のままでも・少し動いていても下がれる
+  { const up = !!b._upBrk
+    if (inp.brk > 0 && inp.thr <= 0 && (inp.lean <= 0.3 || up) && b.g[0] && b.g[1] && vr < (up ? 1.0 : 0.6) && (b.revT > 0 || Math.abs(vr) < (up ? 1.0 : 0.6))) b.revT = (b.revT || 0) + H; else b.revT = 0 }
   // ---- 崩れる足場: 乗っている時間がたまると落ちる（ゴーストは崩さない）
   if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
   // ---- 風（決まった強弱で吹く）
@@ -1203,7 +1211,9 @@ function v16Track(world, b, ev) {
         const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
         if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }) }
       }
-      if (!on0 && !on1 && m.trig == null && T - (m.lastTouch ?? -1e9) > 0.8) m.armed = true
+      if (!on0 && !on1 && m.trig == null && T - (m.lastTouch ?? -1e9) > 0.3) m.armed = true
+      // v29 本人「一回しか跳ねへん」: 板に乗ったままでも、板が下りた後に引き金の手前まで下がれば、もう一度跳ねる
+      if ((on0 || on1) && m.trig == null && !m.armed) { const al2 = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]; if (al2 < m.trigAt - 0.6) m.armed = true }
     }
   }
   if (world.bridges.length) {

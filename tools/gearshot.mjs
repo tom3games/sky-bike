@@ -8,7 +8,7 @@ await import('../server.mjs')
 const br = await chromium.launch({ ...MUTE_LAUNCH, channel: 'chromium', args: [...(MUTE_LAUNCH.args || []), '--use-gl=angle', '--ignore-gpu-blocklist'] })
 const ctx = await br.newContext({ viewport: { width: 1280, height: 720 } }); await muteContext(ctx)
 const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message))
-await page.goto(`http://localhost:${PORT}/?stay=1`); await page.waitForFunction('window.__skyReady', null, { timeout: 60000 })
+await page.addInitScript(() => { try { localStorage.setItem('sky-tut-done', '1') } catch (e) {} }); await page.goto(`http://localhost:${PORT}/?stay=1`); await page.waitForFunction('window.__skyReady', null, { timeout: 60000 })
 await page.evaluate(() => window.sky.startRun('stage1')); await page.waitForTimeout(800)
 // 1 つ目の歯車の並び（回る歯車）の 2 枚目の歯車を見る。バイクを手前に置いて、まわりを作らせる
 const info = await page.evaluate(() => {
@@ -26,6 +26,12 @@ for (const [nm, [bk, up, sd]] of Object.entries(cams)) {
   await page.waitForTimeout(1500)
   await page.screenshot({ path: `${process.env.OUT || 'shots/gear'}_${nm}.jpg`, quality: 88 })
 }
+// 倒れる煙突（同じ工場）
+{ const ch = await page.evaluate(() => { const G = window.sky, A = G.api, P = G.course.path; const i = P.findIndex(q => q.kind === 'chimney'); const q = P[Math.max(0, i - 10)]; const b = A.createBike({ p: [q.p[0], q.p[1] + 0.79, q.p[2]], yaw: q.yaw }); for (let k = 0; k < 30; k++) A.stepBike(G.world, b, { thr: 0, brk: 1, lean: 0, steer: 0 }); A.placeBike(b); A.buildAll(); const m = P[i + 4]; return { p: m.p, yaw: m.yaw } })
+  const f2 = [Math.cos(ch.yaw), 0, -Math.sin(ch.yaw)], r2 = [Math.sin(ch.yaw), 0, Math.cos(ch.yaw)]
+  const cam = [ch.p[0] - f2[0] * 5 + r2[0] * 4, ch.p[1] + 3, ch.p[2] - f2[2] * 5 + r2[2] * 4]
+  await page.evaluate(([cam, tgt]) => { const G = window.sky, cm = G.api.camera; G.state = 'debug'; cm.position.set(...cam); cm.lookAt(...tgt) }, [cam, ch.p])
+  await page.waitForTimeout(1500); await page.screenshot({ path: `${process.env.OUT || 'shots/gear'}_chimney.jpg`, quality: 88 }) }
 const fps = await page.evaluate(async () => { let n = 0; const t0 = performance.now(); while (performance.now() - t0 < 2000) { await new Promise(r => requestAnimationFrame(r)); n++ } return Math.round(n / 2) })
 console.log('gears', info.n, 'fps(far)', fps, 'errors', errs.length ? errs.slice(0, 3) : 'none')
 await br.close(); process.exit(0)

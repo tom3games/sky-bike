@@ -1,8 +1,8 @@
 // SKY BIKE v16 の仕掛け: 回る歯車・ウィリーの溝・揺れる鎖の吊り橋・倒れる煙突・跳ね板・道を選ぶ横に動く床。
 // どれも course.js の Builder（B）の今の位置（B.t）から作り、B.t を仕掛けの先へ進める（Builder のメソッドと同じ約束）。
 // 見た目と当たりは同じ形の一覧（B.shapes）から。動く物は physics.js の mov（gear / wave / topple / kick / shuttle）。
-import { Builder } from './course.js?v=28'
-import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=28'
+import { Builder } from './course.js?v=29'
+import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=29'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -173,7 +173,7 @@ export function chimney(B, o = {}) {
 export function springPlank(B, o = {}) {
   const t = B.t, yaw = t.yaw, f = B.dir(yaw), R = B.right(yaw), Lp = o.len ?? 3.8, W = o.w ?? 3
   const start = t.p.slice()
-  const m = { type: 'kick', axis: UP, stroke: o.stroke ?? 0.6, k0: o.k0 ?? 3.6, kv: o.kv ?? 0.45, vmax: 13, hold: 0.7, back: 1.4, trigAt: o.trigAt ?? 1.5, start, f, ext: [0.2, 1.2, 0.2], trig: null }
+  const m = { type: 'kick', axis: UP, stroke: o.stroke ?? 0.6, k0: o.k0 ?? 3.6, kv: o.kv ?? 0.45, vmax: 13, hold: 0.7, back: 1.0, trigAt: o.trigAt ?? 1.5, start, f, ext: [0.2, 1.2, 0.2], trig: null }
   const sh = B.box({ c: add3(add3(start, f, Lp / 2), UP, -0.12), h: [Lp / 2 - 0.015, 0.12, W / 2], yaw, mat: 'plank', mu: 1.05, tag: 'road', mov: m })
   // 板の下の穴（バネが見える。当たりあり。板より 0.75 下）と両脇の枠
   B.box({ c: add3(add3(start, f, Lp / 2), UP, -0.95), h: [Lp / 2, 0.1, W / 2], yaw, mat: 'iron', tag: 'pit' })

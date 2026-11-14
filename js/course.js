@@ -1,10 +1,10 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=28'
-import * as P16 from './parts16.js?v=28'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=28'
-import { lab16 } from './parts16.js?v=28'
-import * as P17 from './parts17.js?v=28'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=28'
+import * as Z from './zones.js?v=29'
+import * as P16 from './parts16.js?v=29'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=29'
+import { lab16 } from './parts16.js?v=29'
+import * as P17 from './parts17.js?v=29'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=29'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -474,7 +474,7 @@ export function stage1() {
   // ---------------- A 塔の根もとの地面（石畳の広場から出発。道は地面より一段高い石の道）
   B.zone = 'ground'; B.solid = true; B.base = -0.5
   B.t.p = [0, 0.5, 0]
-  B.box({ c: [27, 0.5 - 0.6, 0], h: [36, 0.6, 15], mat: 'cobble', tag: 'pad' }) // 出発の広場（大きいジャンプ台まで含む。外れても落ちない）
+  B.box({ c: [27, 0.5 - 0.6, 0], h: [36, 0.6, 15], mat: 'cobble', tag: 'pad' }).plaza = true // 出発の広場（大きいジャンプ台まで含む。外れても落ちない）
   B.plazaStart = true
   const L = { w: 5, mat: 'cobble', thick: 0.6 }
   B.road(16, L)
@@ -501,14 +501,11 @@ export function stage1() {
   // 速さの帯: 遅いと切れ目の底（地面）へ落ちてすぐ出発に戻る。ちょうどだと着地の坂。速すぎると向こうの高い段の壁に当たる
   { const lip = B.t.p.slice(), f = B.dir(B.t.yaw)
     B.box({ c: [lip[0] + f[0] * 4, lip[1] - 3.2, lip[2] + f[2] * 4], h: [4.2, 0.4, 3.5], yaw: B.t.yaw, mat: 'ground', tag: 'ground' })
-    // v27 本人「最初のジャンプ台はむずい。頭ぶつからないように」: 切れ目（遅いと向こうの壁の角に頭から当たった）をやめ、台の先から長いゆるい下りの着地坂に。
-    // どの速さで跳んでも坂の上に降りる（終わりの高さと位置は前と同じ）
-    B.step(-0.6) }
-  { const a9 = Math.atan2(1.1, 9), H = 5.5 + 9 * Math.cos(a9) - 2.5, Y = 9 * Math.sin(a9) // 終わりの位置と高さは前（切れ目 5.5m＋9m の坂）とぴったり同じに（先の道を 1mm も動かさない）
-    B.road(Math.hypot(H, Y), { ...L, slope: -Math.atan2(Y, H), mat: 'cobble', kind: 'landing', back: 0, noOverlap: true }); B.road(2.5, L) } // 坂の後に平らな 2.5m（段の前で落ち着ける）
+    B.gap(5.5, -0.6, 'jump') } // v29 本人「戻して」: v27 の着地坂・短い坂をやめて v26 の形（切れ目 5.5m・着地の坂 9m・0.75m の段）に戻した
+  B.road(9, { ...L, slope: -Math.atan2(1.1, 9), mat: 'cobble', kind: 'landing', back: 0 })
   B.road(1.5, L)
   B.torch(-1, -1, { down: 3 }); B.torch(1, -1, { down: 3 })
-  { const a = Math.atan2(0.75, 3); B.road(Math.hypot(3, 0.75), { ...L, slope: a, kind: 'ramp', noOverlap: true }); B.road(1, { ...L, noOverlap: true }) } // v27: 着地の先の 0.75m の段（速いまま頭から当たって転んでいた）を、同じ高さへ上がる短い坂に
+  B.step(0.75); B.road(4, { ...L, noOverlap: true })
   B.log(1.5, 0.16, 4.6); B.road(4, L)
   B.curve(14, 32 * DEG, L)
   B.road(4, L)
