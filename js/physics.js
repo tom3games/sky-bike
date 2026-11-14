@@ -627,7 +627,7 @@ function sub(world, b, inpIn, ev) {
       if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
     }
     // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
-    const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -Math.max(0.2, Math.min(0.5, 0.034 * spd)) ? 0 : 0.85 + 0.15 * Math.min(1, spd / 15)) // v15: 前輪をしっかり効かせる（遅い時に前が少し沈んだだけで前ブレーキが抜けていた） // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
+    const spd = Math.abs(b.speed), fb = inp.lean > 0.3 ? 1 : (b.th < -Math.max(0.2, Math.min(1.15, 0.067 * Math.max(spd, (b.brkT || 0) < 1.3 ? (b.brkV0 || 0) : 0))) /* v20: 全速で約50度まで前輪を効かせる */ ? 0 : 0.85 + 0.15 * Math.min(1, spd / 15)) // v15: 前輪をしっかり効かせる（遅い時に前が少し沈んだだけで前ブレーキが抜けていた） // 速いほど前輪が効いて後輪が浮く（15m/s で約30度まで）
     // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
     if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
@@ -805,12 +805,19 @@ function sub(world, b, inpIn, ev) {
   if (!b.crashed && b.g[1] && !b.g[0] && b.cn[1]) {
     const n = b.cn[1].nw || b.cn[1].n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する前の傾き（負＝突っ込む）
     // ブレーキだけの浮きは速さの分だけ（遅くなると戻る）。前体重＋ブレーキは、遅い時は約 37 度で保つ（ジャックナイフ）が、速い時（4m/s 超）は守らない（前へ回って転ぶ）
-    const lim = inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, Math.min(0.56, 0.036 * Math.abs(b.speed) + 0.04))
+    const lim = inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, Math.min(0.8, 0.057 * Math.abs(b.speed) + 0.03), 0.77 * clamp(((b.brkV0 || 0) - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1) * clamp(1.3 - (b.brkT || 0), 0, 1)) /* v20: 全速（13m/s）からの急ブレーキで後輪が約50度まで浮く（本人「全速からの急ブレーキは50度で」） */
     b.noseT = rel < -0.94 && b.w < 0.3 ? (b.noseT || 0) + H : 0
     if (b.noseT > 0.12) crash(b, 'front', 0, ev) // 前輪だけで、地面から 70 度より前へ傾いたまま（前へ回っていく）
     if (rel < lim) { tau += (lim - rel) * 9000; if (b.w < 0) tau -= b.w * 1400 }
     else if (rel < lim + 0.15 && b.w < -1.5) tau -= (b.w + 1.5) * 900 // 限界の手前で、前へ回る勢いを弱めておく（速い時の急ブレーキで回り切らない）
   }
+  // ---- v20 急ブレーキの後輪上げ（本人「全速からの急ブレーキは50度で」）: ブレーキだけを押した時の速さで目標を決め（13m/s 以上で 50 度、4m/s 以下は 0）、
+  //      前輪が着いている間だけ毎秒約 90 度で後輪を持ち上げる。速さが落ちると上の lim が下がって戻る
+  if (!b.crashed && inp.brk > 0.5 && inp.thr <= 0.05 && inp.lean <= 0.3 && b.g[1]) {
+    if (Math.abs(b.speed) > (b.brkV0 || 0) + 0.05) { b.brkV0 = Math.abs(b.speed); b.brkT = 0 } else b.brkT = (b.brkT || 0) + H // 速さが上がった時（止まったまま押していた後に押し出された等）は数え直す
+    const tgt = clamp(1.3 - b.brkT, 0, 1) * 0.873 * clamp((b.brkV0 - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1)
+    { const wT = Math.min(1.6, (b.th + tgt) * 5); if (b.th < -0.2 && b.th > -tgt && b.w > -wT) tau -= (b.w + wT) * 1400 } /* 自然に 11 度以上浮いた時だけ（氷・濡れた石では浮かない）。目標に近づくほどゆっくり */
+  } else { b.brkV0 = 0; b.brkT = 0 }
   // ---- 止まったままのウィリー（トライアルのスタンディングウィリー）: 速さがほぼ 0・アクセルなしで後ろ体重なら、
   //      前輪を約 33 度まで持ち上げてそこで保つ。前体重＋ブレーキなら、前輪で立って約 33 度まで前へ傾けて保つ。
   //      ここを超えて後ろへ回るのは、アクセルを足して押し続けた時だけ

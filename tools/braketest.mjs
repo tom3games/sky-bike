@@ -16,7 +16,7 @@ for (const cid of ['practice', 'stage1']) {
     if (fell) { falls++; continue }
     if (hit) { hits++; continue }
     tries++; maxNose = Math.min(maxNose, nose)
-    if (ev.some(e => e.t === 'crash') || nose < -0.8) { flips++; if (ex.length < 6) ex.push({ cid, i: pts[k].i, v, nose: +(nose * 57.3).toFixed(0), kind: q.kind }) }
+    if (ev.some(e => e.t === 'crash') || nose < -1.15) /* v20: 全速の急ブレーキで約50度まで浮くのは仕様。66度を超えるか転倒したら前転 */ { flips++; if (ex.length < 6) ex.push({ cid, i: pts[k].i, v, nose: +(nose * 57.3).toFixed(0), kind: q.kind }) }
   }
   // ジャックナイフ: 前体重＋ブレーキで後輪が浮くか（平らな所、6m/s）
   for (let k = 0; k < pts.length; k += 25) {
