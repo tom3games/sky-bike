@@ -1,8 +1,8 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=35b'
-import { nextI } from './steer.js?v=35b'
+import { createBike, stepBike, resetFallen } from './physics.js?v=36'
+import { nextI } from './steer.js?v=36'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -116,6 +116,9 @@ export function judge(world, course, R, b, prevP) {
       R.safe = R.safe || []; R.safe.push({ p: q.p.slice(), yaw: q.yaw, t: world.time, i: R.onI, nitro: b.nitro }); if (R.safe.length > 24) R.safe.shift(); R.safeT = 0
     }
   }
+  // v36 小さな猿のような生き物の追いかけ（js/traps.js の chases）
+  if (course.chases && course.chases.length && !b.ghost) chaseStep(world, course, R, b, out)
+  if (b.crashed && b.crashed.why === 'monkey' && b.crashed.t < 2.4) return out // はたかれた: 乗り手が落ちていく間は待つ
   if (b.crashed && b.crashed.t > 0.8) {
     // 転んだら: 数秒前に車輪が着いていた安全な地点から出し直す（旗までは戻さない）。フォルト 1
     const at = b.crashed.at, L = R.lastCrash
@@ -157,8 +160,43 @@ export function judge(world, course, R, b, prevP) {
   if (b.p[1] < -30) out.respawn = { cp: 0, fell: true }
   return out
 }
+// 道の点ごとの道のり（m）。本線だけ
+export function pathS(course) {
+  if (course._S) return course._S
+  const P = course.path, S = new Float64Array(P.length); let acc = 0
+  for (let i = 1; i < P.length; i++) { const a = P[i - 1].p, c = P[i].p; if (a && c && !P[i].branch) acc += Math.min(20, Math.hypot(c[0] - a[0], c[2] - a[2])); S[i] = acc }
+  return (course._S = S)
+}
+export const CHASE = { warn: 32, catchD: 1.2 }
+function chaseStep(world, course, R, b, out) {
+  R.ch = R.ch || {}
+  const S = pathS(course), P = course.path
+  for (const [k, C] of course.chases.entries()) {
+    let st = R.ch[k]
+    if (st && (st.ph === 'done' || st.ph === 'caught')) continue
+    const bi = nearI(course, b.p, st && st.bi != null ? st.bi : R.onI), sb = S[bi]
+    if (!st) { if (bi <= C.i0 && sb > S[C.i0] - CHASE.warn && bi > C.i0 - 60) { R.ch[k] = st = { ph: 'warn', t0: world.time, bi }; out.chase = { k, ph: 'warn' } } continue }
+    st.bi = bi
+    if (st.ph === 'warn') { if (bi >= C.i0) { st.ph = 'run'; st.sm = sb - C.d0; st.t1 = world.time; out.chase = { k, ph: 'run' } } else if (sb < S[C.i0] - CHASE.warn - 25) delete R.ch[k]; continue }
+    // 走って追う: バイクより少し速い（アクセルだけでは少しずつ追いつかれる）。ニトロ・空中（ジャンプ台）・ウィリーの間は引き離せる。止まるとすぐ追いつく
+    // 技（ニトロ・0.4 秒のウィリー・0.6 秒の大きな跳び）を 1 つ使ったら、その後はもう追いつけない（引き離された分は戻らない）
+    const vb = Math.max(0, b.speed), air = !b.g[0] && !b.g[1], wh = b.g[0] && !b.g[1] && b.th > 0.3
+    if (air && !st.airT) st.kick = (b.launchT || 0) > 0 // ジャンプ台から跳んだ時だけ数える（坂の頂上で浮いただけでは数えない）
+    st.whT = wh ? (st.whT || 0) + 1 / 60 : 0; st.airT = air ? (st.airT || 0) + 1 / 60 : 0
+    if (!st.lost && (b.nitroOn || st.whT > 0.4 || (st.airT > 0.5 && st.kick))) { st.lost = true; out.chase = { k, ph: 'lost' } }
+    st.sm += Math.max(8, vb + (b.nitroOn || wh ? -5.5 : st.lost ? -0.6 : C.dv)) / 60
+    if (bi >= C.i1) { st.ph = 'done'; out.chase = { k, ph: 'done' }; continue }
+    if (!b.crashed && sb - st.sm < CHASE.catchD && (b.g[0] || b.g[1])) {
+      st.ph = 'caught'; out.chase = { k, ph: 'caught' }
+      const hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
+      b.crashed = { why: 'monkey', v: 0, t: 0, at: b.p.slice(), side: (k % 2 ? 1 : -1) }
+      b.v = [hx * 0.5, 0, hz * 0.5]
+    }
+  }
+}
 // respawn の指示から新しいバイクを作る
 export function doRespawn(world, course, R, rs) {
+  if (R.ch) for (const k in R.ch) if (R.ch[k].ph !== 'done') delete R.ch[k] // 猿は元の場所へ
   resetFallen(world) // 抜けた床・崩れた敷石を元に戻す（戻らないと登れなくなる）
   for (const s of world.moving) if (s.mov.type === 'seesaw') { s.mov.ang = s.mov.ang0 || 0; s.mov.w = 0 } // 傾いたままのシーソーも元へ（出し直した所の先で、上がった端に当たらない）
   if (rs.safe) { const b = spawnAt(world, { p: rs.safe.p, yaw: rs.safe.yaw }); if (rs.safe.nitro != null) b.nitro = rs.safe.nitro; if (!b.crashed) return b; R.safe = []; return spawnAtCp(world, course, R.rest || 0) } // 出した所で転んでいたら旗から

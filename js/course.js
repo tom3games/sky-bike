@@ -1,11 +1,12 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=35b'
-import * as P16 from './parts16.js?v=35b'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=35b'
-import { lab16 } from './parts16.js?v=35b'
-import * as P17 from './parts17.js?v=35b'
-import { finale } from './finale.js?v=35b'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=35b'
+import * as Z from './zones.js?v=36'
+import * as P16 from './parts16.js?v=36'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=36'
+import { lab16 } from './parts16.js?v=36'
+import * as P17 from './parts17.js?v=36'
+import { finale } from './finale.js?v=36'
+import { v36traps } from './traps.js?v=36'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=36'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -72,6 +73,14 @@ export class Builder {
     // bot 用: 丸太の手前で少し速さを落とす印
     const at0 = add3(t.p, f, at)
     let k = this.path.length; this.path.push({ p: at0, yaw: t.yaw, slope: 0, w, kind: 'bump', dy: r * 2 })
+  }
+  // v36 取った丸太の代わりの道の点（道の点の数と並びを変えない）
+  logGone(at) { const t = this.t, f = this.dir(t.yaw); this.path.push({ p: add3(t.p, f, at), yaw: t.yaw, slope: 0, w: 3.2, kind: 'road' }) }
+  // v36 段の手前の小さな坂（道の上に置く斜めの板。今の位置で高さ h になる）
+  rampUp(h, len, o = {}) {
+    const t = this.t, f = this.dir(t.yaw), ang = Math.atan2(h, len), L2 = Math.hypot(h, len), th = 0.3
+    const fr = this.dir(t.yaw, ang), up = this.upv(t.yaw, ang), start = add3(t.p, f, -len)
+    this.box({ c: add3(add3(start, fr, L2 / 2), up, -th / 2), h: [L2 / 2, th / 2, (o.w ?? 4) / 2], yaw: t.yaw, pitch: ang, mat: o.mat || 'cobble', mu: 1.0, tag: 'road' })
   }
   // ジャンプ台: 今の位置で lip が終わるように、手前に傾けた板を置く（道の上に乗る）
   kicker(len, ang, o = {}) {
@@ -508,19 +517,20 @@ export function stage1() {
   B.road(1.5, L)
   B.torch(-1, -1, { down: 3 }); B.torch(1, -1, { down: 3 })
   B.step(0.75); B.road(4, { ...L, noOverlap: true })
-  B.log(1.5, 0.16, 4.6); B.road(4, L)
+  B.log(1.5, 0.09, 4.6); B.road(4, L) // v36 本人「最初のジャンプ台のあとのでこぼこ、難しすぎ」: 丸太を低く（0.16→0.09）
   B.curve(14, 32 * DEG, L)
   B.road(4, L)
   B.step(0.18); B.road(6, { ...L, noOverlap: true })
   B.torch(1, 2, { down: 3 })
   B.tut('back')
-  B.log(2, 0.14, 4.6); B.road(5, L)
-  B.step(0.42); B.road(6, { ...L, noOverlap: true })
+  B.log(2, 0.08, 4.6); B.road(5, L) // v36: 0.14→0.08
+  B.rampUp(0.42, 1.8, L); B.step(0.42); // v36: 0.42m の段の手前に小さな坂（段で止まらない）
+  B.road(6, { ...L, noOverlap: true })
   B.curve(14, -64 * DEG, L)
-  B.log(1.5, 0.15, 4.6); B.road(4, L)
+  B.logGone(1.5); B.road(4, L) // v36: 坂の登り口の丸太を取った
   B.tut('fwd')
   B.road(9, { ...L, slope: 18 * DEG })
-  B.log(3, 0.15, 4.6); B.road(6, L)
+  B.logGone(3); B.road(6, L) // v36: 坂の上の丸太を取った（道の点は同じ数のまま）
   B.torch(-1, 3, { down: 3 })
   B.curve(14, 32 * DEG, L)
   B.tut('air')
@@ -528,7 +538,7 @@ export function stage1() {
   { const rise = B.kicker(3, 15 * DEG, { w: 4, mat: 'basalt', thick: 0.8 }); B.gap(5.5, rise - 0.7, 'jump') }
   B.road(10, { ...L, back: 0 })
   B.torch(1, 4, { down: 3 }); B.torch(-1, 4, { down: 3 })
-  B.log(2.5, 0.16, 4.6); B.log(5.5, 0.16, 4.6); B.mudRun(6, 0, { ...L, mud: 110 }); B.road(2, L) // v26 本人「結構最初の方に泥一個置いて」: 平らな泥 6m（長さは前の道 8m と同じにして、先の道の位置を変えない）。抜けると「ブリュッ」
+  B.log(2.5, 0.09, 4.6); B.logGone(5.5); B.mudRun(6, 0, /* v36: 続けて並んでいた 2 本を 1 本に・低く */ { ...L, mud: 110 }); B.road(2, L) // v26 本人「結構最初の方に泥一個置いて」: 平らな泥 6m（長さは前の道 8m と同じにして、先の道の位置を変えない）。抜けると「ブリュッ」
   // 高い段（車輪の径くらい）: ゆっくりウィリーで前輪を段の上へ掛け、前体重＋アクセルで後輪を引き上げる
   // v22 本人「出だしの段差やさしくして」: 高い縁の前に、低い順に段を 2 つ（0.5m はふつうのウィリーで、0.75m は前輪を掛ける練習。どちらも降りて元の高さへ）
   B.mark('低い段の練習')
@@ -705,6 +715,8 @@ export function stage1() {
   // 門の前の広場も「浮いた広場」として、下に岩・持ち送り・垂れる鎖を付ける
   for (const sh of B.shapes.slice(-12)) if (sh.type === 'box' && sh.tag === 'road' && sh.mat === 'castle' && sh.h[2] >= 2) B.plats.push({ c: [sh.c[0] + sh.ax[1][0] * sh.h[1], sh.c[1] + sh.h[1], sh.c[2] + sh.ax[1][2] * sh.h[1]], h: [sh.h[0], sh.h[2]], yaw: sh.base.yaw, zone: 'castle', thick: sh.h[1] * 2 })
   castle(B)
+  v36traps(B) // v36 単調な道の罠と猿の追いかけ（js/traps.js）
+  addFlagsBefore(B, [['ウィリーの溝', '溝の手前'], ['崩れていく石の橋', '石の橋の手前']]) // v36 難所の前に旗（tools/flagneed.mjs: 旗から 40 秒以上かかり、人の速さ bot がくり返し失敗していた所）
   addSupports(B)
   towerDressing(B)
   return finishCourse(B, { id: 'stage1', name: '第1面 奈落から天空へ', killBelow: 10, spawnBack: 2, climb: true, groundKill: true })
@@ -851,6 +863,22 @@ function castle(B) {
   B.castleAt = at(14, 0, 20)
 }
 
+// v36 区間（mark）の始まりの少し手前の、平らでまっすぐな道の点に休憩所の旗を足す（道は変えない）。旗の番号がずれるので、旗の飾りの番号も直す
+function addFlagsBefore(B, list) {
+  B.closeMark()
+  const P = B.path, cpI = q => { let bi = 0, bd = 1e18; P.forEach((z, k) => { if (!z.p) return; const d = (z.p[0] - q.p[0]) ** 2 + (z.p[2] - q.p[2]) ** 2 + ((z.p[1] - q.p[1]) * 2) ** 2; if (d < bd) { bd = d; bi = k } }); return bi }
+  const idx = B.cps.map(cpI)
+  for (const [mark, name] of list) {
+    const m = (B.marks || []).find(x => x.name === mark); if (!m) continue
+    let i = m.i0 - 2; while (i > m.i0 - 30 && !(P[i] && P[i].p && P[i].w >= 3 && ['road', 'orbit', 'pad', 'curve'].includes(P[i].kind) && Math.abs(P[i].slope || 0) < 0.08 && ['road', 'orbit', 'pad', 'curve'].includes((P[i + 3] || {}).kind) && ['road', 'orbit', 'pad', 'curve'].includes((P[i - 3] || {}).kind))) i--
+    const q = P[i], at = idx.findIndex(k => k > i), pos = at < 0 ? B.cps.length : at
+    const R = B.right(q.yaw), w = q.w, base = add3(q.p, R, -(w / 2 + 0.45))
+    B.cps.splice(pos, 0, { p: q.p.slice(), yaw: q.yaw, w, name, zone: q.zone || B.zone, rest: true, added: true }); idx.splice(pos, 0, i)
+    for (const f of B.flags) if (f.cp >= pos) f.cp++
+    B.cyl({ a: add3(base, [0, 1, 0], -1.6), b: add3(base, [0, 1, 0], 3.6), r: 0.07, mat: 'pole', tag: 'gate' })
+    B.flags.push({ p: base, h: 3.6, yaw: q.yaw, cp: pos })
+  }
+}
 function finishCourse(B, o) {
   const shapes = B.shapes
   // 落ちたと見なす高さ: 門ごとに、その区間のいちばん低い道の面より killBelow 下
@@ -873,6 +901,6 @@ function finishCourse(B, o) {
     if (a.p && c.p && a.yaw != null && c.yaw != null && a.kind !== 'jump' && c.kind !== 'jump') { const ds = Math.hypot(c.p[0] - a.p[0], c.p[2] - a.p[2]); if (ds > 0.5) k = Math.max(k, Math.abs(wrapA(c.yaw - a.yaw)) / ds) }
     P[i].kap = k
   }
-  return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  return { ...o, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
 export const COURSES = { practice, stage1, lab16, lab17: P17.lab17 }

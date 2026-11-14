@@ -20,11 +20,14 @@ export function runSim(cid, skill, o = {}) {
     const ev = []
     w.tick()
     stepBike(w, b, inp, ev); steps++
+    if (o.onEv) for (const e of ev) o.onEv(e, b, bot, steps)
     if (o.trace && steps >= o.trace[0] && steps <= o.trace[1] && steps % (o.trace[2] || 4) === 0) console.log(steps, b.p.map(v => v.toFixed(2)).join(','), 'th', (b.th * 57.3).toFixed(0), 'psi', (b.psi * 57.3 % 360).toFixed(0), 'v', b.speed.toFixed(1), 'g', +b.g[0] + '' + +b.g[1], 'in', inp.thr, inp.brk, inp.lean, (+inp.steer).toFixed(2), 'ph', bot.phase, 'i', bot.i, c.path[bot.i].kind, (c.path[bot.i].yaw * 57.3 % 360).toFixed(0), ev.map(e => e.t + (e.why || '')).join(' '))
     maxY = Math.max(maxY, b.p[1])
     if (b.g[0] || b.g[1]) lastGround = { i: bot.i, kind: c.path[bot.i].kind, mark: (c.marks || []).find(m => bot.i >= m.i0 && bot.i <= m.i1)?.name }
     for (const e of ev) if (e.t === 'crash') log.push({ s: steps, cp: R.cp, why: e.why, v: +(e.v || 0).toFixed(1), at: b.p.map(v => +v.toFixed(1)), from: lastGround })
+    const restB = R.rest
     const j = judge(w, c, R, b, prev)
+    if (R.rest !== restB || o._rs == null) o._rs = steps // v36: 休憩所を通った時刻（失敗までの秒を出す）
     if (j.gate != null && perCp[j.gate] == null) perCp[j.gate] = +(steps * DT).toFixed(1)
     if (j.finish) return { cid, skill, time: steps * DT, faults, finished: true, log, perCp, hash: hashBike(b), inputs, maxY, nets }
     // 人なら 40 秒（分かれ道の床を待つ分）進めなければ R で休憩所からやり直す
@@ -35,12 +38,13 @@ export function runSim(cid, skill, o = {}) {
       if (j.respawn.fell) log.push({ s: steps, cp: R.cp, why: j.net ? 'net' : 'fall', at: b.p.map(v => +v.toFixed(1)), from: lastGround })
       else if (j.respawn.safe) log.push({ s: steps, cp: R.cp, why: 'back', at: b.p.map(v => +v.toFixed(1)), from: lastGround, crashed: b.crashed && b.crashed.why })
       if (j.net) nets++
-      faults++; b = doRespawn(w, c, R, j.respawn); resetBot(bot, b)
+      if (log.length) { const L = log[log.length - 1]; if (L.ft == null) { L.ft = +((steps - o._rs) / 60).toFixed(1); L.rest = R.rest } }
+      faults++; b = doRespawn(w, c, R, j.respawn); resetBot(bot, b); o._rs = steps
       bot.vMul = (o.vMul || 1) * (0.75 + ((faults * 0.37) % 0.6))
       if (faults > (o.maxFaults || 80)) break
     }
   }
-  return { endP: b.p.map(v => +v.toFixed(2)), endBot: bot.i + ":" + (c.path[bot.i] && c.path[bot.i].kind), cid, skill, time: steps * DT, faults, finished: false, cp: R.cp, cpName: c.cps[R.cp].name, log, perCp, hash: hashBike(b), inputs, maxY, nets }
+  return { log, endP: b.p.map(v => +v.toFixed(2)), endBot: bot.i + ":" + (c.path[bot.i] && c.path[bot.i].kind), cid, skill, time: steps * DT, faults, finished: false, cp: R.cp, cpName: c.cps[R.cp].name, log, perCp, hash: hashBike(b), inputs, maxY, nets }
 }
 if ((process.argv[1] || '').endsWith('sim.mjs')) {
   const [cid = 'practice', skill = 'good', maxSec = 300] = process.argv.slice(2)

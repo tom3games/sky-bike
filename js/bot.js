@@ -1,6 +1,7 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=35b'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=35b'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos } from './physics.js?v=36'
+import { doorAng } from './traps.js?v=36'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=36'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -181,10 +182,11 @@ export function botInput(bot, b) {
     const T0 = bot.world.time, hx = Math.cos(cur.yaw ?? b.psi), hz = -Math.sin(cur.yaw ?? b.psi)
     const near = []
     for (const h of bot.hz) {
+      if (h.custom) continue
       const dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], dy = h.p[1] + 0.8 - b.p[1]
       const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw)
       const da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
-      if (Math.abs(dy) > 2.5 || lat > h.w / 2 + 2.5 || da < -h.half - 1 || da > 16) continue
+      if (Math.abs(dy) > 2.5 || lat > h.w / 2 + 2.5 || da < -h.half - 1 || da > (h.look || 16)) continue
       near.push({ h, da })
     }
     if (near.length) {
@@ -266,11 +268,30 @@ export function botInput(bot, b) {
     const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
     if (o) { thr = o.thr; brk = o.brk; lean = o.lean; if (o.steer != null) steer = o.steer; if (o.nitroOff) nitroNeed = false; bot.stuckT = 0; bot.backT = 0; bot.waiting = true }
   }
+  // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る
+  if (bot.skill === 'good' && bot.world && !air) for (const h of bot.hz) { if (h.kind !== 'door' || path[bot.i].branch || !(bot.i <= h.i + 4 && h.i - bot.i < 36) || ['fork', 'forkRide'].includes(path[bot.i].kind)) continue // 扉の手前の本線の上だけ（分かれ道の床の上では見ない）
+    const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw), dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
+    if (lat > h.w / 2 + 2 || Math.abs(h.p[1] + 0.8 - b.p[1]) > 3 || da < -h.half || da > 34) continue
+    const st = doorAng(h.m, bot.world.time), near = da - h.half
+    if (bot.doorGo || near < 0.5) { bot.doorGo = near > -h.half * 2; thr = 1; brk = 0; lean = 0; break }
+    const tArr = near / Math.max(3, sp), ok = st.at === 'lo' && st.left > tArr + (2 * h.half) / Math.max(6, sp) + 0.15
+    if (ok && sp > 4) { bot.doorGo = true; thr = 1; brk = 0; lean = 0; break }
+    const stopAt = near - 3
+    if (st.at === 'lo' && st.left > 2.2 && stopAt < 1.5) { bot.doorGo = true; thr = 1; brk = 0; lean = 0; break } // 閉じた直後: 止まった所から全開
+    if (stopAt > 0.6) { const vMax = Math.sqrt(2 * 3 * stopAt); thr = sp < Math.min(vMax, 6) ? 1 : 0; brk = sp > vMax ? Math.min(1, (sp - vMax) * 0.5 + 0.3) : 0 } else { thr = 0; brk = Math.abs(sp) > 0.15 ? 1 : 0.6 }
+    lean = 0; bot.waiting = true; break }
+  // v36 油だまり: 手前で 7m/s くらいにして、油の上は何も押さずに惰性で抜ける
+  { let oilAhead = null; for (let jj = 0, d = 0; jj < Math.min(SQ.length, 16); jj++) { const q = path[SQ[jj]]; if (jj > 0 && q.p && path[SQ[jj - 1]].p) d += Math.hypot(q.p[0] - path[SQ[jj - 1]].p[0], q.p[2] - path[SQ[jj - 1]].p[2]); if (q.oil) { oilAhead = d; break } }
+    const onOil = [0, 1].some(i => b.cn[i] && bot.world && bot.world.shapes[b.cn[i].id].oil) || cur.oil
+    if (oilAhead != null && !onOil) { thr = sp < 7 ? 1 : 0; brk = sp > 8 ? Math.min(0.8, (sp - 8) * 0.4) : 0; lean = 0; if (oilAhead < 2.5) { thr = 0; brk = 0 } }
+    bot.oilOn = onOil; if (onOil) { thr = 0; brk = 0; lean = 0 } }
   // v35 回る筒: 助走から筒を出るまで全開（人も同じ。遅いと真上で落ちる）
   if (b._dph || cur.kind === 'drum' || cur.kind === 'drumRun' || SQ.slice(0, 30).some(j => path[j].kind === 'drum')) { thr = 1; brk = 0; lean = 0; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
   // ゲームと同じ、曲がりの手前の自動の減速を通す
-  const inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
+  let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
+  if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1]) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
+  if (bot.oilOn) inp = { ...inp, thr: 0, ab: 0, brk: 0, lean: 0 } // 油の上では何も押さない（手前で速さを落としてあるので自動の減速も入らない）
   // 反応の遅れ（人の速さ）
   if (bot.react > 0) { bot.queue.push(inp); if (bot.queue.length > bot.react) return bot.queue.shift(); return { thr: 0, brk: 0, lean: 0, steer: 0 } }
   return inp

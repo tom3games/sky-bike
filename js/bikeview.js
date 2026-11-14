@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=35b'
+import { BIKE, basis, wheelCenter } from './physics.js?v=36'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -168,7 +168,9 @@ export class BikeView {
     const q = new THREE.Quaternion().setFromRotationMatrix(m)
     // 曲がる時の傾き（見た目だけ）
     const roll = Math.max(-0.7, Math.min(0.7, -Math.atan((b.psiRate || 0) * Math.abs(b.speed || 0) / 9.81))) // 曲がる時、速いほど深く内側へ倒れる（遠心力と釣り合う角度）
-    this.roll = (this.roll || 0) + (roll - (this.roll || 0)) * 0.2
+    const lie = b.crashed && b.crashed.why === 'monkey' ? b.crashed.side || 1 : 0 // v36 猿にはたかれた: バイクはその場で横に倒れる
+    this.roll = (this.roll || 0) + ((lie ? lie * 1.42 : roll) - (this.roll || 0)) * (lie ? 0.09 : 0.2)
+    if (lie) this.root.position.y -= 0.42 * Math.abs(Math.sin(this.roll))
     const qr = new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), this.roll)
     this.body.quaternion.copy(q).multiply(qr)
     for (let i = 0; i < 2; i++) {
@@ -251,6 +253,14 @@ BikeView.prototype.throwRider = function (b, scene) {
   r.matrixWorld.decompose(pos, q, sc)
   scene.add(r); r.position.copy(pos); r.quaternion.copy(q); r.scale.copy(sc)
   this.fly = { v: new THREE.Vector3(b.v[0] * 0.8, b.v[1] * 0.6 + 2.5, b.v[2] * 0.8), w: new THREE.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 3, -4 - Math.random() * 4), t: 0 }
+}
+// v36 猿にはたかれた: 乗り手だけが道の外へ横に飛ばされて落ちる（バイクは sync で横に倒す）
+BikeView.prototype.knockOff = function (b, scene, side) {
+  if (this.fly || !this.ready) return
+  this.throwRider(b, scene)
+  if (!this.fly) return
+  const R = [Math.sin(b.psi), 0, Math.cos(b.psi)]
+  this.fly.v.set(R[0] * side * 6.5, 3.6, R[2] * side * 6.5); this.fly.w.set(-Math.cos(b.psi) * side * 6, 1.5, Math.sin(b.psi) * side * 6)
 }
 BikeView.prototype.updateRider = function (dt, world) {
   const f = this.fly; if (!f) return

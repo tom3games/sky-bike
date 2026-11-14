@@ -70,6 +70,11 @@ function traceTexture(kind, shake, k) {
       if (kind === 'shaky') { for (let i = 0; i < 3; i++) scratch(g, [[x - 40 + i * 30, 380], [x - 30 + i * 30, 470]], lw, sh * 1.3) }
       writeText(g, date, 40, kind === 'up' ? 460 : 380, 36, lw * 0.75, sh * 0.8, shake * 0.4)
       if (kind === 'arrow') for (let i = 0; i < 4; i++) scratch(g, [[150 + i * 16, 400], [148 + i * 16, 450]], lw * 0.8, sh)
+    } else if (kind === 'claw') {
+      // 爪でえぐった 4 本の筋と、震える上向きの矢印
+      for (let i = 0; i < 4; i++) scratch(g, [[40 + i * 26, 90 + i * 6], [110 + i * 26, 300 + i * 4]], lw + 3, sh * 0.5, 'rgba(14,10,8,0.98)')
+      scratch(g, [[200, 470], [196, 180]], lw, sh * 1.4); scratch(g, [[165, 230], [196, 180], [228, 232]], lw, sh * 1.4)
+      writeText(g, '10/24', 30, 400, 34, lw * 0.75, sh, 0.5)
     } else if (kind === 'two') {
       // 二人の印（棒の人が 2 つ並ぶ）と日付。ここまでは二人で来た
       for (const x0 of [70, 160]) { scratch(g, [[x0, 120], [x0, 250]], lw, sh); scratch(g, [[x0 - 34, 330], [x0, 250], [x0 + 34, 330]], lw, sh); scratch(g, [[x0 - 40, 170], [x0 + 40, 170]], lw, sh); g.beginPath(); g.lineWidth = lw; g.strokeStyle = 'rgba(22,16,12,0.95)'; g.arc(x0 + (rnd() - 0.5) * sh, 90, 26, 0, 7); g.stroke() }
@@ -144,13 +149,13 @@ export function traceSpots(course) {
     [0.66, 'lever', '折れたレバー。無理に動かしたらしい。', 'A snapped lever. He forced it.'],
     [0.75, 'sloppy', '印が雑になっていく。', 'His marks are getting sloppy.'],
     [0.84, 'shaky', '字が震えている。', 'The scratches are shaking.'],
-    [0.925, 'up', 'それでも、上へ向かっている。', 'Still, he kept going up.'],
+    [0.895, 'up', 'それでも、上へ向かっている。', 'Still, he kept going up.'],
   ]
   const out = []
   LIST.forEach(([t, kind, ja, en], k) => {
     for (let i = Math.floor(N * t); i < N - 12; i++) {
       let good = true; for (let j = i - 6; j <= i + 6; j++) if (!ok(P[j])) { good = false; break }
-      if (!good || (hs && Math.abs(i - hs.i) < 70)) continue // 廃墟の男の近くには置かない
+      if (!good || (hs && Math.abs(i - hs.i) < 70) || (course.chases || []).some(C => i > C.i0 - 40 && i < C.i1 + 40) || (course.traps || []).some(T => Math.abs(i - T.i) < 40)) continue // 廃墟の男・猿・罠の近くには置かない
       const q = P[i]
       // 塔の壁から遠い側（外の側）の縁に置く
       let side = -1
@@ -162,6 +167,9 @@ export function traceSpots(course) {
   // 中盤の山: 休憩所「嵐の回廊の途中」のそばの野宿の跡（廃墟の男とは別の場所）。字の乱れは 41% と 62% の跡の間
   const cs = campSpot(course)
   if (cs) out.push({ ...cs, side: -1, kind: 'two', camp: true, ja: 'ここまでは二人で来た。', en: 'We made it this far together.', k: 8, shake: 0.36 })
+  // v36 2 か所目の猿を逃げ切った先: 「あれに追われた。振り返るな。」（爪の跡と、震える上向きの矢印）
+  const ch = course.chases && course.chases[1]
+  if (ch) { const P = course.path; let i = ch.i1 + 4; while (i < P.length - 1 && !(P[i].w >= 3 && ['road', 'orbit', 'pad'].includes(P[i].kind))) i++; const q = P[i]; out.push({ i, p: q.p.slice(), yaw: q.yaw, w: q.w, side: -1, kind: 'claw', ja: 'あれに追われた。振り返るな。', en: "They chased me. Don't look back.", k: 9, shake: 0.95 }) }
   return out
 }
 export function campSpot(course) {
