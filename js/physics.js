@@ -518,9 +518,12 @@ export function framePts(b, B) { return BIKE.frame.map(([x, y, r]) => ({ c: body
 
 // 入力 inp = { thr 0..1, brk 0..1, lean -1(後ろ)..1(前), steer -1(左)..1(右) }
 export function stepBike(world, b, inp, ev) {
+  // v33 本人「アクセルもブレーキも押してない状態でも前に傾けるように」: 止まっていて前体重だけの時は、前輪に軽くブレーキを当てたことにして前輪で立つ（約 33 度。後ろ体重だけのウィリーと対称）。
+  // この自動のブレーキでは下がらない（_auto）。走っている時（0.9m/s 以上）は今まで通り
+  if (inp.lean > 0.6 && inp.thr <= 0.05 && inp.brk <= 0.05 && Math.abs(b.speed) < (b._autoF ? 2.0 : 0.3) && !b.crashed && (b.g[0] || b.g[1]) && !b.hang) { inp = { ...inp, brk: 1, _auto: true }; b._autoF = true } else b._autoF = false
   // v29 登り坂で止まりかけてブレーキを押している時は、前体重を効かせない（前輪で立たず、そのまま下がれる。本人「ジャンプ台に乗ったままバックできない」）
   { const cn = b.cn[0] || b.cn[1], hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
-    b._upBrk = !!(cn && inp.brk > 0 && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.3)
+    b._upBrk = !!(cn && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.3)
     if (b._upBrk && inp.lean > 0) inp = { ...inp, lean: 0 } }
   // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
   if (!b.ghost && world.traps.length) for (const s of world.traps) {
@@ -731,7 +734,7 @@ function sub(world, b, inpIn, ev) {
   const vr = b.vtRel != null ? b.vtRel : b.speed
   // v29 本人「ジャンプ台に乗ったままバックできない」: 登り坂（車体が 8 度より上を向いている）では、前体重のままでも・少し動いていても下がれる
   { const up = !!b._upBrk
-    if (inp.brk > 0 && inp.thr <= 0 && (inp.lean <= 0.3 || up) && b.g[0] && b.g[1] && vr < (up ? 1.0 : 0.6) && (b.revT > 0 || Math.abs(vr) < (up ? 1.0 : 0.6))) b.revT = (b.revT || 0) + H; else b.revT = 0 }
+    if (inp.brk > 0 && !inp._auto && inp.thr <= 0 && (inp.lean <= 0.3 || up) && b.g[0] && b.g[1] && vr < (up ? 1.0 : 0.6) && (b.revT > 0 || Math.abs(vr) < (up ? 1.0 : 0.6))) b.revT = (b.revT || 0) + H; else b.revT = 0 }
   // ---- 崩れる足場: 乗っている時間がたまると落ちる（ゴーストは崩さない）
   if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { if (!(sh.touch > 0) && ev) ev.push({ t: 'crumbleTouch', id: sh.id, v: b.speed }); if (!(sh.touch > 0)) { b._crList = b._crList || []; if (!b._crList.includes(sh.id)) b._crList.push(sh.id) } sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
   // v31 本人「落ちる板が、最高速度で進んでると反応してない」: 速く走り抜けた板も、離れた直後（0.12 秒）に後ろで崩れ落ちる（渡り切れるのはそのまま。遅い時は今まで通り乗っている間に落ちる）
@@ -850,7 +853,7 @@ function sub(world, b, inpIn, ev) {
   if (standing && (b.standT > 0.35 || b.standOn || creep)) {
     let con = null, tgt = 0
     if (b.g[0] && inp.lean < -0.6) { con = b.cn[0]; tgt = 0.6 * Math.min(1, -inp.lean) }
-    else if (b.g[1] && inp.lean > 0.6) { con = b.cn[1]; tgt = -0.58 * Math.min(1, inp.lean) }
+    else if (b.g[1] && inp.lean > 0.6) { con = b.cn[1]; tgt = (inp._auto ? -0.44 : -0.58) * Math.min(1, inp.lean) } // 前体重だけ（自動のブレーキ）は約 25 度、前体重＋ブレーキは約 33 度
     b.standOn = !!con
     if (con) {
       const n = con.nw || con.n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する傾き（正＝前が上）
