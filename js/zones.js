@@ -513,7 +513,13 @@ export function ruins(x) {
   { const s = orbit(0.6, 4.0, { mat: 'mud', mu: 0.3, kind: 'mud' }); s.mud = 60 }
   orbit(0.25, 0.75)
   orbit(0.6, 0.4)
-  B.mark('跳ね板'); B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false, k0: 7.4, kv: 0, vxMax: 7.5 }) /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
+  B.mark('跳ね板'); if (globalThis.__oldKick) { B.road(15, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false, k0: 7.4, kv: 0, vxMax: 7.5 }) } else {
+    // v51 本人「跳ね板が 2 連続する所も。2 個目はウィリーで空中で角度を合わせないと、とんでもない飛び方」: 1 枚目（今まで通り）→ すぐ 2 枚目（跳ねる時に前へ回す）。
+    //   全体の前への長さと高さの差は 1 枚だった時と同じ（後の道を動かさない）
+    const s0 = B.t.p.slice(), f0 = B.dir(B.t.yaw), X = 15 + 3.8 + 3.2 + 9 * Math.cos(30 * x.DEG) + 5, Y = 2.4 - 9 * Math.sin(30 * x.DEG)
+    B.road(6, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false, k0: 7.4, kv: 0, vxMax: 7.5, rampLen: 4, after: 2 })
+    const dx = (B.t.p[0] - s0[0]) * f0[0] + (B.t.p[2] - s0[2]) * f0[2], dy = B.t.p[1] - s0[1], X2 = X - dx, Y2 = Y - dy, a2 = 25 * x.DEG, r2 = 1.0, g2 = 3.0, rl2 = (r2 - Y2) / Math.sin(a2), af2 = X2 - 3.8 - g2 - rl2 * Math.cos(a2)
+    x.P.springPlank(B, { beam: false, k0: 7.0, kv: 0, vxMax: 7, rise: r2, gap: g2, ang: 25, rampLen: rl2, after: af2, spin: +(globalThis.__kickSpin ?? -3.6), tol: 20 }) } /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
   B.mark('ウィリーの溝'); orbit(0.3, 0)
   // v38 本人「最初の跳ね板の後の段差、横から落ちにくく」: 段の手前から段の上まで、両脇に低い縁石（高さ約 0.35m・丸い・当たりあり）。道幅・段の高さはそのまま
   { const p0 = B.t.p.slice(), yaw = B.t.yaw, f = B.dir(yaw), R = B.right(yaw), w = 3.2, r = 0.2, off = w / 2 + r + 0.04

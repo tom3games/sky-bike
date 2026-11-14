@@ -682,6 +682,7 @@ export function stepBike(world, b, inp, ev) {
   if (!b.ghost && world.spikes) spikeTrack(world, b, ev)
   if (!b.ghost && world.blasts) blastTrack(world, b, ev)
   if (!b.ghost) v16Track(world, b, ev)
+  if (b._kickSpin) { if (!b.g[0] && !b.g[1]) { b.w += b._kickSpin; b._kickSpin = 0 } else if (world.time - b._kickT > 1.5) b._kickSpin = 0 }
   b.steps++
 }
 const ZERO = { thr: 0, brk: 0, lean: 0, steer: 0 }
@@ -1425,7 +1426,7 @@ function v16Track(world, b, ev) {
       if (on0 || on1) m.lastTouch = T
       if (m.trig == null && on0 && b.g[0] && on1 && b.g[1] && !b.crashed && (m.armed ?? true)) {
         const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
-        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve })
+        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }); if (m.spin) { b._kickSpin = m.spin; b._kickT = T } // v51 2 枚目の跳ね板: 板を離れた瞬間に前へ回す
           // v38 本人「跳ね板から次の壁まで直撃」: 板の向きを少し後ろへ傾けた形。前へ速すぎる分は跳ねる時に削る（どの速さで乗っても坂か着地の道に下りる）
           if (m.vxMax != null) { const vf = b.v[0] * m.f[0] + b.v[2] * m.f[2]; if (vf > m.vxMax) { const d = vf - m.vxMax; b.v[0] -= m.f[0] * d; b.v[2] -= m.f[2] * d } } }
       }

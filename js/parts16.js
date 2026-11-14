@@ -173,7 +173,7 @@ export function chimney(B, o = {}) {
 export function springPlank(B, o = {}) {
   const t = B.t, yaw = t.yaw, f = B.dir(yaw), R = B.right(yaw), Lp = o.len ?? 3.8, W = o.w ?? 3
   const start = t.p.slice()
-  const m = { type: 'kick', axis: UP, stroke: o.stroke ?? 0.6, k0: o.k0 ?? 3.6, kv: o.kv ?? 0.45, vmax: 13, vxMax: o.vxMax, hold: 0.7, back: 1.0, trigAt: o.trigAt ?? 1.5, start, f, ext: [0.2, 1.2, 0.2], trig: null }
+  const m = { type: 'kick', spin: o.spin || 0, axis: UP, stroke: o.stroke ?? 0.6, k0: o.k0 ?? 3.6, kv: o.kv ?? 0.45, vmax: 13, vxMax: o.vxMax, hold: 0.7, back: 1.0, trigAt: o.trigAt ?? 1.5, start, f, ext: [0.2, 1.2, 0.2], trig: null }
   const sh = B.box({ c: add3(add3(start, f, Lp / 2), UP, -0.12), h: [Lp / 2 - 0.015, 0.12, W / 2], yaw, mat: 'plank', mu: 1.05, tag: 'road', mov: m })
   // 板の下の穴（バネが見える。当たりあり。板より 0.75 下）と両脇の枠
   B.box({ c: add3(add3(start, f, Lp / 2), UP, -0.95), h: [Lp / 2, 0.1, W / 2], yaw, mat: 'iron', tag: 'pit' })

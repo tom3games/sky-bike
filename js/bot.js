@@ -146,6 +146,7 @@ export function botInput(bot, b) {
       for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 14); j = SQ[++jj]) if (path[j].kind !== 'jump' && path[j].kind !== 'lip' && path[j].w) { ls = path[j].slope || 0; if (path[j].p[1] < b.p[1] - 0.3) break }
       const tgt = ls - 0.05
       lean = Math.max(-1, Math.min(1, bot.react && b.airT > 0.25 ? (b.th + b.w * bot.react / 60 - tgt) * 2.0 + b.w * 0.5 : (b.th - tgt) * 3.5 + b.w * 0.6)) // v51 人の速さ bot: 長い跳び（0.6 秒より長い）では遅れで回しすぎないように、回る速さを強く見る
+      if (b.w < -2.2 && b.th < tgt + 0.6) lean = -1 // v51 前へ回されている（2 枚目の跳ね板）: すぐ後ろ体重で止める
       thr = 0.5; brk = 0 // 空中ではブレーキを掛けない（掛けると前へ回って突っ込む。v16 の自由な道の切れ目は点が 1 つなので、跳んだ後の先の段で速さを落とそうとしていた）
     } else {
       // 地面: 車体が坂から浮きすぎ・突っ込みすぎを直す
