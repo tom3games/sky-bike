@@ -112,7 +112,7 @@ export function buildMurals(course, scene, M) {
       const f = [Math.cos(s.yaw), 0, -Math.sin(s.yaw)], r = [Math.sin(s.yaw), 0, Math.cos(s.yaw)], at = [s.p[0] + f[0] * 9 + r[0] * (s.w / 2 + 1.6), s.p[1], s.p[2] + f[2] * 9 + r[2] * (s.w / 2 + 1.6)]
       const w = new THREE.Group(); w.position.set(...at); w.rotation.y = s.yaw - Math.PI / 2 + 0.55
       // v44 本人「謎の壁画が浮いている」: 色だけの箱だった壁を、石積みの崩れた壁にして下へ 6m 伸ばす（道の脇の足場に根を下ろす）。上の端はぎざぎざ
-      const WH = 13.5 + 34, sg = new THREE.BoxGeometry(7, WH, 0.9, 8, 14, 1) // v51 下の霧まで伸ばす（道の外の宙に浮いて見えないように）, sp = sg.attributes.position, su = sg.attributes.uv
+      const WH = 13.5 + 34, sg = new THREE.BoxGeometry(7, WH, 0.9, 8, 14, 1), sp = sg.attributes.position, su = sg.attributes.uv // v51 下の霧まで伸ばす（道の外の宙に浮いて見えないように）
       for (let i = 0; i < sp.count; i++) { if (sp.getY(i) > WH / 2 - 0.05) sp.setY(i, sp.getY(i) + Math.abs(Math.sin(sp.getX(i) * 1.7 + 0.6)) * 0.9 - 0.15) }
       for (let i = 0; i < su.count; i++) su.setXY(i, su.getX(i) * 7 / 2.6, su.getY(i) * WH / 2.6)
       sg.computeVertexNormals()

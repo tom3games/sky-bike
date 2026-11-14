@@ -27,3 +27,43 @@ export function buildEpi(course, scene, M) {
   const bk = rustyBike(M); bk.position.set(...C.bike); bk.rotation.y = yaw; bk.rotateX(-0.14); group.add(bk)
   return { group, silh }
 }
+
+// v51 下山で外れた前輪（見た目だけ）: バイクの前輪の模型を複製して、外れた所から前へ転がし、跳ねて道の外へ。当たりは物理の世界の面で見る（バイクの物理には関わらない）
+export function wheelProp(scene) {
+  const root = new THREE.Group(); root.name = 'wheelProp'; root.visible = false; scene.add(root)
+  let spin = null, v = new THREE.Vector3(), t = 0, roll = 0, axis = new THREE.Vector3(0, 0, 1), base = new THREE.Quaternion()
+  const R = 0.36, tmp = new THREE.Vector3(), qa = new THREE.Quaternion()
+  return {
+    root,
+    start(bikeView, b) {
+      if (spin) root.remove(spin)
+      const src = bikeView.wheels[1]
+      spin = src.children[0].clone(); spin.rotation.set(0, 0, 0); root.add(spin)
+      root.position.copy(bikeView.root.position).add(src.position)
+      base.copy(src.quaternion); root.quaternion.copy(base)
+      axis.set(0, 0, 1).applyQuaternion(base)
+      const h = new THREE.Vector3(Math.cos(b.psi), 0, -Math.sin(b.psi)), r = new THREE.Vector3(Math.sin(b.psi), 0, Math.cos(b.psi))
+      v.set(b.v[0], b.v[1], b.v[2]).multiplyScalar(1.15).addScaledVector(r, 1.1).addScaledVector(h, 1.5); v.y += 2.4 // 少し跳ねて、前と右へ
+      t = 0; roll = 0; root.visible = true
+    },
+    update(dt, world) {
+      if (!root.visible || !spin) return
+      t += dt; if (t > 9) { root.visible = false; return }
+      const n = Math.max(1, Math.ceil(dt / 0.008)), h = dt / n
+      for (let k = 0; k < n; k++) {
+        v.y -= 9.81 * h
+        root.position.addScaledVector(v, h)
+        const p = root.position, ids = world.near(p.x, p.y, p.z, R + 0.5), con = world.sphere(p.x, p.y, p.z, R, ids)
+        if (con && con.depth > 0) {
+          const nn = tmp.set(con.n[0], con.n[1], con.n[2]); p.addScaledVector(nn, con.depth)
+          const vn = v.dot(nn); if (vn < 0) v.addScaledVector(nn, -vn * 1.45) /* 跳ね返り 0.45 */; v.multiplyScalar(1 - 0.08 * h) // 転がる抵抗は小さく（バイクより先へ転がっていく）
+        }
+      }
+      // 転がる（進む速さで車軸のまわりに回す）。少しずつ横へ倒れていく
+      const hv = Math.hypot(v.x, v.z); roll -= hv * dt / R
+      qa.setFromAxisAngle(axis, roll); root.quaternion.copy(qa).multiply(base)
+      root.rotateX(Math.min(0.5, t * 0.12))
+    },
+    hide() { root.visible = false },
+  }
+}

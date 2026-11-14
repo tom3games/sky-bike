@@ -346,6 +346,7 @@ export function botInput(bot, b) {
   // v41 落石の坂: 予告（地鳴り）が始まったら、門まで真っすぐバック（ブレーキを押し続ける。ハンドルは自動のバックの線）
   { const Bo = bot.course && bot.course.boulder, st = bot.R && bot.R.bo
     if (Bo && st && (st.ph === 'warn' || st.ph === 'roll')) inp = bot.i > Bo.gateI - 2 ? { thr: 0, brk: 1, lean: 0, steer: Math.round(steerFor(bot.st, b) * 16) / 16, nitro: 0 } : { thr: b.speed < -0.4 ? 0.5 : 0, brk: 0, lean: 0, steer: Math.round(steerFor(bot.st, b) * 16) / 16, nitro: 0 } } // 門の外へ出たら止まって、岩が割れるのを待つ
+  if (b.noFront && bot.skill === 'good') inp = { ...inp, thr: 1, brk: 0, ab: 0, lean: -1, nitro: 0 } // v51 下山で前輪が外れたら、後ろ体重のまま全開（ウィリーの補助で保つ）
   // 反応の遅れ（人の速さ）
   // v39: STEERNOW（globalThis.__steerNow）で、ハンドルだけ遅らせない人の bot（ゲームのハンドルは自動なので人の遅れが乗らない）。ふだんは今までどおり全部遅らせる（これまでの数字と比べられるように）
   if (bot.react > 0) { bot.queue.push(inp); const st = globalThis.__steerNow ? inp.steer : null; if (bot.queue.length > bot.react) { const d = bot.queue.shift(); return st == null ? d : { ...d, steer: st } } return { thr: 0, brk: 0, lean: 0, steer: st ?? 0 } }
