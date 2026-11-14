@@ -1,10 +1,10 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=30'
-import * as P16 from './parts16.js?v=30'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=30'
-import { lab16 } from './parts16.js?v=30'
-import * as P17 from './parts17.js?v=30'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=30'
+import * as Z from './zones.js?v=31'
+import * as P16 from './parts16.js?v=31'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=31'
+import { lab16 } from './parts16.js?v=31'
+import * as P17 from './parts17.js?v=31'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=31'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -362,6 +362,7 @@ export class Builder {
     { const q = at(d1 - 0.75, mid); this.cyl({ a: [q[0], q[1] - 0.05, q[2]], b: [q[0], q[1] + 2.3, q[2]], r: 0.7, mat: 'statue', tag: 'statue' }); this.props.push({ kind: 'statue', p: q, yaw: t.yaw + Math.PI }) }
     // 樽（入口の外側。当たりは円柱、見た目は同じ大きさの樽の模型）
     for (const [dd, ll] of [[0.9, l0 + 0.8], [1.7, l0 + 0.9], [1.2, l1 - 0.8]]) { const q = at(dd, ll); this.cyl({ a: [q[0], q[1], q[2]], b: [q[0], q[1] + 0.88, q[2]], r: 0.29, mat: 'barrel', tag: 'barrel' }); this.props.push({ kind: 'barrel', p: q, rot: dd * 1.7 + ll }) }
+    { const q = at(1.3, l0 + 0.85); q[1] += 0.88; this.cyl({ a: [q[0], q[1], q[2]], b: [q[0], q[1] + 0.88, q[2]], r: 0.29, mat: 'barrel', tag: 'barrel' }); this.props.push({ kind: 'barrel', p: q, rot: 2.3 }) } // v31 本人「その上にあるドラム缶も爆発させたい」: 2 つ並んだ樽の上に 1 つ積む（爆発する樽なら連鎖する）
     this.curve(Ru, u * Math.PI, { noShape: true, pw: 2 * Ru, kind: 'uturn' })
     this.last = { slope: 0, yaw: this.t.yaw, w: 2 * Ru }
   }

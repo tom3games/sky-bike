@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=30'
+import { BIKE, basis, wheelCenter } from './physics.js?v=31'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -66,7 +66,7 @@ export class BikeView {
     if (!ghost) {
       this.lampM = new THREE.MeshStandardMaterial({ color: 0xd8d4c8, emissive: 0xfff2c8, emissiveIntensity: 0.05, roughness: 0.3, metalness: 0.2 })
       const lens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.03, 18), this.lampM); lens.rotation.z = Math.PI / 2; lens.position.set(0.17, 0.05, 0); this.bar.add(lens)
-      this.lampLight = new THREE.SpotLight(0xfff0d0, 0, 30, 0.45, 0.45, 1.2); this.lampLight.position.set(0.2, 0.05, 0); this.bar.add(this.lampLight)
+      this.lampLight = new THREE.SpotLight(0xfff0d0, 0, 30, 0.45, 0.45, 1.2); this.lampAt = new THREE.Object3D(); this.lampAt.position.set(0.2, 0.05, 0); this.bar.add(this.lampAt); scene.add(this.lampLight) // v31: 光はバイクの外（シーン直下）に置き、毎フレーム位置だけ合わせる（バイクを隠す・出すで光の数が変わると、全部の材料のシェーダを作り直して止まる）
       const tg = new THREE.Object3D(); tg.position.set(6, -0.9, 0); this.bar.add(tg); this.lampLight.target = tg
       // 光ったときの、ライトのまわりのにじみ（足し算で重ねる板）
       const cv = document.createElement('canvas'); cv.width = cv.height = 64; const cx = cv.getContext('2d'), gr = cx.createRadialGradient(32, 32, 0, 32, 32, 32)
@@ -109,7 +109,7 @@ export class BikeView {
       const fm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false })
       const cone = (r, h, m) => { const g = new THREE.ConeGeometry(r, h, 14, 1, true); g.translate(0, h / 2, 0); g.rotateZ(Math.PI); const ms = new THREE.Mesh(g, m); ms.castShadow = false; fl.add(ms); return ms }
       this.flameOut = cone(0.075, 0.9, fm(0xff8a3a, 0.75)); this.flameIn = cone(0.04, 0.55, fm(0x7ec8ff, 0.95))
-      this.flameLight = new THREE.PointLight(0x7ab8ff, 0, 5, 2); this.flameLight.position.set(0, -0.4, 0); fl.add(this.flameLight)
+      this.flameLight = new THREE.PointLight(0x7ab8ff, 0, 5, 2); this.flameAt = new THREE.Object3D(); this.flameAt.position.set(0, -0.4, 0); fl.add(this.flameAt); scene.add(this.flameLight) // v31: 炎を隠しても光は数えたまま（明るさ 0）
       fl.visible = false
     }
     // 乗り手
@@ -197,8 +197,12 @@ export class BikeView {
     if (this.flame) {
       const on = !!b.nitroOn; this._fl = (this._fl || 0) + ((on ? 1 : 0) - (this._fl || 0)) * (on ? 0.5 : 0.25)
       this.flame.visible = this._fl > 0.02
+      if (!this.flame.visible) this.flameLight.intensity = 0
       if (this.flame.visible) { const k = this._fl, j = 0.8 + Math.random() * 0.45; this.flameOut.scale.set(k * (0.9 + Math.random() * 0.2), k * j, k * (0.9 + Math.random() * 0.2)); this.flameIn.scale.set(k, k * (0.85 + Math.random() * 0.3), k); this.flameLight.intensity = 6 * k * j }
     }
+    // v31: シーン直下の光を、ライトと炎の位置へ
+    if (this.lampAt) { this.lampAt.updateWorldMatrix(true, false); this.lampAt.getWorldPosition(this.lampLight.position) }
+    if (this.flameAt) { this.flameAt.updateWorldMatrix(true, false); this.flameAt.getWorldPosition(this.flameLight.position) }
   }
 }
 // 2本の骨の IK: A（付け根）→ B（関節）→ C（先）を、先が target に来るよう曲げる。pole は関節を向ける側

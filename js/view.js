@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=30'
+import { arcPoint } from './physics.js?v=31'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -309,7 +309,7 @@ export function updateLOD(chunks, cam, near = 230, farMax = 1600) {
     if (ch.far) ch.far.visible = !det && d < farMax
   }
 }
-const _m = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3()
+const _m = new THREE.Matrix4(), _r = new THREE.Matrix4(), _x = new THREE.Vector3(), _y = new THREE.Vector3(), _z = new THREE.Vector3()
 export function updateMovers(movers, world, cam) {
   for (const mesh of movers) {
     const s = mesh.userData.shape
@@ -319,12 +319,16 @@ export function updateMovers(movers, world, cam) {
       _m.makeBasis(_x.set(...s.ax[0]), _y.set(...s.ax[1]), _z.set(...s.ax[2]))
       let ox = 0, oy = 0
       if (s.mov.type === 'crumble' && s.touch > 0 && !s.gone) { ox = (Math.random() - 0.5) * 0.05 * s.touch / s.mov.delay; oy = (Math.random() - 0.5) * 0.04 }
+      // v31: 崩れた板は、その場で消さずに 1.2 秒かけて回りながら落ちる（後ろで崩れ落ちるのが見える）
+      const fa = s.mov.type === 'crumble' && s.gone && s.goneAt != null ? world.time - s.goneAt : -1
+      if (fa >= 0 && fa < 1.2) { const k = s.id % 2 ? 1 : -1; _m.premultiply(_r.makeRotationAxis(_y.set(...s.ax[2]).normalize(), k * fa * 1.4)); oy -= 4.9 * fa * fa + fa * 0.6 }
       _m.setPosition(s.c[0] + ox, s.c[1] + oy, s.c[2])
-      mesh.visible = !s.gone
+      mesh.visible = !s.gone || (fa >= 0 && fa < 1.2)
     } else if (s.type === 'arc') {
       // 抜ける床・崩れる敷石: その場で、抜ける前はガタガタ揺れ、抜けたら消える
       const sh = s.warnT != null && !s.gone ? 0.05 : (s.mov.type === 'crumble' && s.touch > 0 && !s.gone ? 0.04 * s.touch / s.mov.delay : 0)
-      _m.makeTranslation(sh ? (Math.random() - 0.5) * sh : 0, sh ? -Math.random() * sh : 0, 0); mesh.visible = !s.gone
+      const fa = s.mov.type === 'crumble' && s.gone && s.goneAt != null ? world.time - s.goneAt : -1 // v31: 崩れた敷石は 1.2 秒かけて落ちる
+      _m.makeTranslation(sh ? (Math.random() - 0.5) * sh : 0, (sh ? -Math.random() * sh : 0) - (fa >= 0 && fa < 1.2 ? 4.9 * fa * fa + fa * 0.6 : 0), 0); mesh.visible = !s.gone || (fa >= 0 && fa < 1.2)
     } else if (s.type === 'sph') {
       // 鉄球は振れる向きに少し回し、岩は落ちながら転がす
       const a = s.mov.type === 'drop' ? world.time * 3.1 + s.id : (s.c[0] + s.c[2]) * 0.4

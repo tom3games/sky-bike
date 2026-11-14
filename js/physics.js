@@ -482,7 +482,7 @@ export const BIKE = {
   frame: [[-0.35, -0.16, 0.13], [0, -0.22, 0.13], [0.36, -0.12, 0.13]],
   rider: [[-0.10, 0.22, 0.17, 0.22], [-0.02, 0.52, 0.17, 0.25], [0.02, 0.86, 0.15, 0.28]], // [前, 上, 半径, 重心で前へ動く量]
   hardLand: 9.5,
-  nitroTop: 20, nitroDrive: 2.1, nitroPower: 2.2, nitroThrust: 700, nitroUse: 0.4, // v15 ニトロ: 押している間は最高速度 20m/s・押す力 2 倍。満タンで 2.5 秒
+  nitroTop: 21, nitroDrive: 2.1, nitroPower: 2.2, nitroThrust: 700, nitroUse: 0.4, // v15 ニトロ: 押している間は最高速度 20m/s・押す力 2 倍。満タンで 2.5 秒
   vtop: 13.5, vfade: 2, // v15: 13 → 13.5（本人「ほんの少しだけ上げて」）。 // v12: 最高速度（11m/s から効きが弱まり 13m/s で止まる）。ジャンプ台の踏み切りでは launchV で v11 と同じ飛び出しの速さに戻す
   wheelieEase: 0.47,
 }
@@ -733,7 +733,11 @@ function sub(world, b, inpIn, ev) {
   { const up = !!b._upBrk
     if (inp.brk > 0 && inp.thr <= 0 && (inp.lean <= 0.3 || up) && b.g[0] && b.g[1] && vr < (up ? 1.0 : 0.6) && (b.revT > 0 || Math.abs(vr) < (up ? 1.0 : 0.6))) b.revT = (b.revT || 0) + H; else b.revT = 0 }
   // ---- 崩れる足場: 乗っている時間がたまると落ちる（ゴーストは崩さない）
-  if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
+  if (!b.ghost) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn) continue; const sh = world.shapes[cn.id]; if (sh.mov && sh.mov.type === 'crumble' && !sh.gone) { if (!(sh.touch > 0) && ev) ev.push({ t: 'crumbleTouch', id: sh.id, v: b.speed }); if (!(sh.touch > 0)) { b._crList = b._crList || []; if (!b._crList.includes(sh.id)) b._crList.push(sh.id) } sh.touch += H / 2; sh.lastTouch = world.time; if (sh.touch > sh.mov.delay) { sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id }) } } }
+  // v31 本人「落ちる板が、最高速度で進んでると反応してない」: 速く走り抜けた板も、離れた直後（0.12 秒）に後ろで崩れ落ちる（渡り切れるのはそのまま。遅い時は今まで通り乗っている間に落ちる）
+  if (!b.ghost && b._crList && b._crList.length) b._crList = b._crList.filter(id => { const sh = world.shapes[id]; if (sh.gone) return false; const dt = world.time - (sh.lastTouch ?? -1e9); if (dt > 1.0) return false
+    const away = closest(sh, b.p[0], b.p[1], b.p[2]).d
+    if (dt > 0.12 && away > 1.3 && b.speed > 0.5 && (!b.cn[0] || b.cn[0].id !== id) && (!b.cn[1] || b.cn[1].id !== id)) { /* 板を越えて前へ進んだ時だけ（手前で止まって下がった時は崩さない） */ sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id, fast: true }); return false } return true })
   // ---- 風（決まった強弱で吹く）
   for (const wd of world.winds) {
     if (b.p[0] < wd.min[0] || b.p[0] > wd.max[0] || b.p[1] < wd.min[1] || b.p[1] > wd.max[1] || b.p[2] < wd.min[2] || b.p[2] > wd.max[2]) continue
@@ -889,6 +893,14 @@ function sub(world, b, inpIn, ev) {
   b.w += tau / P.Ip * H
   if (air) b.w *= 1 - 0.35 * H
   b.w = clamp(b.w, -14, 14)
+  // v29 前輪が段の面に当たった直後（0.8 秒）は、後ろへ回る勢いを 1.2 rad/s までにする（速いまま段に当たると跳ね上げられて後ろへ宙返りしていた。水の中の木箱）
+  const wet = c => { const sh = c && world.shapes[c.id]; return !!(sh && (sh.flow || sh.flowR || sh.flowT)) } // 水の流れの中の段だけ（水の中の木箱。ほかの段・ジャンプ台の当たり方は変えない）
+  const vNow = b.v[0] * B.h[0] + b.v[2] * B.h[2], hitDrop = b.speed - vNow > 1.2 // この刻みで前向きの速さが急に落ちた（段の面に当たった。ジャンプ台の坂に乗っただけでは落ちない）
+  { const c1 = b.cn[1], n1 = c1 && (c1.nw || c1.n); if (hitDrop && n1 && wet(c1) && -(n1[0] * B.h[0] + n1[2] * B.h[2]) > 0.25 && n1[1] < 0.97) b._faceT = 0.8; else if (b._faceT) b._faceT = Math.max(0, b._faceT - H)
+    if (b._faceT > 0 && !b.hang && b.w > 1.2) b.w = 1.2 }
+  // 後輪が段の面に当たった直後（0.8 秒）は、前へ回る勢いを 1.2 rad/s までにする（ウィリーのまま後輪が段に当たると前へ投げ出されていた）
+  { const c0 = b.cn[0], n0 = c0 && (c0.nw || c0.n); if (hitDrop && n0 && wet(c0) && -(n0[0] * B.h[0] + n0[2] * B.h[2]) > 0.25 && n0[1] < 0.97) b._faceR = 0.8; else if (b._faceR) b._faceR = Math.max(0, b._faceR - H)
+    if (b._faceR > 0 && !b.hang && b.w < -1.2) b.w = -1.2 }
   b.p[0] += b.v[0] * H; b.p[1] += b.v[1] * H; b.p[2] += b.v[2] * H
   if (b.carryId >= 0) { const sh = world.shapes[b.carryId], u = world.shapeVel(sh, b.p) || [0, 0, 0]; b.p[0] += u[0] * H; b.p[1] += u[1] * H; b.p[2] += u[2] * H; if (sh.mov.type === 'spin') { const a = sh.mov.rate * H, ca = dcos(a), sa = dsin(a), vx = b.v[0], vz = b.v[2]; b.psi += a; b.v[0] = vx * ca + vz * sa; b.v[2] = -vx * sa + vz * ca } } // 回る床の上では、床に対する速さの向きも一緒に回す
   b.th += b.w * H

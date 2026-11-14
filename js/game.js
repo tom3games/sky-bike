@@ -8,15 +8,15 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=30'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=30'
-import { COURSES } from './course.js?v=30'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=30'
-import { BikeView, snap } from './bikeview.js?v=30'
-import { createBot, botInput, resetBot } from './bot.js?v=30'
-import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=30'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=30'
-import { Birds } from './birds.js?v=30'
+import { buildGimmicks } from './gimmicks.js?v=31'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=31'
+import { COURSES } from './course.js?v=31'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=31'
+import { BikeView, snap } from './bikeview.js?v=31'
+import { createBot, botInput, resetBot } from './bot.js?v=31'
+import { judge, doRespawn, spawnAtCp, riserY } from './run.js?v=31'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=31'
+import { Birds } from './birds.js?v=31'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -190,6 +190,13 @@ function refreshBest() {
   }
 }
 
+// v31 途中で初めて出る物（ニトロの炎・爆発・ライトのにじみ・ゴースト・カラス・缶など）のシェーダを、読み込みの時に先に作る。
+// 隠れている物も一度だけ見える扱いにして compile する（途中で初めて描くと、スマホで 0.1〜0.2 秒止まっていた）
+function warmShaders() {
+  const hid = []; scene.traverse(o => { if (!o.visible) { hid.push(o); o.visible = true } })
+  try { renderer.compile(scene, camera) } catch (e) {}
+  for (const o of hid) o.visible = false
+}
 function loadCourse(id) {
   if (built) { for (const o of built.objs) if (o) scene.remove(o); built.group.traverse(o => o.geometry && o.geometry.dispose()) }
   const LM = window.__loadMarks = window.__loadMarks || {}, lt = () => performance.now(); let l0 = lt()
@@ -256,14 +263,17 @@ function loadCourse(id) {
   G.steer = createSteer(c.path)
   // v27: 序盤の赤いドラム缶のうち、道がいちばん先に近くを通る 1 個は、近くを通ると爆発する（見た目と音だけ。バイクには何もしない）
   G.boom = null
-  if (c.climb) { let best = null; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel') return; let bi = -1, bd = 1e9; c.path.forEach((q, i) => { if (!q.p || q.branch) return; const d = Math.hypot(q.p[0] - sh.a[0], q.p[2] - sh.a[2]); if (Math.abs(q.p[1] - sh.a[1]) < 1.5 && d < bd) { bd = d; bi = i } }); if (bd < 4.5 && (!best || bi < best.i)) best = { si, i: bi, a: sh.a.slice(), b: sh.b.slice() } }); G.boom = best }
+  if (c.climb) { let best = null; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel') return; let bi = -1, bd = 1e9; c.path.forEach((q, i) => { if (!q.p || q.branch) return; const d = Math.hypot(q.p[0] - sh.a[0], q.p[2] - sh.a[2]); if (Math.abs(q.p[1] - sh.a[1]) < 1.5 && d < bd) { bd = d; bi = i } }); if (bd < 4.5 && (!best || bi < best.i)) best = { si, i: bi, a: sh.a.slice(), b: sh.b.slice() } }); G.boom = best
+    // v31 上に積んである缶（下の缶の上の面の上・横 0.8m 以内）も連鎖して爆発する
+    if (best) { best.ups = []; c.shapes.forEach((sh, si) => { if (sh.tag !== 'barrel' || si === best.si) return; const dy = sh.a[1] - best.a[1]; if (dy > 0.5 && dy < 2.2 && Math.hypot(sh.a[0] - best.a[0], sh.a[2] - best.a[2]) < 0.8) best.ups.push({ si, a: sh.a.slice(), b: sh.b.slice(), delay: 0.2 + 0.2 * (best.ups.length % 2) + 0.12 * Math.floor(dy / 0.9) }) }) } }
   // v22: 道に止まっているカラス（近づくと飛び立つ。当たりなし）
   if (G.birds) G.birds.dispose()
   G.birds = c.climb ? new Birds(scene, c) : null
-  if (G.birds) G.birds.load('assets/models/crow.glb').catch(() => {})
+  if (G.birds) G.birds.load('assets/models/crow.glb').then(warmShaders).catch(() => {})
   // 道の点ごとに「鎖や木のきしむ物が近いか」（橋・広場）
   G.creakPts = c.path.filter(q => q.p && (q.kind === 'bridge' || q.kind === 'uturn' || q.kind === 'crumble')).map(q => q.p)
   if (propsReady) placeProps()
+  setTimeout(warmShaders, 0)
   if (cardTex && c.tower) { built.cards = buildCards(c, scene, cardTex); built.objs.push(built.cards) }
   sky.material.uniforms.hasPano.value = c.tower && panoTex ? 1 : 0
   // 背景の月が、タイトルの場面の左上に来るように回す（世界のどこから見ても同じ向き）
@@ -276,6 +286,7 @@ async function loadProps() {
   const ld = new GLTFLoader(), get = u => ld.loadAsync(u).then(g => g.scene).catch(() => null)
   const [barrel, statue, gate] = await Promise.all([get('assets/models/Barrel_01/Barrel_01_1k.gltf'), get('assets/models/gothic_statue/gothic_statue_1k.gltf'), get('assets/models/large_iron_gate/large_iron_gate_1k.gltf')])
   propsReady = { barrel, statue, gate }
+  setTimeout(warmShaders, 0)
   for (const m of Object.values(propsReady)) if (m) m.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true } })
   placeProps()
 }
@@ -340,10 +351,14 @@ async function loadEnv() {
 
 // ------------------------------------------------------------ v27 爆発するドラム缶
 const boomLight = new THREE.PointLight(0xff8a3a, 0, 16, 2); scene.add(boomLight)
+const boomLight2 = new THREE.PointLight(0xff8a3a, 0, 14, 2); scene.add(boomLight2) // 連鎖の2つ目（最初から置いて明るさ 0。光の数を変えない）
 // 火の玉と煙の玉（中心が明るいぼかしの板。カメラを向く）
 const boomTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), g = x.createRadialGradient(64, 64, 4, 64, 64, 62); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.75)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
 const boomFire = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex, color: 0xff9a40, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0 })); boomFire.visible = false; scene.add(boomFire)
 const boomSmoke = new THREE.Sprite(new THREE.SpriteMaterial({ map: boomTex, color: 0x2a2826, depthWrite: false, transparent: true, opacity: 0 })); boomSmoke.visible = false; scene.add(boomSmoke)
+const boomFire2 = new THREE.Sprite(boomFire.material.clone()); boomFire2.visible = false; scene.add(boomFire2)
+// 置物（樽）の中から、位置がいちばん近い物
+function propNear(p) { if (!built || !built.props) return null; let m = null, bd = 1e9; built.props.children.forEach(o => { const d = Math.hypot(o.position.x - p[0], o.position.y - p[1], o.position.z - p[2]); if (d < bd) { bd = d; m = o } }); return bd < 0.3 ? m : null }
 function boomMesh() { const B = G.boom; if (!B || !built || !built.props) return null; if (B.mesh && B.mesh.parent) return B.mesh; let m = null, bd = 1e9; built.props.children.forEach(o => { const d = Math.hypot(o.position.x - B.a[0], o.position.z - B.a[2]); if (d < bd) { bd = d; m = o } }); B.mesh = bd < 0.3 ? m : null; if (B.mesh) B.home = { p: B.mesh.position.clone(), r: B.mesh.rotation.clone() }; return B.mesh }
 function boomReset() {
   const B = G.boom; if (!B) return
@@ -351,6 +366,9 @@ function boomReset() {
   const sh = G.world && G.world.shapes[B.si]; if (sh) { sh.a = B.a.slice(); sh.b = B.b.slice() }
   const m = boomMesh(); if (m && B.home) { m.position.copy(B.home.p); m.rotation.copy(B.home.r); m.visible = true }
   boomLight.intensity = 0; boomFire.visible = false; boomSmoke.visible = false
+  boomLight2.intensity = 0; boomFire2.visible = false
+  for (const u of B.ups || []) { u.done = false; u.vel = null; const s2 = G.world && G.world.shapes[u.si]; if (s2) { s2.a = u.a.slice(); s2.b = u.b.slice() } if (!u.mesh || !u.mesh.parent) u.mesh = propNear(u.a); if (u.mesh) { if (!u.home) u.home = { p: u.mesh.position.clone(), r: u.mesh.rotation.clone() }; u.mesh.position.copy(u.home.p); u.mesh.rotation.copy(u.home.r); u.mesh.visible = true } }
+  B.ups0 = (B.ups || []).length
 }
 function boomUpdate(dt) {
   const B = G.boom; if (!B) return
@@ -377,6 +395,19 @@ function boomUpdate(dt) {
     boomFire.visible = t < 0.7; boomFire.position.set(B.a[0], B.a[1] + 1 + t * 1.5, B.a[2]); boomFire.scale.set(fireS, fireS, 1); boomFire.material.opacity = Math.max(0, 1 - t / 0.7) * 0.95
     boomSmoke.visible = t < 2.6; boomSmoke.position.set(B.a[0], B.a[1] + 1.3 + t * 1.2, B.a[2]); boomSmoke.scale.set(smokeS, smokeS, 1); boomSmoke.material.opacity = Math.min(0.75, t * 3) * Math.max(0, 1 - t / 2.6) }
   if (B.t < 1.2) { const p = [B.a[0], B.a[1] + 0.4, B.a[2]]; if (Math.random() < dt * 30) dust.emit(p, 2, 1.2, { col: 0x3a3836, up: 2.5, size: 2.4 }); if (B.t < 0.6 && Math.random() < dt * 40) dust.emit(p, 2, 1.5, { col: 0xff9a40, up: 3, size: 1.4 }) }
+  // 連鎖: 上の缶が 0.2〜0.4 秒遅れて爆発し、上へ吹き飛ぶ
+  for (const u of B.ups || []) {
+    if (!u.done && B.t >= u.delay) { u.done = true; G.boomChain = (G.boomChain || 0) + 1
+      const s2 = G.world.shapes[u.si]; if (s2) { s2.a = [u.a[0], -9999, u.a[2]]; s2.b = [u.b[0], -9998, u.b[2]] }
+      const q = [u.a[0], u.a[1] + 0.5, u.a[2]]
+      Snd.play('boom', { vol: 0.8, rate: 1.12 })
+      dust.emit(q, 28, 6, { col: 0xff7a2a, up: 8, size: 2.0 }); dust.emit(q, 14, 3, { col: 0xffc060, up: 5, size: 2.0 }); dust.emit(q, 16, 7, { col: 0x8a2a20, heavy: 1, up: 7, size: 0.9 })
+      boomLight2.position.set(q[0], q[1] + 1, q[2]); u.t0 = B.t
+      if (!u.mesh || !u.mesh.parent) u.mesh = propNear(u.a); if (u.mesh && !u.home) u.home = { p: u.mesh.position.clone(), r: u.mesh.rotation.clone() }
+      u.vel = [(Math.random() - 0.5) * 2.5, 12 + Math.random() * 2, (Math.random() - 0.5) * 2.5]; u.spin = [(Math.random() - 0.5) * 14, (Math.random() - 0.5) * 9, (Math.random() - 0.5) * 14] }
+    if (u.done && u.t0 != null) { const t2 = B.t - u.t0; boomLight2.intensity = Math.max(boomLight2.intensity * 0, 70 * Math.max(0, 1 - t2 / 0.6)); const fs = 1 + 3.6 * Math.min(1, t2 / 0.16); boomFire2.visible = t2 < 0.6; boomFire2.position.set(u.a[0], u.a[1] + 1 + t2 * 1.6, u.a[2]); boomFire2.scale.set(fs, fs, 1); boomFire2.material.opacity = Math.max(0, 1 - t2 / 0.6) * 0.95 }
+    if (u.mesh && u.vel && u.mesh.visible) { u.vel[1] -= 9.81 * dt; u.mesh.position.x += u.vel[0] * dt; u.mesh.position.y += u.vel[1] * dt; u.mesh.position.z += u.vel[2] * dt; u.mesh.rotation.x += u.spin[0] * dt; u.mesh.rotation.y += u.spin[1] * dt; u.mesh.rotation.z += u.spin[2] * dt; if (u.mesh.position.y < u.a[1] - 30) u.mesh.visible = false }
+  }
   const m = boomMesh(); if (m && B.vel && m.visible) { B.vel[1] -= 9.81 * dt; m.position.x += B.vel[0] * dt; m.position.y += B.vel[1] * dt; m.position.z += B.vel[2] * dt; m.rotation.x += B.spin[0] * dt; m.rotation.y += B.spin[1] * dt; m.rotation.z += B.spin[2] * dt; if (m.position.y < B.a[1] - 30) m.visible = false }
 }
 // ------------------------------------------------------------ v28 クラクション: 居座るカラスの群れの 7.5m 手前で自動で「ぷっぷー」、ライトが 2 回パッパッ。1.2 秒後に群れが飛ぶ
@@ -421,7 +452,7 @@ function startRun(id) {
   const bst = G.best[id]
   G.ghost = null
   if (bst && bst.rec && !!bst.hard === !!G.R.hard) { G.ghost = { rec: unpack(bst.rec), ev: (bst.ev || []).slice(), i: 0, cp: 0 }; G.ghost.bike = ghostSpawn({ cp: 0 }) }
-  if (!G.ghostView) G.ghostView = new BikeView(scene, { ghost: true })
+  if (!G.ghostView) { G.ghostView = new BikeView(scene, { ghost: true }); setTimeout(warmShaders, 0) }
   G.ghostView.root.visible = !!G.ghost
   if (Q.get('ff')) G.ff = +Q.get('ff')
   if (Q.get('bot')) { G.bot = createBot(G.course, { skill: Q.get('bot') }); G.bot.world = G.world; resetBot(G.bot, G.bike); G.testInput = () => botInput(G.bot, G.bike) }
@@ -579,7 +610,9 @@ function fixedStep() {
     if (e.t === 'hangBreak') { Snd.play('rockbreak', { vol: 0.8 }); dust.emit(e.p, 20, 2, { col: 0x8a8278, heavy: 1 }) }
     if (e.t === 'hangUp') Snd.play('spring', { vol: 0.4 })
     if (e.t === 'thud') { const k = Math.min(1, e.v / 16); Snd.play('land', { vol: 0.7 + k * 0.3 }); Snd.play('clank', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.1 + k * 0.1); flash('bad'); if (b.cn[0]) dust.emit(b.cn[0].q, 14, 3.5) }
-    if (e.t === 'crumble') { Snd.play('crack', { vol: 0.7 }); Snd.play('creak', { vol: 0.5 }) }
+    if (e.t === 'crumble') { Snd.play('crack', { vol: e.fast ? 1 : 0.7 }); Snd.play('creak', { vol: 0.5 }); if (e.fast) Snd.play('rockfall', { vol: 0.7 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) { const h = [Math.cos(b.psi), 0, -Math.sin(b.psi)]; dust.emit([c0[0], c0[1] + 0.2, c0[2]], 26, 3, { col: 0x8a7a68, up: 2, size: 1.6 }); dust.emit([c0[0] + h[0] * 0.5, c0[1] + 0.1, c0[2] + h[2] * 0.5], 18, 4, { col: 0x5a4a3c, heavy: 1, up: 3, size: 0.8 }) } }
+    // v31: 崩れる板に乗った瞬間（どの速さでも）: 大きくきしむ・ひびの音・砂ぼこり
+    if (e.t === 'crumbleTouch') { Snd.play('creak', { vol: 0.9, rate: 1.1 }); Snd.play('crack', { vol: 0.45, rate: 1.3 }); const sh = G.world.shapes[e.id], c0 = sh && (sh.c || sh.tc); if (c0) dust.emit([c0[0], c0[1] + 0.15, c0[2]], 14, 2.2, { col: 0x9a8a76, up: 1.2, size: 1.2 }) }
     if (e.t === 'trapwarn') { Snd.play('pebbles', { vol: 0.9 }); Snd.play('creak', { vol: 0.6 }); dust.emit(e.p, 10, 1.5) }
     if (e.t === 'trapfall') { Snd.play('crack', { vol: 0.9 }); Snd.play('rockfall', { vol: 0.6 }); dust.emit(e.p, 22, 3) }
     if (e.t === 'break') { Snd.play('crack', { vol: 1 }); Snd.play('rockbreak', { vol: 0.7 }); G.shake = Math.max(G.shake, 0.12); dust.emit(b.p, 30, 5) }
@@ -997,6 +1030,7 @@ async function boot() {
   loadCourse('stage1'); fill.style.width = '45%'
   bikeView = new BikeView(scene)
   bikeView.root.visible = false
+  setTimeout(warmShaders, 0)
   await new Promise(r => setTimeout(r, 30))
   const LM = window.__loadMarks = window.__loadMarks || {}, c0 = performance.now(); LM.boot = Math.round(c0)
   try { await renderer.compileAsync(scene, camera) } catch (e) { renderer.compile(scene, camera) } fill.style.width = '100%'; LM.compile = Math.round(performance.now() - c0)
