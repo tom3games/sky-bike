@@ -1,8 +1,8 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=48'
-import { doorAng } from './traps.js?v=48'
-import { BLADE } from './v37.js?v=48'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=48'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=49'
+import { doorAng } from './traps.js?v=49'
+import { BLADE } from './v37.js?v=49'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=49'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -17,7 +17,7 @@ export function createBot(course, o = {}) {
   for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
   return { course, fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
-export function resetBot(bot, b) { bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
+export function resetBot(bot, b) { bot.sn = null; bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
 function nearest(bot, b, from, to) {
   let best = 1e9, bi = from
   const scan = (a, z) => { for (let i = Math.max(0, a); i < Math.min(bot.path.length, z); i++) {
@@ -193,17 +193,23 @@ export function botInput(bot, b) {
     }
     if (near.length) {
       near.sort((a, b2) => a.da - b2.da)
-      const vGo = Math.min(...near.map(z => z.h.vGo || 5.2)), acc = 4.2
-      const sAt = t => { const tv = Math.max(0, (vGo - Math.max(0, sp)) / acc); return t < tv ? Math.max(0, sp) * t + acc * t * t / 2 : Math.max(0, sp) * tv + acc * tv * tv / 2 + vGo * (t - tv) }
-      const tAt = d => { if (d <= 0) return 0; let lo = 0, hi = 20; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (sAt(m) < d) lo = m; else hi = m } return hi }
-      let ok = true, first = null
-      for (const { h, da } of near) {
-        const tin = tAt(da - h.half - 1.0), tout = tAt(da + h.half + 1.0)
-        if (tout <= 0) continue
-        if (h.entryOnly) { if (h.unsafe(T0 + tin + 0.08)) ok = false } // 乗る（着く）瞬間だけ見る仕掛け
-        else for (let t = tin; t <= tout; t += 0.05) if (h.unsafe(T0 + t)) { ok = false; break }
-        if (!ok) { first = { h, da }; break }
+      const vGo0 = Math.min(...near.map(z => z.h.vGo || 5.2)), acc = 4.2
+      // v48b 人の速さの bot: 止まった所から決まった速さでは、周期のそろった振り子の隙間に入れないことがある（旗 41 の三つの鉄球で 40 秒待ち続けた）。人と同じく、行く速さを少し変えて隙間を探す
+      let vGo = vGo0, ok = true, first = null
+      for (const vTry of bot.react > 0 && !bot.commitHz ? [vGo0, vGo0 + 1.2, vGo0 - 1, vGo0 + 2.2] : [vGo0]) {
+        vGo = vTry; ok = true; first = null
+        const sAt = t => { const tv = Math.max(0, (vGo - Math.max(0, sp)) / acc); return t < tv ? Math.max(0, sp) * t + acc * t * t / 2 : Math.max(0, sp) * tv + acc * tv * tv / 2 + vGo * (t - tv) }
+        const tAt = d => { if (d <= 0) return 0; let lo = 0, hi = 20; for (let k = 0; k < 30; k++) { const m = (lo + hi) / 2; if (sAt(m) < d) lo = m; else hi = m } return hi }
+        for (const { h, da } of near) {
+          const tin = tAt(da - h.half - 1.0), tout = tAt(da + h.half + 1.0)
+          if (tout <= 0) continue
+          if (h.entryOnly) { if (h.unsafe(T0 + tin + 0.08)) ok = false } // 乗る（着く）瞬間だけ見る仕掛け
+          else for (let t = tin; t <= tout; t += 0.05) if (h.unsafe(T0 + t)) { ok = false; break }
+          if (!ok) { first = { h, da }; break }
+        }
+        if (ok) break
       }
+      if (ok) bot.vGoUse = vGo; else if (bot.vGoUse && near.some(({ h, da }) => da < h.half + 1.0 && da > -h.half - 1)) vGo = bot.vGoUse
       // 助走して跳ぶ仕掛けは、一度行くと決めたら（助走を始めたら）、跳ぶまで迷わない
       // 助走が足りない所に出し直された時は、少し下がって助走を取り直す
       for (const { h, da } of near) if (h.runup && !bot.commitHz && da < h.runup * 0.7 && sp < 2 && !(bot.backT > 0)) { bot.backT = 90; bot.phase = 0 }
@@ -265,6 +271,9 @@ export function botInput(bot, b) {
   // ---------------- v17 溝の刻まれた動く床（上手い bot だけ）
   const gl17 = bot.skill === 'good' && !air && !b.hang ? v17Lift(bot, b, SQ, PV, { sp, B, lean }) : null
   if (gl17) { thr = gl17.thr; brk = gl17.brk; lean = gl17.lean; bot.stuckT = 0; bot.backT = 0; bot.waiting = !!gl17.wait; bot.phase = 0 }
+  // ---------------- v49 後輪だけで乗る感知式の台
+  const sn49 = bot.skill === 'good' && !b.hang && !gl17 ? v49Sense(bot, b, SQ) : null
+  if (sn49) { thr = sn49.thr; brk = sn49.brk; lean = sn49.lean; bot.stuckT = 0; bot.backT = 0; bot.waiting = !!sn49.wait; bot.phase = 0 }
   // ---------------- v16 の仕掛け（上手い bot だけ）
   if (bot.skill === 'good' && !gl17) {
     const o = v16Input(bot, b, SQ, PV, { thr, brk, lean, steer, sp, air, B })
@@ -310,7 +319,10 @@ export function botInput(bot, b) {
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' ? 1 : 0
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
-  if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1]) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
+  if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach')) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
+  // v48b 空中で、着地のすぐ先に曲がりがあると分かっている時は、着いた瞬間に効くようにブレーキを先に押しておく（人も着地の前から構える。反応の遅れで着いてから押すと曲がりの外へ飛ぶ: 旗 39 の浮き島）
+  if (!b.g[0] && !b.g[1] && bot.skill === 'good' && bot.react > 0 && sp > 6) { let k = bot.i; for (let n = 0; n < 6 && path[k] && (path[k].kind === 'jump' || path[k].kind === 'lip' || !path[k].w); n++) k++
+    if (path[k]) { const cap = cornerCap({ path, i: k }, b); if (cap < sp - 1.5) inp = { ...inp, thr: 0, brk: Math.max(inp.brk || 0, 0.7) } } }
   if (bot.oilOn) inp = { ...inp, thr: 0, ab: 0, brk: 0, lean: 0 } // 油の上では何も押さない（手前で速さを落としてあるので自動の減速も入らない）
   // v41 落石の坂: 予告（地鳴り）が始まったら、門まで真っすぐバック（ブレーキを押し続ける。ハンドルは自動のバックの線）
   { const Bo = bot.course && bot.course.boulder, st = bot.R && bot.R.bo
@@ -426,6 +438,31 @@ function v16Input(bot, b, SQ, PV, c) {
   return null
 }
 
+// v49 後輪だけで乗る感知式の台: ゆっくり近づき、前輪が端の 2.2m 手前で何も押さずに後ろ体重（惰性のウィリー）→ 後輪が台の真ん中の手前まで来たら、そのまま後ろ体重で止まって運ばれる。
+// 向こうで止まったら前体重で前輪を足場に下ろし、アクセルで降りる。台が待っていない時は手前で止まって待つ
+function v49Sense(bot, b, SQ) {
+  const path = bot.path, W = bot.world; if (!W) return null
+  let gl = null; for (let jj = 0; jj < Math.min(SQ.length, 22); jj++) { const q = path[SQ[jj]]; if (q && q.sense) { gl = q.sense; break } }
+  if (!gl && bot.sn && bot.sn.ph !== 'approach') gl = bot.sn.gl
+  if (!gl) { bot.sn = null; return null }
+  const S = bot.sn && bot.sn.gl === gl ? bot.sn : (bot.sn = { gl, ph: 'approach' })
+  if (S.ph === 'done') return null
+  const m = gl.m, f = gl.f, al = p => (p[0] - gl.start[0]) * f[0] + (p[2] - gl.start[2]) * f[2]
+  const Bs = basis(b), rw = wheelCenter(b, Bs, 0, b.s[0]), fw = wheelCenter(b, Bs, 1, b.s[1]), sp = b.speed, cAl = al(gl.shape.c)
+  if (S.ph === 'approach') {
+    const fd = -al(fw)
+    if (fd < -0.5) { bot.sn = null; return null }
+    if (m.st !== 'wait') { const d = fd - 2.8; if (d < 0.3) return { thr: 0, brk: Math.abs(sp) > 0.15 ? 1 : 0.6, lean: 0, wait: true }; const vM = Math.sqrt(2 * 3 * d); return { thr: sp < Math.min(vM, 3) ? 0.6 : 0, brk: sp > vM ? 0.8 : 0, lean: 0, wait: true } }
+    const fL = 2.25 + (bot.react || 0) / 60 * 1.6 // 人の速さは押すのが遅れる分だけ手前で
+    const v0 = bot.react ? 2.0 : 1.7
+    if (fd < fL && sp < v0 + 0.5 && sp > 1.15) S.ph = 'lift'
+    else { const vT = Math.min(12, v0 + Math.sqrt(2 * 3.5 * Math.max(0, fd - fL - 0.2))); return { thr: sp < vT - 0.1 ? (vT < 2 ? 0.6 : 1) : 0, brk: sp > vT + 0.3 ? Math.min(1, (sp - vT) * 0.5 + 0.2) : 0, lean: 0, wait: true } }
+  }
+  if (S.ph === 'lift') { if (al(rw) > cAl - 0.45) S.ph = 'hold'; return { thr: 0, brk: 0, lean: -1, wait: true } }
+  if (S.ph === 'hold') { if (m.st === 'end') S.ph = 'down'; return { thr: 0, brk: 0, lean: -1, wait: true } }
+  if (S.ph === 'down') { if (b.g[1]) S.ph = 'done'; else return { thr: 0, brk: 0, lean: 1, wait: true } }
+  return null // 前輪が足場に着いたら、あとはふつうの走り（すぐ先の高い縁などの技に任せる）
+}
 // v17: 段のある動く床。手前で床が止まっている間に乗り、ウィリーで段に前輪を掛けて上がり、段の上で止まって運ばれる。
 // 床が向こうで止まったら、ふつうの高い縁の技（前輪を掛ける）に任せる（null を返す）
 function v17Lift(bot, b, SQ, PV, c) {

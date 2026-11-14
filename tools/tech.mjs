@@ -35,7 +35,7 @@ function tryMark(m, pol, seed) {
   let sd = 1234 + seed * 77
   const queue = []
   const rnd = () => ((sd = (sd * 16807) % 2147483647) / 2147483647)
-  for (let s = 0; s < 60 * (/回廊/.test(m.name) ? 90 : FORK ? 60 : 30); s++) { // 道を選ぶ床は、床が来るのを待つ分（1 周 16 秒）だけ長く
+  for (let s = 0; s < 60 * (/回廊|台と梁/.test(m.name) ? 90 : FORK ? 60 : 30); s++) { // 道を選ぶ床は、床が来るのを待つ分（1 周 16 秒）だけ長く
     let inp = botInput(bot, b)
     if (bot.cautious) { inp = { ...inp, thr: b.speed < 3 ? 1 : 0, brk: b.speed > 4 ? 0.3 : 0, lean: 0 } }
     // ハンドルは全員自動（ゲームと同じ）。人の手の遅れ: アクセル・ブレーキ・重心だけ遅らせる（上手い 0 秒・ほか 0.25 秒）

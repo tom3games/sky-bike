@@ -2,8 +2,9 @@
 // 1 辺に技を 1 つずつ（動く床の段・縁から杭・跳ね板から縁・動く床と縁・縁の三段・ニトロの急坂・上がる床・溝と跳び）。同じ形を続けない。
 // どの周も同じ四角の上に重なる（辺の長さを S にそろえる）ので、最後の周を抜けた所は、最初の辺と同じ向き・同じ位置の真上。
 // 大ジャンプと天空城は、前と同じ場所のまま高さだけ上がる（v37added に数えるので、罠・猿・壁画の置き場所もずれない）
-import { stepLift, pegRow } from './parts17.js?v=48'
-import { springPlank, wheelieGrooves } from './parts16.js?v=48'
+import { stepLift, pegRow } from './parts17.js?v=49'
+import { springPlank, wheelieGrooves } from './parts16.js?v=49'
+import { senseLift } from './v49.js?v=49'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const DEG = Math.PI / 180
 export const TOWER45 = { S: 46, R: 8, rise: 3, r: 20 } // 辺の長さ・角の半径・角で上がる高さ・塔の半径
@@ -81,11 +82,10 @@ export function v45(B) {
     B.road(4, D)
   })
   side(() => {
-    B.mark('最後の塔 上がる床')
-    B.road(6, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
-    B.mover('up', { rise: 3.2, size: 3.2, w: 3.0, dwell: 2.4, move: 2.6 })
-    B.road(1.2, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
-    B.step(0.6); B.road(5, { w: 3.0, mat: 'rust', thick: 1.0, noOverlap: true })
+    B.mark('最後の塔 後輪で乗る台と梁') // v49 上がる床を、後輪だけで乗る感知式の台（下がって前へ・梁をくぐって上がる）に替えた。高さは前と同じだけ上がる
+    B.road(12, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
+    senseLift(B, { route: [[1.2, 0, 0], [1.2, 0, -1.8], [4.6, 0, -1.8], [4.6, 0, 1.0], [6.6, 0, 1.0]], beams: [{ at: 2, u: 0.58, h: 1.8 }], exitLen: 3.5, exitW: 3 }) // 少し前へ出てから下がり（下がる時に道の端が車体の後ろに当たらない）、梁をくぐり、上がってから前へ（前輪が足場の面に当たらない）
+    B.hangLedge(1.6, 4, { w: 3.0, mat: 'rust', max: 8, thick: 0.8 })
   })
   side(() => {
     B.road(3, D)

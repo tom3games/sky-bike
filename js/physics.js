@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=48'
+import { doorAng } from './traps.js?v=49'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -259,7 +259,7 @@ function seesawPose(s) {
   s.c = [0, 1, 2].map(k => H0[k] + d0[k] * ca + cr[k] * sa + R0[k] * kd * (1 - ca)); s.ax = nb.ax
 }
 // 落ちて登り直した時（出し直し）に、抜けた床と一度きりで崩れた道を元に戻す
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } resetDrums(world) }
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'trap' || (m.type === 'crumble' && m.once)) { s.gone = false; s.touch = 0; s.warnT = null } } resetDrums(world) }
 // v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
@@ -276,6 +276,30 @@ function bladeTrack(world, b) {
   }
 }
 // v36 影が落ちてくる鉄骨: 近づくと t0 を置き、T 秒後に 0.6 秒で落ち、1 秒道に転がって、0.6 秒で道の外へずり落ちて消える（js/traps.js）
+// v49 後輪だけで乗る感知式の床: 後輪だけが乗って 0.3 秒たつと動き出し、折れ線 m.pts（足場の中心からのずれ）を区間ごとにゆっくり進んで（区間の間で m.pause 秒止まる）向こうで止まる。
+// 誰も乗らなくなって 1.5 秒で元へ戻り、また待つ。前輪も乗っている時は感知しない（前輪まで乗せると前輪が外れて落ちる大きさ）
+export function senseDur(m) { let T = 0; for (let j = 0; j + 1 < m.pts.length; j++) T += m.segT[j] + (j + 2 < m.pts.length ? m.pause : 0); return T }
+export function senseAt(m, t) {
+  const pts = m.pts, n = pts.length, Z = [0, 0, 0]
+  if (m.st === 'wait') return { p: pts[0], v: Z }
+  if (m.st === 'end') return { p: pts[n - 1], v: Z }
+  const back = m.st === 'back', idx = j => back ? n - 1 - j : j
+  let e = t - m.t0
+  for (let j = 0; j + 1 < n; j++) {
+    const a = pts[idx(j)], b = pts[idx(j + 1)], T = m.segT[back ? n - 2 - j : j]
+    if (e < T) { const u = e / T, k = (1 - dcos(PI * u)) / 2, dk = PI / (2 * T) * dsin(PI * u); return { p: [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k], v: [(b[0] - a[0]) * dk, (b[1] - a[1]) * dk, (b[2] - a[2]) * dk] } }
+    e -= T
+    if (j + 2 < n) { if (e < m.pause) return { p: b, v: Z }; e -= m.pause }
+  }
+  return { p: pts[back ? 0 : n - 1], v: Z }
+}
+function senseTrack(world, b, ev) {
+  for (const s of world.senses) {
+    const m = s.mov, rear = !!(b.cn[0] && b.cn[0].id === s.id), front = !!(b.cn[1] && b.cn[1].id === s.id)
+    if (m.st === 'wait') { m.load = rear && !front && !b.crashed ? m.load + DT : 0; if (m.load >= 0.3) { m.st = 'go'; m.t0 = world.time; if (ev) ev.push({ t: 'senseGo', id: s.id }) } }
+    else if (m.st === 'end') { m.idle = rear || front ? 0 : m.idle + DT; if (m.idle > 1.5) { m.st = 'back'; m.t0 = world.time; if (ev) ev.push({ t: 'senseBack', id: s.id }) } }
+  }
+}
 export function resetGirders(world) { for (const s of world.moving) if (s.mov.type === 'girder') { s.mov.t0 = null; s.mov.landed = false; s.gone = true; s.c = s.base.c.slice() } }
 const GIR_FALL = 0.6, GIR_LIE = 1.0, GIR_OFF = 0.6
 export function girderPose(s, t) {
@@ -317,7 +341,7 @@ function drumTrack(world, b, ev) {
   }
 }
 // 乗ると一緒に運ばれる動く床の種類
-const CARRY = new Set(['lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge', 'wave', 'kick', 'shuttle', 'topple', 'blade'])
+const CARRY = new Set(['sense', 'lift', 'slide', 'spin', 'seesaw', 'pend', 'hinge', 'wave', 'kick', 'shuttle', 'topple', 'blade'])
 // v16: 床の加速を体に感じる（床の座標系の見かけの力）。止まる跳ね板から飛び出す・揺れる吊り橋から投げ出される
 const FICT = new Set(['wave', 'kick', 'shuttle', 'topple'])
 const NOIDLE = new Set(['wave', 'kick', 'topple']) // 何もしない時に床と一緒に止める補助を使わない（橋・跳ね板・煙突はふつうの路面と同じに転がる）
@@ -344,6 +368,7 @@ export class World {
       if (s.mov && s.mov.type === 'gate' && !this.drums.includes(s.mov.drumR)) this.drums.push(s.mov.drumR) // v35 回る筒
       if (s.mov && s.mov.type === 'girder') this.girders = true
       if (s.mov && s.mov.type === 'blade') this.blades = true
+      if (s.mov && s.mov.type === 'sense') { (this.senses = this.senses || []).push(s); s.mov.st = 'wait'; s.mov.load = 0; s.mov.idle = 0; s.mov.t0 = 0 }
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
         // 動く足場: 動く範囲を全部含む箱で当たりの候補に入れる
@@ -374,6 +399,7 @@ export class World {
     for (const s of this.moving) {
       const m = s.mov, B0 = s.base
       if (m.type === 'slide') { const k = m.amp * dsin(t * m.w + (m.ph || 0)); s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
+      else if (m.type === 'sense') { if (t === 0) { m.st = 'wait'; m.load = 0; m.idle = 0 } if ((m.st === 'go' || m.st === 'back') && t - m.t0 >= senseDur(m)) { m.st = m.st === 'go' ? 'end' : 'wait'; m.idle = 0; m.load = 0 } const o = senseAt(m, t); s.c = [B0.c[0] + o.p[0], B0.c[1] + o.p[1], B0.c[2] + o.p[2]] }
       else if (m.type === 'lift') { const k = liftPos(m, t).k; s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
       else if (m.type === 'blade') { const a = bladeAng(m, t).a, cy = dcos(m.yaw), sy = dsin(m.yaw), ca = dcos(a), sa = dsin(a), f = [cy * ca, sa, -sy * ca], u = [-cy * sa, ca, sy * sa]; s.c = [m.hub[0] + f[0] * m.rc - u[0] * m.th / 2, m.hub[1] + f[1] * m.rc - u[1] * m.th / 2, m.hub[2] + f[2] * m.rc - u[2] * m.th / 2]; s.ax = makeBox({ c: s.c, h: s.h, yaw: m.yaw, pitch: a }).ax } // v37 風車の羽根
       else if (m.type === 'spin' && s.type === 'box') { const nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw + m.rate * t, pitch: B0.pitch, roll: B0.roll }); s.ax = nb.ax }
@@ -405,6 +431,7 @@ export class World {
   shapeVel(s, q) {
     const m = s.mov; if (!m) return null
     if (m.type === 'slide') { const k = m.amp * m.w * dcos(this.time * m.w + (m.ph || 0)); return [m.axis[0] * k, m.axis[1] * k, m.axis[2] * k] }
+    if (m.type === 'sense') return senseAt(m, this.time).v.slice()
     if (m.type === 'lift') { const k = liftPos(m, this.time).v; return [m.axis[0] * k, m.axis[1] * k, m.axis[2] * k] }
     if (m.type === 'pend') { const st = pendState(m, this.time); return [m.across[0] * st.vx, -st.vy, m.across[2] * st.vx] }
     if (m.type === 'hinge') { const w = hingeAng(m, this.time).w * m.sgn, R0 = m.right, r = [q[0] - m.hinge[0], q[1] - m.hinge[1], q[2] - m.hinge[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
@@ -610,6 +637,7 @@ export function stepBike(world, b, inp, ev) {
   if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
   if (!b.ghost && world.drums.length) drumTrack(world, b, ev)
   if (!b.ghost && world.girders) girderTrack(world, b, ev)
+  if (!b.ghost && world.senses) senseTrack(world, b, ev)
   if (!b.ghost && world.blades) bladeTrack(world, b)
   if (!b.ghost) v16Track(world, b, ev)
   b.steps++

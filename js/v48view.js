@@ -1,6 +1,6 @@
 // SKY BIKE v48 下山の終わりの小屋の見た目: 窓の暖かい灯り（光は足さない。光る板と、にじむ板）・扉・横に錆びた古いトライアルバイク（草原の倒れたバイクと同じ型）
 import * as THREE from 'three'
-import { rustyBike } from './v37view.js?v=48'
+import { rustyBike } from './v37view.js?v=49'
 
 export function buildEpi(course, scene, M) {
   const group = new THREE.Group(); group.name = 'v48'; scene.add(group)

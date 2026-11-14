@@ -15,6 +15,7 @@ const blocks = []
 for (let i = 0; i < main - 1; i++) {
   const q = P[i]
   if (doorAt.has(i)) blocks.push({ i, why: '扉（体当たりで壊す）' })
+  if (P[i].kind === 'sense' && (!P[i - 1] || P[i - 1].kind !== 'sense')) blocks.push({ i, why: '後輪だけで乗る台（タイヤしか感知しない）' }) // v49
   // 切れ目: 地面の点 → 切れ目の点が続く → 次の地面の点。横の距離と高さ
   if (q.w && same(i, i + 1) && !P[i + 1].w && (P[i + 1].kind === 'jump' || P[i + 1].kind === 'gap' || P[i + 1].kind === 'draw')) {
     let k = i + 1; while (k < main && same(k - 1, k) && !P[k].w && P[k].kind !== 'stepUp' && P[k].kind !== 'stepDown') k++

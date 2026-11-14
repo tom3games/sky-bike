@@ -1,13 +1,14 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=48'
-import * as P16 from './parts16.js?v=48'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=48'
-import { lab16 } from './parts16.js?v=48'
-import * as P17 from './parts17.js?v=48'
-import { finale } from './finale.js?v=48'
-import { v36traps } from './traps.js?v=48'
-import { descent } from './v48.js?v=48'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=48'
+import * as Z from './zones.js?v=49'
+import * as P16 from './parts16.js?v=49'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=49'
+import { lab16 } from './parts16.js?v=49'
+import * as P17 from './parts17.js?v=49'
+import * as V49 from './v49.js?v=49'
+import { finale } from './finale.js?v=49'
+import { v36traps } from './traps.js?v=49'
+import { descent } from './v48.js?v=49'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=49'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -911,4 +912,4 @@ function finishCourse(B, o) {
   }
   return { ...o, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
-export const COURSES = { practice, stage1, lab16, lab17: P17.lab17 }
+export const COURSES = { practice, stage1, lab16, lab17: P17.lab17, lab49: (...a) => V49.lab49(...a) }

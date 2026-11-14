@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=48'
+import { hbeam } from './course.js?v=49'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -20,6 +20,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
+import { senseLift, SENSE } from './v49.js?v=49'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
@@ -245,14 +246,15 @@ export function factoryMore(x) {
   orbit(0.9, 0.6) // v17 後（短いと鐘楼の塔の円柱が工場の道を飲む）
   })
   // 前後に動く床 → 着いた先は高い段（床の上で待って、向こうの端で段によじ登る）
-  B.mark('動く床と高い段')
+  B.mark('後輪で乗る台と高い段')
   excursion({
     Ru: 6, Rs: 12, sRise: 6.6, w: 3.0, mat: 'grate', plat: 'rust', thick: 0.6,
     out: () => {
       B.road(5, { w: 3.0, mat: 'grate', thick: 0.6, back: 0 })
-      B.mover('fwd', { len: 9, size: 3, w: 3.0, dwell: 2.2, move: 2.8 })
-      B.road(1.5, { w: 3.0, mat: 'rust', thick: 0.6, back: 0 })
-      B.hangLedge(1.6, 5, { w: 3.0, mat: 'rust', max: 8, thick: 0.8 }) // 動く床の端から高い縁へ前輪を掛ける
+      B.sign('後輪だけで 乗れ', { at: 1 })
+      // v49 前後に動く床を、後輪だけで乗る感知式の台に替えた（切れ目の長さ・道の点の数・先の位置は同じ）
+      senseLift(B, { route: [[7 - SENSE.L - SENSE.gap - SENSE.exitGap, 0, 0]], pathN: 7, exitLen: 3.5, exitW: 3.0 }) // 降りた先 3.5m（縁に前輪を掛ける間合い）
+      B.hangLedge(1.6, 5, { w: 3.0, mat: 'rust', max: 8, thick: 0.8 }) // 台の先から高い縁へ前輪を掛ける
     },
     back: () => { B.road(5, { w: 3.0, slope: 6 * x.DEG, mat: 'grate', thick: 0.6 }) },
   })
