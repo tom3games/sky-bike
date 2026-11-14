@@ -264,6 +264,7 @@ export function resetFallen(world) { for (const s of world.moving) { const m = s
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
 export function bladeAng(m, t) {
+  if (m.cont) { let a = m.aBoard + m.w * t + m.ph + PI; a = a - 2 * PI * Math.floor(a / (2 * PI)); return { a: a - PI, w: m.w } } // v51 回り続ける
   if (m.t0 == null) return { a: m.aBoard, w: 0 }
   if (m.tBack != null) { const a = m.aBack - m.w * (t - m.tBack); if (a <= m.aBoard) { m.t0 = null; m.tBack = null; return { a: m.aBoard, w: 0 } } return { a, w: -m.w } }
   const a = m.aBoard + m.w * (t - m.t0); return a >= m.aTop ? { a: m.aTop, w: 0 } : { a, w: m.w }
@@ -271,6 +272,7 @@ export function bladeAng(m, t) {
 function bladeTrack(world, b) {
   for (const s of world.moving) { const m = s.mov; if (m.type !== 'blade') continue
     const on = [0, 1].some(i => b.cn[i] && b.cn[i].id === s.id) && !b.crashed
+    if (m.cont) continue
     if (on) { m.offT = 0; if (m.t0 == null) m.t0 = world.time; if (m.tBack != null) { const a = bladeAng(m, world.time).a; m.t0 = world.time - (a - m.aBoard) / m.w; m.tBack = null } }
     else if (m.t0 != null && m.tBack == null) { m.offT = (m.offT || 0) + DT; if (m.offT > 1.5) { m.aBack = bladeAng(m, world.time).a; m.tBack = world.time } }
   }
@@ -346,7 +348,7 @@ const CARRY = new Set(['sense', 'lift', 'slide', 'spin', 'seesaw', 'pend', 'hing
 const FICT = new Set(['wave', 'kick', 'shuttle', 'topple'])
 const NOIDLE = new Set(['wave', 'kick', 'topple']) // 何もしない時に床と一緒に止める補助を使わない（橋・跳ね板・煙突はふつうの路面と同じに転がる）
 // 止まってブレーキを押し続けて下がり始めるまでの時間（動く床の上では長押し）
-function revHold(b) { return b.onMov ? 1e9 : 0.45 } // 動く床の上では下がらない（ブレーキは床と一緒に止まっているだけ）
+function revHold(b) { return b.onMov ? 1e9 : b._upRev ? +(globalThis.__revUp ?? 0.1) : 0.45 } // v51 本人「落石の坂、バックし始めるのが遅い」: 登り坂では 0.12 秒で下がり始める // 動く床の上では下がらない（ブレーキは床と一緒に止まっているだけ）
 // 塔のまわりの道に沿って流れる水（flowT: 左回りの向きを正とする速さ）
 function flowTan(sh, q) { const dx = q[0] - sh.cx, dz = q[2] - sh.cz, L = Math.sqrt(dx * dx + dz * dz) || 1; return [dz / L * sh.flowT, 0, -dx / L * sh.flowT] }
 // 突風の強さ 0..1（周期の 3 割ほどだけ強く吹く。ほかは凪）
@@ -573,7 +575,7 @@ export const BIKE = {
   frame: [[-0.35, -0.16, 0.13], [0, -0.22, 0.13], [0.36, -0.12, 0.13]],
   rider: [[-0.10, 0.22, 0.17, 0.22], [-0.02, 0.52, 0.17, 0.25], [0.02, 0.86, 0.15, 0.28]], // [前, 上, 半径, 重心で前へ動く量]
   hardLand: 9.5,
-  nitroTop: 21, nitroDrive: 2.1, nitroPower: 2.2, nitroThrust: 700, nitroUse: 0.4, // v15 ニトロ: 押している間は最高速度 20m/s・押す力 2 倍。満タンで 2.5 秒
+  nitroTop: 21, nitroDrive: 2.1, nitroPower: 2.2, nitroThrust: 700, nitroUse: 0.4, nitroClimb: +(globalThis.__nitroClimb ?? 650), // v15 ニトロ: 押している間は最高速度 20m/s・押す力 2 倍。満タンで 2.5 秒
   vtop: 13.5, vfade: 2, // v15: 13 → 13.5（本人「ほんの少しだけ上げて」）。 // v12: 最高速度（11m/s から効きが弱まり 13m/s で止まる）。ジャンプ台の踏み切りでは launchV で v11 と同じ飛び出しの速さに戻す
   wheelieEase: 0.47,
 }
@@ -616,6 +618,7 @@ export function stepBike(world, b, inp, ev) {
   // v29 登り坂で止まりかけてブレーキを押している時は、前体重を効かせない（前輪で立たず、そのまま下がれる。本人「ジャンプ台に乗ったままバックできない」）
   { const cn = b.cn[0] || b.cn[1], hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
     b._upBrk = !!(cn && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.3)
+    b._upRev = !!(cn && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.06) // v51: 登り坂（約 3.5 度より急）でブレーキ
     if (b._upBrk && inp.lean > 0) inp = { ...inp, lean: 0 } }
   // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
   if (!b.ghost && world.traps.length) for (const s of world.traps) {
@@ -633,7 +636,7 @@ export function stepBike(world, b, inp, ev) {
     else if (inp.nitro && inp.thr > 0.5 && b.nitro <= 0 && ev && !b._nEmptyT) { ev.push({ t: 'nitroEmpty' }); b._nEmptyT = 40 }
     if (b._nEmptyT) b._nEmptyT-- }
   if (b.hang) { hangStep(world, b, inp, ev); b.steps++; return }
-  for (let k = 0; k < SUB; k++) sub(world, b, inp, ev)
+  for (let k = 0; k < SUB; k++) { b._subK = k; sub(world, b, inp, ev) }
   if (!b.crashed && !b.ghost && world.hangs.length) hangCatch(world, b, inp, ev)
   if (!b.ghost && world.drums.length) drumTrack(world, b, ev)
   if (!b.ghost && world.girders) girderTrack(world, b, ev)
@@ -644,6 +647,14 @@ export function stepBike(world, b, inp, ev) {
 }
 const ZERO = { thr: 0, brk: 0, lean: 0, steer: 0 }
 function sub(world, b, inpIn, ev) {
+  // v51 回る羽根は 1 コマに 1 回まとめて動く（setTime）ので、乗っている物も同じ時に・当たりを計算する前にまとめて動かす（羽根の回りで位置・速さ・傾きを回す）。
+  // 後で細かく動かすと、毎コマ羽根が車輪へ食い込んで跳ね、登れなかった
+  if (b._subK === 0 && b.carryId >= 0) { const sh = world.shapes[b.carryId], m = sh && sh.mov
+    if (m && m.type === 'blade' && m.cont && !sh.gone) { const a = m.w * DT, ca = dcos(a), sa = dsin(a), fx0 = dcos(m.yaw), fz0 = -dsin(m.yaw)
+      const rot = (x, y) => [x * ca - y * sa, x * sa + y * ca]
+      const d = [b.p[0] - m.hub[0], b.p[1] - m.hub[1], b.p[2] - m.hub[2]], xf = d[0] * fx0 + d[2] * fz0, [xf2, y2] = rot(xf, d[1]); b.p[0] += fx0 * (xf2 - xf); b.p[2] += fz0 * (xf2 - xf); b.p[1] = m.hub[1] + y2
+      const vf = b.v[0] * fx0 + b.v[2] * fz0, [vf2, vy2] = rot(vf, b.v[1]); b.v[0] += fx0 * (vf2 - vf); b.v[2] += fz0 * (vf2 - vf); b.v[1] = vy2
+      b.th += a * dcos(b.psi - m.yaw) } }
   const P = BIKE, inp = b.crashed ? ZERO : inpIn
   // 体の動き（重心の前後とハンドル）はなめらかに
   const lt = clamp(inp.lean, -1, 1)
@@ -720,7 +731,7 @@ function sub(world, b, inpIn, ev) {
         const vx = b.vx || 0, fdFree = nk ? 0 : inp.thr * Math.min(drv, pwr / Math.max(1, vt + vx))
         fd *= clamp((top - vt) / P.vfade, 0, 1)
         // ニトロ中: 増えた分の押す力は車体の重心を押す（車輪の接地点で押すと前輪が上がって後ろへ回るので、回す力にしない）。タイヤの滑らない範囲で
-        if (nk) { const fx2 = inp.thr * Math.min(drv * P.nitroDrive, pwr * P.nitroPower / Math.max(1, vt)) * clamp((top - vt) / P.vfade, 0, 1), ex = Math.max(0, Math.min(fx2 - fd, lim * 1.1 - fd)); if (ex > 0) addF([t[0] * ex, t[1] * ex, t[2] * ex], b.p, 'nitro') }
+        if (nk) { const fx2 = inp.thr * Math.min(drv * P.nitroDrive, pwr * P.nitroPower / Math.max(1, vt)) * clamp((top - vt) / P.vfade, 0, 1), ex = Math.max(0, Math.min(fx2 - fd, lim * 1.1 - fd)) + inp.thr * P.nitroClimb * clamp((top - vt) / P.vfade, 0, 1) /* v51 本人「ニトロの馬力を上げて。坂を登るのが遅い」: タイヤの滑りに関係なく重心を押す分（最高速度は同じ） */; if (ex > 0) addF([t[0] * ex, t[1] * ex, t[2] * ex], b.p, 'nitro') }
         // ウィリーの上限（v12）: 後輪だけで 34 度を超えたら、アクセルの押す力を弱めて 35〜45 度あたりで止まるようにする（後ろへ宙返りしない）
         b.vxAcc = (b.vxAcc || 0) + Math.max(0, Math.min(fdFree, lim) - Math.min(fd, lim))
         if (b.creep && b.standOn) fd *= clamp((1.2 - vt) * 2, 0, 1) * 0.6 // ゆっくり進むウィリーは歩く速さまで
@@ -729,7 +740,7 @@ function sub(world, b, inpIn, ev) {
         // ウィリーで 26 度を超えたら、アクセルで後ろへ起き上がる回す力を弱める（前へ進む力はそのまま）。後ろへ回っていく速さが遅くなり、保てる角度の幅が少し広がる
         if (!b.g[1] && b.th > 0.45) { const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2], F = [t[0] * fd, t[1] * fd, t[2] * fd]; tau -= P.wheelieEase * ((ry * F[2] - rz * F[1]) * B.R[0] + (rz * F[0] - rx * F[2]) * B.R[1] + (rx * F[1] - ry * F[0]) * B.R[2]) }
       }
-      if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) { b.wasRev = true; Ft -= (vt > -3.3 ? 1500 : vt > -3.6 ? 250 : 0) * inp.brk }
+      if (inp.brk > 0 && inp.thr <= 0 && vt < 0.6 && b.revT > revHold(b)) { b.wasRev = true; Ft -= (vt > -3.3 ? (b._upRev ? +(globalThis.__revF ?? 2400) : 1500) : vt > -3.6 ? 250 : 0) * inp.brk }
       if (vt > 0.2) b.wasRev = false // 止まって 0.45 秒ブレーキを押し続けると下がる（歩くより少し速い 3.5m/s まで）
     }
     // ブレーキは後輪寄り。前輪を強く効かせるのは前体重と同時に押した時だけ（ジャックナイフ）。前に傾き始めたら前輪は効かせない
@@ -745,6 +756,7 @@ function sub(world, b, inpIn, ev) {
     { const sh = world.shapes[con.id]; if (sh.mov && sh.mov.type === 'gear') Ft -= clamp(vt * sh.mov.grip, -0.9 * lim, 0.9 * lim) } // v16 歯車: 歯にタイヤが噛んで、面の速さに引っぱられる（逆らうと進めない）
     let Fl = -clamp(vl * 2600, -lim, lim)
     if (b.oilSide && world.shapes[con.id].oil) Fl *= 0.08 // v36 油の上で滑り始めたら、横は踏ん張れない
+    if (globalThis.__dbgF) globalThis.__dbgF(i, vt, Ft, lim, N, vl)
     const tot = Math.sqrt(Ft * Ft + Fl * Fl)
     if (tot > lim) { Ft *= lim / tot; Fl *= lim / tot }
     const Fw = [n[0] * N + t[0] * Ft + lat[0] * Fl, n[1] * N + t[1] * Ft + lat[1] * Fl, n[2] * N + t[2] * Ft + lat[2] * Fl]
@@ -958,7 +970,7 @@ function sub(world, b, inpIn, ev) {
   // v36 本人「慣性でタイヤがちょっと動いてるだけでもウィリーできない」: アクセルもブレーキも押さずに惰性で転がっている時（3m/s まで）も、後ろ体重だけで止まったままと同じに前輪が上がる。
   //     前体重だけの前輪立ち（自動のブレーキ）も 3m/s まで。押してから上がり始めるまで、動いている時は 0.25 秒（止まっている時は今まで通り 0.35 秒。0.15 秒では人の速さ bot の段の技が崩れた）
   const flatR = b.cn[0] && (b.cn[0].nw || b.cn[0].n)[1] > 0.9985 // 坂（約 3 度より急）の上の、体重で釣り合わせる技（坂のウィリーの溝など）は今まで通り
-  const coastBack = inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(b.speed) < (globalThis.__oldStand ? 0.9 : Math.abs(b.speed) < 0.9 || (flatR && b.g[1]) || b.coastSt ? 3.0 : 0.9) // 動いている時は、両輪が着いた平らな所で始めた時だけ（止まって立てたまま進む・溝の技は今まで通り）
+  const coastBack = inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(b.speed) < (globalThis.__oldStand ? 0.9 : Math.abs(b.speed) < 0.9 || (flatR && b.g[1]) || b.coastSt ? 4.0 : 0.9) /* v51 本人: 3→4m/s */ // 動いている時は、両輪が着いた平らな所で始めた時だけ（止まって立てたまま進む・溝の技は今まで通り）
   const fwdStand = inp.brk > 0.3 && inp.lean > 0.6 && Math.abs(b.speed) < (inp._auto ? 3.0 : 0.9)
   const standing = creep || (!b.crashed && (coastBack || fwdStand))
   if (coastBack && Math.abs(b.speed) >= 0.9 && b.g[1] && !b.standOn) b.coastSt = true; else if (!coastBack) b.coastSt = false
@@ -1021,7 +1033,8 @@ function sub(world, b, inpIn, ev) {
   { const c0 = b.cn[0], n0 = c0 && (c0.nw || c0.n); if (hitDrop && n0 && wet(c0) && -(n0[0] * B.h[0] + n0[2] * B.h[2]) > 0.25 && n0[1] < 0.97) b._faceR = 0.8; else if (b._faceR) b._faceR = Math.max(0, b._faceR - H)
     if (b._faceR > 0 && !b.hang && b.w < -1.2) b.w = -1.2 }
   b.p[0] += b.v[0] * H; b.p[1] += b.v[1] * H; b.p[2] += b.v[2] * H
-  if (b.carryId >= 0) { const sh = world.shapes[b.carryId], u = world.shapeVel(sh, b.p) || [0, 0, 0]; b.p[0] += u[0] * H; b.p[1] += u[1] * H; b.p[2] += u[2] * H; if (sh.mov.type === 'spin') { const a = sh.mov.rate * H, ca = dcos(a), sa = dsin(a), vx = b.v[0], vz = b.v[2]; b.psi += a; b.v[0] = vx * ca + vz * sa; b.v[2] = -vx * sa + vz * ca } } // 回る床の上では、床に対する速さの向きも一緒に回す
+  if (b.carryId >= 0) { const sh = world.shapes[b.carryId], u = world.shapeVel(sh, b.p) || [0, 0, 0], kH = sh.mov.type === 'blade' && sh.mov.cont ? 0 : H /* v51 回る羽根は 1 コマに 1 回まとめて動く（setTime）ので、乗っている物も同じ時にまとめて動かす（細かく動かすと羽根が毎コマ車輪へ跳ね上がって進めなかった） */; b.p[0] += u[0] * kH; b.p[1] += u[1] * kH; b.p[2] += u[2] * kH; if (sh.mov.type === 'spin') { const a = sh.mov.rate * H, ca = dcos(a), sa = dsin(a), vx = b.v[0], vz = b.v[2]; b.psi += a; b.v[0] = vx * ca + vz * sa; b.v[2] = -vx * sa + vz * ca }
+    if (false) { const a = 0, ca = dcos(a), sa = dsin(a), fx0 = dcos(sh.mov.yaw), fz0 = -dsin(sh.mov.yaw), vf = b.v[0] * fx0 + b.v[2] * fz0, vy = b.v[1], vf2 = vf * ca - vy * sa, vy2 = vf * sa + vy * ca; b.v[0] += fx0 * (vf2 - vf); b.v[2] += fz0 * (vf2 - vf); b.v[1] = vy2; if (globalThis.__bth !== 0) b.th += a * dcos(b.psi - sh.mov.yaw) * (globalThis.__bth ?? 1) } } // v51 回り続ける羽根: 縦に回る床の上では、床に対する速さと車体の傾きも一緒に回す（回さないと羽根が立つほど登れなくなった） // 回る床の上では、床に対する速さの向きも一緒に回す
   b.th += b.w * H
   b.speed = b.v[0] * B.h[0] + b.v[2] * B.h[2]
   // ---- 向き（ヨー）。前輪だけ接地＝前輪を軸に（ジャックナイフ）、後輪だけ＝後輪を軸に

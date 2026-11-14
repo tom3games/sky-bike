@@ -64,6 +64,7 @@ export function buildV37(course, scene, M) {
   daySky.renderOrder = -1; daySky.visible = false; scene.add(daySky)
   // 遠くの風車（草原の向こう）と、乗れる風車の塔・帆
   const mills = []
+  const ml0 = n => !!(n.blades && n.blades[0] && n.blades[0].mov && n.blades[0].mov.cont)
   for (const n of course.notes.filter(n => n.kind === 'windmill')) {
     const g = new THREE.Group(); g.position.set(...n.hub); g.rotation.y = n.yaw; group.add(g)
     const wood = new THREE.MeshStandardMaterial({ color: 0x8a7458, roughness: 0.95 }), cloth = new THREE.MeshStandardMaterial({ color: 0xe8e0cc, roughness: 1, side: THREE.DoubleSide, transparent: true, opacity: 0.92 })
@@ -72,8 +73,9 @@ export function buildV37(course, scene, M) {
     const hubM = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 4.4, 14), wood); hubM.rotation.x = Math.PI / 2; hubM.position.z = -2.4; g.add(hubM)
     const rot = new THREE.Group(); g.add(rot)
     for (let k = 0; k < 4; k++) { const arm = new THREE.Group(); arm.rotation.z = k * Math.PI / 2; rot.add(arm)
-      if (k > 0) { const pole = new THREE.Mesh(new THREE.BoxGeometry(12.6, 0.3, 0.3), wood); pole.position.x = 7.1; arm.add(pole) } // 乗れる羽根（k=0）は当たりの箱が見える
-      const sail = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 2.4, 6, 1), cloth); sail.position.set(8, 0.15, k === 0 ? -1.75 : 0); sail.rotation.x = Math.PI / 2; arm.add(sail) }
+      const cont = ml0(n) // v51: 4 枚とも乗れる羽根（当たりの箱が見える）。回り続けない古い形だけ 3 枚は棒
+      if (k > 0 && !cont) { const pole = new THREE.Mesh(new THREE.BoxGeometry(12.6, 0.3, 0.3), wood); pole.position.x = 7.1; arm.add(pole) } // 乗れる羽根（k=0）は当たりの箱が見える
+      const sail = new THREE.Mesh(new THREE.PlaneGeometry(9.5, 2.4, 6, 1), cloth); sail.position.set(8, 0.15, k === 0 || cont ? -1.75 : 0); sail.rotation.x = Math.PI / 2; arm.add(sail) }
     mills.push({ n, rot })
   }
   return {

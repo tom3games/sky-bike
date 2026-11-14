@@ -144,7 +144,7 @@ export function botInput(bot, b) {
       let ls = 0
       for (let jj = 0, j = SQ[0]; jj < Math.min(SQ.length, 14); j = SQ[++jj]) if (path[j].kind !== 'jump' && path[j].kind !== 'lip' && path[j].w) { ls = path[j].slope || 0; if (path[j].p[1] < b.p[1] - 0.3) break }
       const tgt = ls - 0.05
-      lean = Math.max(-1, Math.min(1, (b.th - tgt) * 3.5 + b.w * 0.6))
+      lean = Math.max(-1, Math.min(1, bot.react && b.airT > 0.25 ? (b.th + b.w * bot.react / 60 - tgt) * 2.0 + b.w * 0.5 : (b.th - tgt) * 3.5 + b.w * 0.6)) // v51 人の速さ bot: 長い跳び（0.6 秒より長い）では遅れで回しすぎないように、回る速さを強く見る
       thr = 0.5; brk = 0 // 空中ではブレーキを掛けない（掛けると前へ回って突っ込む。v16 の自由な道の切れ目は点が 1 つなので、跳んだ後の先の段で速さを落とそうとしていた）
     } else {
       // 地面: 車体が坂から浮きすぎ・突っ込みすぎを直す
@@ -285,16 +285,33 @@ export function botInput(bot, b) {
     if (lat > 4 || xf < -14 || xf > Bl.L + 3 || Math.abs(b.p[1] - h.hub[1]) > Bl.L + 3) continue
     const T = bot.world.time, ang = () => bladeAng(h.blades[0].mov, T).a
     const onB = [0, 1].some(i => b.cn[i] && h.blades.includes(bot.world.shapes[b.cn[i].id]))
+    // v51 回り続ける羽根: 羽根の通り道（横 ±1.5m）の外で、前の羽根が頭の上を過ぎて次の羽根が下から来る間（窓）を待ってから入る
+    if (!onB && h.blades[0].mov.cont && lat >= 1.1 && lat < 6 && xf > 0.3 && xf < Bl.x0 + 1.6 && Math.abs(b.p[1] - 0.8 - (h.hub[1] - Bl.x0 * Math.tan(-Bl.aBoard))) < 1.2) {
+      const nx = h.blades.map(x => bladeAng(x.mov, T).a).filter(a => a < Bl.aBoard + 0.02 && a > -Math.PI / 2 - 0.3).sort((p, q) => q - p)[0] ?? -9
+      const lo = +(globalThis.__bwLo ?? -58) * Math.PI / 180, hi = +(globalThis.__bwHi ?? -44) * Math.PI / 180
+      if (lat < 2.9 || (nx > lo && nx < hi) || bot.bladeIn) { if (lat < 2.9) bot.bladeIn = true } else { thr = 0; brk = sp > 0.15 ? 1 : 0.3; lean = 0; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; break }
+    }
+    if (onB || lat > 6) bot.bladeIn = false
+    if (!onB) bot.bladeDash = false
     if (!onB && lat < 1.1 && xf < Bl.x0 + 1.4 && xf > 0.3 && Math.abs(b.p[1] - 0.8 - (h.hub[1] - Bl.x0 * Math.tan(-Bl.aBoard))) < 1.2) { // 待ちの足場: 止まって、下から来る羽根にすくわれるのを待つ
       const mis = Math.abs(Math.atan2(Math.sin(b.psi - h.yaw), Math.cos(b.psi - h.yaw)))
-      if (mis > 0.15) { thr = sp < 1.0 ? 0.5 : 0; brk = sp > 1.6 ? 0.5 : 0 } else { thr = sp < 2.0 ? 1 : 0; brk = 0 } // 向きがそろうまでゆっくり回り、そろったら羽根へ（乗ると回り始める）
+      if (mis > 0.15) { thr = sp < 1.0 ? 0.5 : 0; brk = sp > 1.6 ? 0.5 : 0 } else { thr = sp < 2.0 ? 1 : 0; brk = 0 } // 向きがそろったら（回り続ける羽根は）その場で止まって、下から来る羽根にすくわれるのを待つ
+      if (h.blades[0].mov.cont && xf > Bl.x0 + 0.6) { thr = 0; brk = 1 } else if (mis <= 0.15 && h.blades[0].mov.cont) { const xw = Bl.x0 + 0.6; thr = xf < xw - 0.3 && sp < 1.0 ? 0.6 : 0; brk = xf > xw - 0.3 || sp > 1.0 ? 1 : 0 } // 向きがそろうまでゆっくり回り、そろったら羽根へ（乗ると回り始める）
       lean = 0; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; break }
     if (onB) { bot.bladeGo = false
-      const a = ang()
+      const onS = [0, 1].map(i => b.cn[i] && bot.world.shapes[b.cn[i].id]).find(x => x && h.blades.includes(x)), a = onS && onS.mov.cont ? bladeAng(onS.mov, T).a : ang()
+      const lead = onS && onS.mov.cont ? +(globalThis.__bladeLead ?? 0.04) : 0.1
       const r = Math.hypot(xf, b.p[1] - h.hub[1]), nearTip = r > Bl.L + Bl.r0 - 2.2
       lean = a > 0.12 ? 1 : 0.4
-      if (nearTip && a < Bl.aTop - 0.1) { thr = 0; brk = Math.abs(sp) > 0.2 ? 0.8 : 0.4 } // 先が上がるまで待つ（体重は前）
-      else { thr = sp < (nearTip ? 4.5 : 3.2) ? 1 : 0; brk = sp > 4.2 && !nearTip ? 0.4 : 0 }
+      if (onS && onS.mov.cont) { // v51 回り続ける羽根: 先の 3.2m 手前で止まって待ち、先が次の足場の高さ（aTop）になる dash 秒前に全開で先へ（勢いのまま足場へ）
+        const tR = (Bl.aTop - a) / onS.mov.w, dash = +(globalThis.__bDash ?? 1.3), rW = Bl.L + Bl.r0 - +(globalThis.__bWait ?? 3.2)
+        if ((tR < dash && tR > -1.2) || bot.bladeDash) { bot.bladeDash = tR > -1.2; thr = 1; brk = 0; lean = 1 }
+        else if (r < rW - 0.4) { thr = sp < 2.2 ? 1 : 0; brk = sp > 3 ? 0.5 : 0; lean = a > 0.12 ? 1 : 0.3 }
+        else { thr = 0; brk = sp > 0.3 ? 0.7 : 0.45; lean = 0 }
+        bot.waiting = true; bot.stuckT = 0; break }
+      if (nearTip && a < Bl.aTop - lead) { thr = 0; brk = Math.abs(sp) > 0.2 ? 0.8 : 0.4 } // 先が上がるまで待つ（体重は前）
+      else if (onS && onS.mov.cont) { const rem = Bl.L + Bl.r0 - 1.2 - r, tR = Math.max(0.25, (Bl.aTop - a) / onS.mov.w), vd = Math.min(5, rem / tR + 0.3); thr = sp < vd ? 1 : 0; brk = sp > vd + 0.8 ? 0.6 : 0 } // v51 先に着くのが羽根の先が足場の高さになる時と同じになる速さ
+      else { const vc = onS && onS.mov.cont ? 4.4 : 3.2; thr = sp < (nearTip ? 4.5 : vc) ? 1 : 0; brk = sp > vc + 1 && !nearTip ? 0.4 : 0 }
       bot.waiting = true; bot.stuckT = 0; break }
   }
   // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る

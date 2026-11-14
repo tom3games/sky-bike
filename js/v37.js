@@ -5,7 +5,7 @@
 //  4 ワイヤーの綱渡り（谷に張った太いケーブルの上をタイヤで渡る。たわみ・横風。落ちたら手前の旗）
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const DEG = Math.PI / 180
-export const BLADE = { L: 12.6, r0: 0.8, W: 3.0, TH: 0.3, w: 0.27, n: 4, aBoard: -18 * DEG, aTop: 22 * DEG, x0: 2.2 }
+export const BLADE = { L: 12.6, r0: 0.8, W: 3.0, TH: 0.3, w: 0.27, wc: 0.21, n: 4, aBoard: -18 * DEG, aTop: 22 * DEG, x0: 2.2 }
 
 export function v37(B) {
   const D = { w: 4.2, mat: 'castle', thick: 1.2 }
@@ -79,8 +79,14 @@ function windmill(B) {
   const t = B.t, yaw = t.yaw, f = B.dir(yaw), R = B.right(yaw), Bl = BLADE
   const hub = add3(add3(t.p, f, -Bl.x0), [0, 1, 0], Bl.x0 * Math.tan(-Bl.aBoard))
   // 乗れる羽根は 1 枚（残りの 3 枚は見た目だけ。乗れる羽根と一緒に回る）。待っている間は足場と同じ高さで止まっていて、乗ると回り始め、先が +22 度で止まる。降りて 1.5 秒で元へ戻る
-  const m = { type: 'blade', hub: hub.slice(), yaw, aBoard: Bl.aBoard, aTop: Bl.aTop, w: Bl.w, rc: Bl.r0 + Bl.L / 2, th: Bl.TH, ext: [Bl.L + 2, Bl.L + 2, Bl.L + 2], t0: null, tBack: null }
-  const blades = [B.box({ c: bladeCenter(m, Bl.aBoard), h: [Bl.L / 2, Bl.TH / 2, Bl.W / 2], yaw, pitch: Bl.aBoard, mat: 'plankold', mu: 1.1, tag: 'road', mov: m })]
+  // v51 本人「風車は回り続けてほしい。ちゃんとタイミングよく降りないとダメって感じに」: 4 枚とも乗れる羽根で、止まらずに回り続ける（cont）。
+  // 待ちの足場で下から来た羽根にすくわれ、先へ走り、先が次の足場の高さ（aTop）に来た瞬間に降りる。早いと先が足場より低く壁、遅いと先が上がって後ろへ下がっていく
+  const blades = []
+  for (let k = 0; k < 4; k++) {
+    const m = { type: 'blade', cont: true, ph: k * Math.PI / 2, hub: hub.slice(), yaw, aBoard: Bl.aBoard, aTop: Bl.aTop, w: +(globalThis.__bladeW ?? Bl.wc), rc: Bl.r0 + Bl.L / 2, th: Bl.TH, ext: [Bl.L + 2, Bl.L + 2, Bl.L + 2], t0: null, tBack: null }
+    const a0 = Bl.aBoard + m.ph
+    blades.push(B.box({ c: bladeCenter(m, a0), h: [Bl.L / 2, Bl.TH / 2, Bl.W / 2], yaw, pitch: a0, mat: 'plankold', mu: 1.1, tag: 'road', mov: m }))
+  }
   // 軸の柱（羽根の横。道の外）と、軸の箱（羽根より横）
   for (const sg of [-1, 1]) { const q = add3(hub, R, sg * (Bl.W / 2 + 0.7)); B.cyl({ a: [q[0], hub[1] - 40, q[2]], b: [q[0], hub[1] + 0.6, q[2]], r: 0.5, mat: 'girder', tag: 'post' }) }
   // 道の点: 羽根の上（kind 'blade'）。羽根が aTop の時の線に沿わせる

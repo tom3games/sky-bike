@@ -1,6 +1,7 @@
 // SKY BIKE v36 塔の壁の古い壁画 4 枚（世界が崩れた理由。字幕は出さない）。手で描いた線と色あせた顔料・剥がれ・ひび・煤
 // ① 谷の町の人々が天空城を見上げる ② 人々が行列になって塔を登る ③ 城の光が強くなり、塔の上で人が消えていく（長い腕の小さな影が増える）④ 塔が崩れ、谷が霧に沈む（瓦礫に影が住みつく）
 import * as THREE from 'three'
+import { World, closest } from './physics.js?v=50'
 
 let seed = 9
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -79,6 +80,7 @@ export function muralTexture(k) {
 }
 // 置き場所: 道の割合 t の先で、塔の壁のすぐ横を走る所。壁の、少し先（目に入る所）に
 export function muralSpots(course) {
+  const WORLD = new World(course.shapes)
   const P = course.path, N = (P.findIndex(q => q.branch) > 0 ? P.findIndex(q => q.branch) : P.length) - (course.v37added || 0), out = [] // v37 で足した終盤の道は数えない（置き場所を変えない）
   // 塔ごとに、道が塔の壁のすぐ横を回る点（壁から 1〜4m）。① 廃墟の塔の最初 ② 工場の塔の最初 ③ 鐘楼の塔の最初 ④ 鐘楼の塔の終わりの方
   const near = T => { const L = []; for (let i = 0; i < N - 8; i++) { const q = P[i]; if (!q.p || !q.w || !['orbit', 'road', 'curve', 'pad'].includes(q.kind)) continue; const d = Math.hypot(q.p[0] - T.cx, q.p[2] - T.cz) - T.r; if (d > 0.8 && d < q.w / 2 + 2 && q.p[1] > T.y0 + 1 && q.p[1] < (T.top2 ?? T.top) - 5) L.push(i) } return L }
@@ -93,7 +95,13 @@ export function muralSpots(course) {
     out.push({ k, i, T: tw, th: th + Math.sign(d) * (2.5 / tw.r), y: q.p[1] }) // 2.5m 先の壁（塔の壁は外へふくらんでいるので、先すぎると曲がりの陰になる）
   }
   // ④ 終盤（86%）の、崩れた塔の壁の切れ端（道の脇に立つ大きな石の壁。当たりなし）
-  for (let i = Math.floor(N * 0.86); i < N * 0.9; i++) { const q = P[i]; if (q.p && q.w >= 3 && ['road', 'orbit', 'pad'].includes(q.kind) && Math.abs(q.slope || 0) < 0.1) { out.push({ k: 3, i, wall: true, p: q.p.slice(), yaw: q.yaw, w: q.w }); break } }
+  // v51 本人「まだ壁画が浮いてる。ジャンプで飛び越える所の間にある」: 壁の立つ所（9m 先・道の横）から 5.5m 以内に道の点が無く、前後 20m にジャンプの切れ目が無い所だけ
+  const wallAt = (q, w) => { const f = [Math.cos(q.yaw), 0, -Math.sin(q.yaw)], r = [Math.sin(q.yaw), 0, Math.cos(q.yaw)]; return [q.p[0] + f[0] * 9 + r[0] * (w / 2 + 1.6), q.p[1], q.p[2] + f[2] * 9 + r[2] * (w / 2 + 1.6)] }
+  const clear = (at, qq) => { for (const q of P) { if (!q.p) continue; const d = Math.hypot(q.p[0] - at[0], q.p[2] - at[2]), dy = Math.abs(q.p[1] - at[1]); if (dy < 12 && (d < 4.9 || (d < 20 && ['jump', 'lip', 'gap'].includes(q.kind)))) return false } const wy = q0 => q0.yaw - Math.PI / 2 + 0.55, ax = [Math.cos(wy(qq)), 0, -Math.sin(wy(qq))]
+    for (let u = -3.5; u <= 3.5; u += 1.75) { const pt = [at[0] + ax[0] * u, at[1] + 1, at[2] + ax[2] * u]
+      for (const id of WORLD.near(pt[0], pt[1], pt[2], 3)) { const sh = WORLD.shapes[id]; if (!['road', 'pad', 'ground'].includes(sh.tag)) continue; const cp = closest(sh, pt[0], pt[1], pt[2]).q; if (Math.hypot(cp[0] - pt[0], cp[2] - pt[2]) < 0.7 && cp[1] > pt[1] - 4 && cp[1] < pt[1] + 6) return false } }
+    return true } // 走れる床の上・すぐ横にも立てない（当たりのない壁を道に置かない）
+  for (let i = Math.floor(N * 0.84); i < N * 0.96; i++) { const q = P[i]; if (q.p && q.w >= 3 && ['road', 'orbit', 'pad'].includes(q.kind) && Math.abs(q.slope || 0) < 0.1 && clear(wallAt(q, q.w), q)) { out.push({ k: 3, i, wall: true, p: q.p.slice(), yaw: q.yaw, w: q.w }); break } }
   return out
 }
 export function buildMurals(course, scene, M) {
@@ -104,11 +112,11 @@ export function buildMurals(course, scene, M) {
       const f = [Math.cos(s.yaw), 0, -Math.sin(s.yaw)], r = [Math.sin(s.yaw), 0, Math.cos(s.yaw)], at = [s.p[0] + f[0] * 9 + r[0] * (s.w / 2 + 1.6), s.p[1], s.p[2] + f[2] * 9 + r[2] * (s.w / 2 + 1.6)]
       const w = new THREE.Group(); w.position.set(...at); w.rotation.y = s.yaw - Math.PI / 2 + 0.55
       // v44 本人「謎の壁画が浮いている」: 色だけの箱だった壁を、石積みの崩れた壁にして下へ 6m 伸ばす（道の脇の足場に根を下ろす）。上の端はぎざぎざ
-      const sg = new THREE.BoxGeometry(7, 13.5, 0.9, 8, 6, 1), sp = sg.attributes.position, su = sg.attributes.uv
-      for (let i = 0; i < sp.count; i++) { if (sp.getY(i) > 6.7) sp.setY(i, sp.getY(i) + Math.abs(Math.sin(sp.getX(i) * 1.7 + 0.6)) * 0.9 - 0.15) }
-      for (let i = 0; i < su.count; i++) su.setXY(i, su.getX(i) * 7 / 2.6, su.getY(i) * 13.5 / 2.6)
+      const WH = 13.5 + 34, sg = new THREE.BoxGeometry(7, WH, 0.9, 8, 14, 1) // v51 下の霧まで伸ばす（道の外の宙に浮いて見えないように）, sp = sg.attributes.position, su = sg.attributes.uv
+      for (let i = 0; i < sp.count; i++) { if (sp.getY(i) > WH / 2 - 0.05) sp.setY(i, sp.getY(i) + Math.abs(Math.sin(sp.getX(i) * 1.7 + 0.6)) * 0.9 - 0.15) }
+      for (let i = 0; i < su.count; i++) su.setXY(i, su.getX(i) * 7 / 2.6, su.getY(i) * WH / 2.6)
       sg.computeVertexNormals()
-      const st = new THREE.Mesh(sg, (M && M.ruinwall) || new THREE.MeshStandardMaterial({ color: 0x5c5a52, roughness: 0.95 })); st.position.y = 5.35 - 6.75; st.castShadow = true; st.receiveShadow = true; w.add(st)
+      const st = new THREE.Mesh(sg, (M && M.ruinwall) || new THREE.MeshStandardMaterial({ color: 0x5c5a52, roughness: 0.95 })); st.position.y = 5.35 - WH / 2; st.castShadow = true; st.receiveShadow = true; w.add(st)
       const m = new THREE.Mesh(new THREE.PlaneGeometry(6.2, 3.9), new THREE.MeshStandardMaterial({ map: muralTexture(s.k), emissive: 0x3a3226, emissiveIntensity: 0.35, transparent: true, alphaTest: 0.4, roughness: 0.95 })); m.position.set(0, 3.1, 0.47); w.add(m)
       g.add(w); continue
     }

@@ -11,6 +11,8 @@ export function vMinJump(gap, drop, ang) {
   return 30
 }
 
+// 全開で踏み切った時に届く限界（後輪が着地の頭の高さをよぎる、切れ目の始まりからの距離）。null は速さを落として跳ぶ所（変えない）
+export const FULLGAP = [null, 20.28, 21.58, null, null, null, null, null, 20.95, 25.17, 20.88, 20.33], FULL_MARGIN = 0.9
 export function descent(B, base, yaw0) {
   const E = B.epi = { i0: B.path.length, cps: [] }
   B.zone = 'castle'
@@ -21,14 +23,20 @@ export function descent(B, base, yaw0) {
   const flag = name => { B.cp(name, { w: B.last ? B.last.w : 4.6, rest: true }); E.cps.push(B.cps.length - 1) }
   const down = (len, deg, o = RK) => B.road(len, { ...o, slope: -deg * DEG })
   // 跳ぶ: 平ら 3m → 台 → 切れ目（下へ drop）→ 下り坂の着地。vNeed は台の先の速さ（bot の目安）
+  // v51 本人「下山のジャンプ、全速力でようやく届く程度まで間隔を開けて。スピード落として跳ぶ所はそのまま」:
+  // 全開で抜けられたジャンプ（jn 番目）だけ、切れ目を「全開で踏み切った時に後輪が着地の頭の高さをよぎる所」の FULL_MARGIN 手前まで広げる（tools/epijumps.mjs で測った値）
+  let jn = -1
   const jump = (gap, drop, o = {}) => {
+    jn++
+    const full = FULLGAP[jn] != null && !globalThis.__oldEpiGap
+    if (full) gap = FULLGAP[jn] - (globalThis.__fullMargin ?? (jn === 10 ? +(globalThis.__m10 ?? 2.6) : FULL_MARGIN)) // 10 番目は旗から 12m しか助走がない（出し直しで踏み遅れると届かない）ので少し余裕
     const ang = (o.ang ?? 14) * DEG
     B.road(o.flat ?? 4, { ...RK, ...(o.mat ? { mat: o.mat } : {}), w: o.w ?? RK.w })
     const rise = B.kicker(o.klen ?? 3, ang, { w: 3.8, mat: 'plank', thick: 0.7 })
     const vm = vMinJump(gap, drop + rise, ang)
     B.path[B.path.length - 1].vNeed = vm + 1
-    B.gap(gap, -rise - drop, 'jump'); B.path[B.path.length - 1].vJump = Math.min(o.vMax ?? 13.2, vm + (o.extra ?? 1.6))
-    B.road(o.land ?? 10, { ...RK, w: o.lw ?? 5.4, slope: -(o.lslope ?? 16) * DEG, kind: 'landing', back: 0 })
+    B.gap(gap, -rise - drop, 'jump'); B.path[B.path.length - 1].vJump = full ? 16 : Math.min(o.vMax ?? 13.2, vm + (o.extra ?? 1.6)); if (full) B.path[B.path.length - 1].full = true // 全開（bot は全開で跳ぶ）
+    B.road(full ? Math.max(o.land ?? 10, 14) : o.land ?? 10, { ...RK, w: o.lw ?? 5.4, slope: -(full ? Math.max(o.lslope ?? 16, +(globalThis.__fullSlope ?? 24)) : o.lslope ?? 16) * DEG, kind: 'landing', back: 0 }) // 全開の長い跳びは、落ちてくる角度に合わせて着地坂を急に・長く
     return vm
   }
   E.vNeeds = []
