@@ -625,7 +625,7 @@ function kcStep(bot, b, SQ, sp, air) {
   if (m.trig != null || ra > m.trigAt + 0.3) return null
   const vA = +(globalThis.__kcvA ?? KC.vIn) - (bot.react || 0) / 60 * 2
   return { thr: sp < vA - 0.4 ? 1 : sp < vA ? 0.3 : 0, brk: sp > vA + 0.6 ? 0.4 : 0, lean: 0 }
-
+}
 // v62 道の上のウィリー跳ね板。板の印 v62 を先の道から探す。跳ねた後（空中）はふつうの空中の技
 function v62Step(bot, b, SQ, sp, air) {
   const path = bot.path
