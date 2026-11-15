@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=66'
+import { doorAng } from './traps.js?v=67'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -613,7 +613,7 @@ export const KICK_LEAD = +(globalThis.__kickLead ?? 0), KICK_ANY = !!(globalThis
 export const LAND = { crash: +(globalThis.__landCrashDeg ?? 35), ok: +(globalThis.__landOk ?? 20), span: 30, max: +(globalThis.__landMax ?? 0.3) } // v61 着地: 坂とのずれが ok 度までは減速なし、そこから span 度で最大 max（前向きの速さの割合）を失う
 export const NOFRONT_TIP = +(globalThis.__tip ?? 2600)
 export const NOFRONT_HOLD = 1.0 // v56 本人「脱輪から転び始めるまでを少し早く」2.0→1.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
-export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5) } // v52 水が押す強さ（1/秒）と上限（m/s²）
+export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5), fastV: +(globalThis.__waterFastV ?? 5.5), fastMax: +(globalThis.__waterFastMax ?? 6), fastP: +(globalThis.__waterFastP ?? 2) } // v52 水が押す強さ（1/秒）と上限（m/s²）
 export const BRK_HOLD = 0.25 // v23: 急ブレーキで後輪を持ち上げるのは、ブレーキ全開をこの秒数（0.25 秒）より長く押し続けた時だけ
 export const BIKE = {
   m: 180, Ip: 60, g: 9.81,
@@ -818,6 +818,7 @@ function sub(world, b, inpIn, ev) {
     let Fl = -clamp(vl * 2600, -lim, lim)
     { const sh = world.shapes[con.id]; if (sh.flow || sh.flowR) Fl *= WATER.lat } // v52 横切る水の上ではタイヤが横に踏ん張りにくい（流される）
     if (b.oilSide && world.shapes[con.id].oil) Fl *= 0.08 // v36 油の上で滑り始めたら、横は踏ん張れない
+    if (inp.slide) Fl *= +(globalThis.__slideLat ?? 0.3) /* v67 縁石の曲がりに速すぎた: 横に踏ん張れず外へ滑る（steer.js curbSkid） */
     if (globalThis.__dbgF) globalThis.__dbgF(i, vt, Ft, lim, N, vl)
     const tot = Math.sqrt(Ft * Ft + Fl * Fl)
     if (tot > lim) { Ft *= lim / tot; Fl *= lim / tot }
@@ -935,7 +936,10 @@ function sub(world, b, inpIn, ev) {
   if (!b.ghost && !b.crashed) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; const sh = cn && world.shapes[cn.id]; if (!sh) continue
     const u = sh.flow || (sh.flowR ? flowRad(sh, cn.q) : sh.flowT ? flowTan(sh, cn.q) : null); if (!u) continue
     const ul = Math.hypot(u[0], u[2]); if (ul < 0.1) continue
-    const e = [u[0] / ul, u[2] / ul], va = b.v[0] * e[0] + b.v[2] * e[1], d = Math.max(-WATER.cap, Math.min(WATER.cap, (ul - va) * WATER.k))
+    const e = [u[0] / ul, u[2] / ul], va = b.v[0] * e[0] + b.v[2] * e[1]
+    /* v67 本人「全力で走ってるとき、水に押し出される感じがなかった」: 横切る流れは、速いほど強く押す（水の上にいる時間が短い分。WATER.fastV より速いと速さに比べて、最大 fastMax 倍）。流れに沿う向き（逆流の水路）は今まで通り */
+    const fl = Math.hypot(B.f[0], B.f[2]) || 1, crs = Math.abs(e[0] * B.f[2] - e[1] * B.f[0]) / fl, mul = 1 + (Math.max(1, Math.min(WATER.fastMax, (Math.abs(b.speed) / WATER.fastV) ** WATER.fastP)) - 1) * crs
+    const d = Math.max(-WATER.cap * mul, Math.min(WATER.cap * mul, (ul - va) * WATER.k * mul))
     fx += P.m * 0.5 * d * e[0]; fz += P.m * 0.5 * d * e[1] }
   // ---- 風（決まった強弱で吹く）
   for (const wd of world.winds) {
@@ -1107,7 +1111,7 @@ function sub(world, b, inpIn, ev) {
   }
   // ---- v51 前輪が無い時のウィリーの補助: 後ろ体重なら、地面から約 37 度（25〜45 度の間）に保つ。全開でも後ろへ回らない。
   //      後ろ体重をやめると前へ倒れ、フォークの先が刺さる・頭から行くと転倒（頭を打った）
-  if (inp.curbThrow && !b.crashed && (b.g[0] || b.g[1])) { crash(b, 'curb', b.speed, ev); b.crashed.side = inp.curbThrow } // v61 縁石の曲がりにかなり速く入った: 乗り手が外へ投げ出される
+  if (inp.curbThrow && !b.crashed && (b.g[0] || b.g[1])) { crash(b, 'curb', b.speed, ev); b.crashed.side = inp.curbThrow } /* v67 滑って縁石に勢いよく当たった瞬間: 乗り手が外へ投げ出される（速さだけでは転ばせない） */
   if (b.noFront && !b.crashed) {
     const NF = b.noFront, n0 = b.g[0] && b.cn[0] ? (b.cn[0].nw || b.cn[0].n) : [0, 1, 0], rel = B.f[0] * n0[0] + B.f[1] * n0[1] + B.f[2] * n0[2]
     if (inp.lean < -0.3 && b.g[0]) { const tgt = 0.6, e = tgt - rel; tau += e * 9000 - b.w * 900; if (rel > 0.7 && b.w > 0) tau -= b.w * 3000 }

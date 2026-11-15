@@ -1,7 +1,7 @@
 // ハンドルは自動（Trials と同じく、人が操るのはアクセル・ブレーキ・重心の前後だけ）。
 // コースの線（path）をなぞる向きにハンドルを切る。ゲームと検査（bot）で同じものを使う。
 // 速すぎると曲がり切れずに外へふくらむ（ハンドルの切れる量は physics.js が速さで絞る）。だから曲がり角の前はブレーキ。
-import { STEER_DK } from './physics.js?v=66'
+import { STEER_DK } from './physics.js?v=67'
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 
 // 向きのずれ・目標点へのずれ・横のずれ・曲がりの先取り の重み（tools/steertest.mjs で決めた）
@@ -89,17 +89,35 @@ export function steerFor(st, b, lat = 0) {
 export const ALAT = 8, ADEC = 7
 export const ICE_ALAT = 2.2 // v51 氷の曲がり: 横に踏ん張れる加速度（氷の摩擦 0.25 ほど）
 export const CURB_K = 1.1
+export const SLIDE_AB = +(globalThis.__slideAb ?? 0.3) /* v67 滑っている間の減速（踏ん張れないので弱い） */
 // v61 縁石の曲がり: 今いる曲がりで、曲がれる速さ（自動減速の 1.07 倍）を超えたら横滑り（1）、さらにその 1.2 倍を超えたら乗り手が外へ投げ出される（2）
 export const CURB_THROW = +(globalThis.__curbThrow ?? 1.2)
+export const CURB_HIT = +(globalThis.__curbHit ?? 2.5) /* v67 縁石へ外向きにこの速さ（m/s）以上で当たると投げ出される */
 export function curbSkid(st, b) {
-  const path = st.path, q = path[st.i]; if (!q || !q.curb) return (st.skid = 0)
+  const path = st.path, q = path[st.i]
+  if (!q || !q.curb) { if (st.skid === 2 && st.curbI != null && st.i >= st.curbI && st.i <= st.curbI + 4 && b.speed > (st.curbLim || 99)) return 2; /* 曲がりの出口: 滑り出していたら、縁石の終わりまで滑り続ける */ return (st.skid = 0) }
   let kmax = 0, turn = 0; for (let k = st.i, n = 0; k >= 0 && n < 6; k = nextI(path, k), n++) if (path[k].curb) { kmax = Math.max(kmax, path[k].kap || 0); const z = path[nextI(path, k)]; if (z && z.yaw != null) { let d = z.yaw - path[k].yaw; turn += Math.atan2(Math.sin(d), Math.cos(d)) } }
   if (kmax < 0.015) return (st.skid = 0)
   const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4)), lim = Math.sqrt(alat * 1.15 / kmax)
-  st.curbOut = turn > 0 ? -1 : 1 /* 外側（右手 [sin, cos] の向きの符号） */
-  if (b.speed > lim * (q.curb === 1 ? CURB_THROW + 0.15 : CURB_THROW)) return (st.skid = 2) /* 前の 2 か所は投げ出されるまでの幅を広く */
+  st.curbOut = turn > 0 ? 1 : -1 /* 外側（右手 [sin, cos] の向きの符号）。v67: 向きが逆だった（yaw が増える＝左へ曲がる＝外は右。内側へ投げ出されていた） */
+  st.curbI = st.i; st.curbLim = lim
+  // v67 本人「文字だけで勝手に殺すな。曲がりきれずにコースアウト、縁石に勢いよく当たって投げ出される、を映像で」:
+  //   かなり速い（2）と、ここでは転ばせない。タイヤが横に踏ん張れず外へ滑っていく（physics.js inp.slide）。その先は、縁石に当たる（curbHit）か、道の外へ落ちるか
+  if (b.speed > lim * (q.curb === 1 ? CURB_THROW + 0.15 : CURB_THROW) || (st.skid === 2 && b.speed > lim)) return (st.skid = 2) /* 前の 2 か所は滑り出すまでの幅を広く。滑り出したら、曲がれる速さに落ちるまで滑り続ける */
   if (b.speed > lim) st.skid = 1; else if (b.speed < lim * 0.75) st.skid = 0 // 一度滑ったら、限りの 3/4 まで落ちるまで滑り続ける（下手だと遅くなる分）
   return st.skid
+}
+// v67 縁石に当たった: 縁石の曲がり（出口の縁石の終わりまで）で、外へ流れて道の端の縁（低い壁）に車輪が横から当たり、当たる直前の外向きの速さが CURB_HIT 以上。
+//   返り: 外側の符号（当たっていなければ 0）。縁の無い所では投げ出さない（そのまま道の外へ落ちる）
+export function curbHit(st, b) {
+  const path = st.path, q = path[st.i]
+  if (!q || !q.p || q.yaw == null || !q.w || st.curbI == null) { st.vo1 = st.vo2 = 0; return 0 }
+  const rt = [Math.sin(q.yaw), Math.cos(q.yaw)], out = st.curbOut, vNow = (b.v[0] * rt[0] + b.v[2] * rt[1]) * out
+  const vo = Math.max(vNow, st.vo1 || 0, st.vo2 || 0); st.vo2 = st.vo1 || 0; st.vo1 = vNow // 当たった後は速さが消えるので、直前 2 コマの大きい方
+  if (st.i < st.curbI || st.i > st.curbI + 4 || vo < CURB_HIT) return 0
+  { const lat = ((b.p[0] - q.p[0]) * rt[0] + (b.p[2] - q.p[2]) * rt[1]) * out; if (lat < q.w / 2 - 1.3 || lat > q.w / 2 + 0.7 || Math.abs(b.p[1] - 0.8 - q.p[1]) > 0.7) return 0 } // 外側の端の近く・道の高さにいる時だけ（道の外へ落ちていく途中で下の物に当たっても数えない）
+  for (const sd of b.side || []) if (sd && sd.depth > 0.004) return out
+  return 0
 }
 export function cornerCap(st, b, o = {}) {
   const path = st.path, sp = Math.max(0, b.speed), look = sp * sp / (2 * ADEC) + 8
@@ -119,7 +137,7 @@ export function cornerCap(st, b, o = {}) {
 }
 export function assist(st, b, inp) {
   if (!b.g[0] && !b.g[1]) return inp
-  { const sk = curbSkid(st, b); if (sk === 2) return { ...inp, thr: 0, ab: 1, skid: 1, curbThrow: st.curbOut }; if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がりで速すぎる: 横滑りして大きく減速／かなり速いと投げ出される
+  { const sk = curbSkid(st, b), hit = curbHit(st, b); if (hit) return { ...inp, thr: 0, skid: 1, curbThrow: hit }; if (sk === 2) return { ...inp, thr: 0, ab: SLIDE_AB, skid: 1, slide: 1 }; if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がりで速すぎる: 横滑りして大きく減速／かなり速いと投げ出される
   const over = b.speed - cornerCap(st, b)
   if (over <= 0) return inp
   return { ...inp, thr: over > 0.4 ? 0 : inp.thr, ab: Math.round(Math.min(1, over * 0.6) * 8) / 8 }

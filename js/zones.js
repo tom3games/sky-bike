@@ -1,5 +1,5 @@
-import { hbeam } from './course.js?v=66'
-import { WATER } from './physics.js?v=66'
+import { hbeam } from './course.js?v=67'
+import { WATER } from './physics.js?v=67'
 const KICK_VMIN = +(globalThis.__kVmin ?? 6.8), KICK_TRIG = +(globalThis.__kTrig ?? 1.2) // v59 跳ね板: 遅く乗っても跳ねる強さの下限・板に乗ってから跳ねるまで
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
@@ -22,7 +22,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=66'
+import { senseLift, SENSE } from './v49.js?v=67'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)

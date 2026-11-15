@@ -1,9 +1,9 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=66'
-import { ROCK as ROCK0 } from './v41.js?v=66'
-import { nextI } from './steer.js?v=66'
+import { createBike, stepBike, resetFallen } from './physics.js?v=67'
+import { ROCK as ROCK0 } from './v41.js?v=67'
+import { nextI } from './steer.js?v=67'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -121,7 +121,7 @@ export function judge(world, course, R, b, prevP) {
   if (course.chases && course.chases.length && !b.ghost) chaseStep(world, course, R, b, out)
   if (course.boulder && !b.ghost) boulderStep(world, course, R, b, out)
   if (b.crashed && b.crashed.why === 'boulder' && b.crashed.t < 4.5) return out // はね飛ばされた: 道の外へ飛んで落ちていく（長い落下は飛ばしで旗へ）
-  if (b.crashed && b.crashed.why === 'monkey' && b.crashed.t < 2.4) return out // はたかれた: 乗り手が落ちていく間は待つ
+  if (b.crashed && (b.crashed.why === 'monkey' || b.crashed.why === 'curb') && b.crashed.t < 2.4) return out /* v67 縁石に当たって投げ出された時も、落ちていくのを見せる */ // はたかれた: 乗り手が落ちていく間は待つ
   if (b.crashed && b.crashed.t > 0.8) {
     // 転んだら: 数秒前に車輪が着いていた安全な地点から出し直す（旗までは戻さない）。フォルト 1
     const at = b.crashed.at, L = R.lastCrash
