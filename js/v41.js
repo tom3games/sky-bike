@@ -24,7 +24,7 @@ export function v41(B) {
   B.road(6, D)
   B.mark('落石の坂')
   const slopeI0 = B.path.length, slopeP0 = B.t.p.slice()
-  B.road(ROCK.slopeLen, { ...D, slope: ROCK.slopeDeg * DEG, kind: 'road' })
+  B.road(ROCK.slopeLen, { ...D, slope: ROCK.slopeDeg * DEG, kind: 'road' }).quickRev = true // v51 本人「落石の坂、バックし始めるのが遅い」: この坂だけブレーキで早く下がり始める
   const slopeI1 = B.path.length
   B.road(10, D)
   const topI = B.path.length, topP = B.t.p.slice()

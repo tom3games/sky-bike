@@ -346,10 +346,10 @@ export function botInput(bot, b) {
       bot.waiting = true; bot.stuckT = 0 }
     else if (sp0 && sp0.t0 != null && path[bot.i].spike) { lean = b.th > 0.08 ? 1 : 0; thr = 1; brk = 0 } }
   // v51 氷の曲がり: 自動の減速は効かない。氷で曲がれる速さ（ICE_ALAT）を超えそうなら、手前の普通の道でブレーキ（氷の上では弱く）
-  if (bot.skill === 'good' && !air) { const capI = cornerCap({ path, i: bot.i }, b, { ice: true }); if (sp > capI - 0.3) { thr = 0; brk = path[bot.i] && path[bot.i].ice ? 0.25 : 0.8; lean = 0 } else if (path[bot.i] && path[bot.i].ice && sp > capI - 1.2) thr = 0 }
+  if (bot.skill === 'good' && !air) { const capI = cornerCap({ path, i: bot.i }, b, { ice: true, iceOnly: true }); if (sp > capI - 0.3) { thr = 0; brk = path[bot.i] && path[bot.i].ice ? 0.25 : 0.8; lean = 0 } else if (path[bot.i] && path[bot.i].ice && sp > capI - 1.2) thr = 0 }
   // v51 爆発で消える床: 手前 30m からは全開。爆発したら（G.t0）すぐニトロ
   let blastNit = false
-  if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } }
+  if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) { if (!path[j].blast && !['road', 'orbit', 'curve', 'pad', 'spin', 'trap', 'spike'].includes(path[j].kind)) break; if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } } }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })

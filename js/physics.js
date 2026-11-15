@@ -652,7 +652,7 @@ export function stepBike(world, b, inp, ev) {
   // v29 登り坂で止まりかけてブレーキを押している時は、前体重を効かせない（前輪で立たず、そのまま下がれる。本人「ジャンプ台に乗ったままバックできない」）
   { const cn = b.cn[0] || b.cn[1], hx = Math.cos(b.psi), hz = -Math.sin(b.psi)
     b._upBrk = !!(cn && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.3)
-    b._upRev = !!(cn && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.06) // v51: 登り坂（約 3.5 度より急）でブレーキ
+    b._upRev = !!(cn && world.shapes[cn.id] && world.shapes[cn.id].quickRev && inp.brk > 0 && !inp._auto && inp.thr <= 0 && b.speed < 1.0 && -(cn.n[0] * hx + cn.n[2] * hz) > 0.06) // v51: 登り坂（約 3.5 度より急）でブレーキ
     if (b._upBrk && inp.lean > 0) inp = { ...inp, lean: 0 } }
   // 急に抜け落ちる床（trap）: バイクが近づくと、ひびと小石の予兆のあと抜け落ちる。落ちた床は、出し直した時か 12 秒後に戻る
   if (!b.ghost && world.traps.length) for (const s of world.traps) {
@@ -1033,7 +1033,7 @@ function sub(world, b, inpIn, ev) {
   // v36 本人「慣性でタイヤがちょっと動いてるだけでもウィリーできない」: アクセルもブレーキも押さずに惰性で転がっている時（3m/s まで）も、後ろ体重だけで止まったままと同じに前輪が上がる。
   //     前体重だけの前輪立ち（自動のブレーキ）も 3m/s まで。押してから上がり始めるまで、動いている時は 0.25 秒（止まっている時は今まで通り 0.35 秒。0.15 秒では人の速さ bot の段の技が崩れた）
   const flatR = b.cn[0] && (b.cn[0].nw || b.cn[0].n)[1] > 0.9985 // 坂（約 3 度より急）の上の、体重で釣り合わせる技（坂のウィリーの溝など）は今まで通り
-  const coastBack = inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(b.speed) < (globalThis.__oldStand ? 0.9 : Math.abs(b.speed) < 0.9 || (flatR && b.g[1]) || b.coastSt ? 4.0 : 0.9) /* v51 本人: 3→4m/s */ // 動いている時は、両輪が着いた平らな所で始めた時だけ（止まって立てたまま進む・溝の技は今まで通り）
+  const coastBack = inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(b.speed) < (globalThis.__oldStand ? 0.9 : Math.abs(b.speed) < 0.9 || (flatR && b.g[1]) || b.coastSt ? +(globalThis.__coastV ?? 4.0) : 0.9) /* v51 本人: 3→4m/s */ // 動いている時は、両輪が着いた平らな所で始めた時だけ（止まって立てたまま進む・溝の技は今まで通り）
   const fwdStand = inp.brk > 0.3 && inp.lean > 0.6 && Math.abs(b.speed) < (inp._auto ? 3.0 : 0.9)
   const standing = creep || (!b.crashed && (coastBack || fwdStand))
   if (coastBack && Math.abs(b.speed) >= 0.9 && b.g[1] && !b.standOn) b.coastSt = true; else if (!coastBack) b.coastSt = false

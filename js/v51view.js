@@ -23,8 +23,8 @@ export function buildV51(course, scene) {
     lasers.push({ d, beam, glow, glow2 })
   }
   // 爆発の火の玉（光る板 2 枚）
-  const fireTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), gr = x.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.3, 'rgba(255,170,60,0.9)'); gr.addColorStop(1, 'rgba(255,90,20,0)'); x.fillStyle = gr; x.fillRect(0, 0, 128, 128); return new THREE.CanvasTexture(cv) })()
-  const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0, toneMapped: false })); fire.visible = false; group.add(fire)
+  const fireTex = (() => { const cv = document.createElement('canvas'); cv.width = cv.height = 128; const x = cv.getContext('2d'), gr = x.createRadialGradient(64, 64, 4, 64, 64, 62); gr.addColorStop(0, 'rgba(255,255,230,1)'); gr.addColorStop(0.3, 'rgba(255,170,60,0.9)'); gr.addColorStop(1, 'rgba(255,90,20,0)'); x.clearRect(0, 0, 128, 128); x.fillStyle = gr; x.beginPath(); x.arc(64, 64, 62, 0, Math.PI * 2); x.fill(); const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.premultiplyAlpha = true; return t })() // 円の外は透明（四角い縁を出さない）
+  const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, blending: THREE.AdditiveBlending, premultipliedAlpha: true, depthWrite: false, transparent: true, opacity: 0, toneMapped: false })); fire.visible = false; group.add(fire)
   const smoke = new THREE.Sprite(new THREE.SpriteMaterial({ map: fireTex, color: 0x2a2826, depthWrite: false, transparent: true, opacity: 0 })); smoke.visible = false; group.add(smoke)
   // 谷底から吹き上げる風: 吹いている間（gustK）だけ、下から白い霧の粒が速く上がる
   const winds = []

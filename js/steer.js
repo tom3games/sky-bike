@@ -98,7 +98,7 @@ export function cornerCap(st, b, o = {}) {
     let wmin = 9; for (let j = k, n = 0; j >= 0 && n < 5; j = nextI(path, j), n++) if (path[j].w) wmin = Math.min(wmin, path[j].w)
     const alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4))
     if (q.ice && o.ice && q.kap > 0.015) { const v = Math.sqrt(ICE_ALAT / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * 3.5 * Math.max(0, d - 2))) } // 氷は自動では減速しない（bot が速さを読む時だけ数える）
-    else if (!q.wide && !q.ice && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
+    else if (!q.wide && !q.ice && !o.iceOnly && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
     const a = q.p, c = path[nk].p; if (a && c) d += Math.hypot(c[0] - a[0], c[2] - a[2])
   }
   return cap
