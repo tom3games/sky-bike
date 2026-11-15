@@ -9,7 +9,7 @@ const FAR = 130
 // 道の上・縁に群れを置く所を選ぶ（決まった並び。区間に偏らないよう、道の長さで等間隔に近く・ふつうの道の点だけ）
 export function birdSpots(course, n = 22) {
   const P = course.path, ok = []
-  const BAD = new Set(['blade', 'drum', 'dark', 'narrow', 'jump', 'lip', 'gap', 'stepUp', 'stepDown', 'hang', 'lift', 'glift', 'slide', 'spin', 'seesaw', 'draw', 'crumble', 'trap', 'water', 'mud', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'peg', 'bump', 'uturn'])
+  const BAD = new Set(['vgear', 'blade', 'drum', 'dark', 'narrow', 'jump', 'lip', 'gap', 'stepUp', 'stepDown', 'hang', 'lift', 'glift', 'slide', 'spin', 'seesaw', 'draw', 'crumble', 'trap', 'water', 'mud', 'fork', 'forkRide', 'gear', 'swing', 'chimney', 'kick', 'groove', 'peg', 'bump', 'uturn'])
   for (let i = 20; i < P.length - 20 - (course.v37added || 0); i++) { const q = P[i]; if (q.p && !q.branch && q.w >= 2.6 && !BAD.has(q.kind) && Math.abs(q.slope || 0) < 0.12) ok.push(i) }
   const out = []
   let sd = 4242
