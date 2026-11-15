@@ -4,13 +4,13 @@
 //  2 目の前で爆発して床が消える（blast）: 合図の台は置かない。近づくと目の前の床（落とし穴の 1.8m＋その先の道の初めの 3.2m）が爆発で消える。
 //    その瞬間にニトロを押せば向こうへ届く（ふつうの全開では手前の縁に前輪が落ちる）。手前に燃料の缶。5 秒で床は戻る
 // 置き換える落とし穴は、組み立てた後の形の並び（tools/_traplist.mjs の番号）で選ぶ
-export const LASERS = [0, 2, 9, 10, 12, 25, 36, 41], BLASTS = [13]
+export const LASERS = [0, 2, 9, 22, 12, 25, 36, 41], BLASTS = [13]
 export const SPIKE = { h: 0.3, back: 1.75, rise: 0.42, kick: 4.5, spin: 5.5 }
 export const ICE = { mu: 0.3 }
 export const SLICK = { mu: +(globalThis.__slickMu ?? 0.45) }
 export const UPDRAFT = { a: 13, run: +(globalThis.__upRun ?? 10.6), T: 4.6 }
 export const BLAST = { cut: 5.0, trig: 6.5, back: 5, lipDeg: 8, lipLen: 1.0, roadN: 2 }
-import { closest } from './physics.js?v=52'
+import { closest } from './physics.js?v=53'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
