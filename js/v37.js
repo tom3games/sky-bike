@@ -3,8 +3,8 @@
 //  2 明るい草原の浮き島（霧を抜けると急に昼。違和感 3 つ・錆びた古いトライアルバイク 3 台・草に隠れた穴 1 つ・跳ね台）
 //  3 風車の羽根に乗って運ばれる（ゆっくり回る羽根の上を根元から先へ。羽根が傾くので体重で耐え、先で次の足場へ）
 //  4 ワイヤーの綱渡り（谷に張った太いケーブルの上をタイヤで渡る。たわみ・横風。落ちたら手前の旗）
-import { vgears, vgearDims } from './v51gear.js?v=54'
-import { datan2 } from './physics.js?v=54'
+import { vgears, vgearDims } from './v51gear.js?v=55'
+import { datan2 } from './physics.js?v=55'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const DEG = Math.PI / 180
 export const BLADE = { L: 12.6, r0: 0.8, W: 3.0, TH: 0.3, w: 0.27, wc: 0.21, n: 4, aBoard: -18 * DEG, aTop: 22 * DEG, x0: 2.2 }

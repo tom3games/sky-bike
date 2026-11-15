@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=54'
+import { doorAng } from './traps.js?v=55'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -1018,7 +1018,7 @@ function sub(world, b, inpIn, ev) {
     const n = b.cn[1].nw || b.cn[1].n, rel = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] // 地面に対する前の傾き（負＝突っ込む）
     // ブレーキだけの浮きは速さの分だけ（遅くなると戻る）。前体重＋ブレーキは、遅い時は約 37 度で保つ（ジャックナイフ）が、速い時（4m/s 超）は守らない（前へ回って転ぶ）
     const lim = (b.brkV0 || 0) > 14.5 && inp.brk > 0.5 ? -9 : inp.lean > 0.3 && inp.brk > 0 ? (Math.abs(b.speed) > 4 ? -9 : -0.64) : -Math.max(0.3, (b.brkV0 || 0) > 0 ? Math.min(0.8, 0.057 * Math.abs(b.speed) + 0.03) : Math.min(0.56, 0.036 * Math.abs(b.speed) + 0.04), 0.77 * clamp(((b.brkV0 || 0) - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1) * clamp(1.3 - (b.brkT || 0), 0, 1)) /* v20: 全速（13m/s）からの急ブレーキで後輪が約50度まで浮く（本人「全速からの急ブレーキは50度で」） */
-    b.noseT = rel < -0.94 && b.w < 0.3 ? (b.noseT || 0) + H : 0
+    b.noseT = rel < -0.94 && b.w < 0.3 && n[1] > 0.5 && !b.cn[1].side && B.f[1] < -0.85 ? (b.noseT || 0) + H : 0 // v54 本人「前に回ってないのに前に回ったと出る（爆発の床のあと、前輪立ちで着地）」: 登り坂や段の面に前輪から着いた時は、面に対しては 70 度でも見た目は 50 度ほど。見た目でも 58 度より前へ傾いている時だけ転ぶ。縦の面に当たった時は数えない
     if (b.noseT > 0.12) crash(b, 'front', 0, ev) // 前輪だけで、地面から 70 度より前へ傾いたまま（前へ回っていく）
     if (rel < lim) { tau += (lim - rel) * 9000; if (b.w < 0) tau -= b.w * 1400 }
     else if (rel < lim + 0.15 && b.w < -1.5) tau -= (b.w + 1.5) * 900 // 限界の手前で、前へ回る勢いを弱めておく（速い時の急ブレーキで回り切らない）
@@ -1031,7 +1031,7 @@ function sub(world, b, inpIn, ev) {
     if (!(b.brkV0 > 0)) { b.brkV0 = Math.max(Math.abs(b.speed), b.brkVs || 0); b.brkT = 0 } else if (Math.abs(b.speed) > b.brkV0 + 0.05) { b.brkV0 = Math.abs(b.speed); b.brkT = 0 } else b.brkT = (b.brkT || 0) + H // 速さが上がった時（止まったまま押していた後に押し出された等）は数え直す
     const flip = b.brkV0 > 14.5 // v20b: ニトロ並みの速さ（最高速度13.5を超えた）からの急ブレーキは、ゆっくり前へ回って転ぶ（本人「ニトロ中の急ブレーキはゆっくり転ぶように」）
     const tgt = flip ? 1.5 : clamp(1.3 - b.brkT, 0, 1) * 0.873 * clamp((b.brkV0 - 4) / 9, 0, 1) * clamp(Math.abs(b.speed) / 3, 0, 1)
-    { const wT = flip ? 0.6 : Math.min(1.6, (b.th + tgt) * 5); if (flip && b.w < -wT) tau += (-wT - b.w) * 1600 /* ゆっくり回る（約1.5秒で転ぶ） */; if (flip && b.th < -1.3) crash(b, 'front', 0, ev) /* 約75度で転ぶ */; if ((flip || b.th < -0.2) && b.th > -tgt && b.w > -wT) tau -= (b.w + wT) * 1400 } /* 自然に 11 度以上浮いた時だけ（氷・濡れた石では浮かない）。目標に近づくほどゆっくり */
+    { const wT = flip ? 0.6 : Math.min(1.6, (b.th + tgt) * 5); if (flip && b.w < -wT) tau += (-wT - b.w) * 1600 /* ゆっくり回る（約1.5秒で転ぶ） */; if (flip && b.cn[1] && (() => { const n = b.cn[1].nw || b.cn[1].n; return n[1] > 0.5 && B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2] < -0.96 })()) crash(b, 'front', 0, ev) /* 約75度で転ぶ（v54: 水平でなく前輪の下の面に対して。下りの着地坂の上で、坂に対しては 45 度なのに転んでいた） */; if ((flip || b.th < -0.2) && b.th > -tgt && b.w > -wT) tau -= (b.w + wT) * 1400 } /* 自然に 11 度以上浮いた時だけ（氷・濡れた石では浮かない）。目標に近づくほどゆっくり */
   } else { b.brkV0 = 0; b.brkT = 0 }
   // ---- 止まったままのウィリー（トライアルのスタンディングウィリー）: 速さがほぼ 0・アクセルなしで後ろ体重なら、
   //      前輪を約 33 度まで持ち上げてそこで保つ。前体重＋ブレーキなら、前輪で立って約 33 度まで前へ傾けて保つ。
