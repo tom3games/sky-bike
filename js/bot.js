@@ -1,10 +1,10 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=60'
-import { VGEAR, holeOnTop } from './v51gear.js?v=60'
-import { doorAng } from './traps.js?v=60'
-import { BLADE } from './v37.js?v=60'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=60'
-import { K3 } from './v60.js?v=60'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=61'
+import { VGEAR, holeOnTop } from './v51gear.js?v=61'
+import { doorAng } from './traps.js?v=61'
+import { BLADE } from './v37.js?v=61'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=61'
+import { K3 } from './v60.js?v=61'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）

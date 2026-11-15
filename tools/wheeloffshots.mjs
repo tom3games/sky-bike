@@ -28,6 +28,10 @@ const go = lazy => page.evaluate(lazy => {
   G.wheelOffs = 0
 }, lazy)
 const R = {}
+if (process.env.SEQ) { // v61 何もしない時の、前輪が外れてから倒れるまでをコマで撮る（SEQ=1）
+  await go(true); await until(() => window.sky.wheelOffs >= 1); await until(() => window.sky.bike.noFront && window.sky.bike.noFront.t > 0.9)
+  const log = []; for (let k = 0; k < 16; k++) { await sh('seq_' + String(k).padStart(2, '0')); log.push(await page.evaluate(() => { const b = window.sky.bike; return (b.noFront ? b.noFront.t.toFixed(2) : '-') + ' th' + (b.th * 57.3).toFixed(0) + (b.crashed ? ' C' : '') })); await rafs(5) }
+  console.log(log.join(' | '), 'errors', errs.length); await br.close(); process.exit(0) }
 // 1) ウィリーで小屋まで
 await go(false)
 await until(() => window.sky.wheelOffs >= 1); await rafs(3); await sh('1_off')

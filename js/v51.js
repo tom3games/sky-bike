@@ -7,11 +7,11 @@
 export const LASERS = [0, 2, 9, 22, 12, 25, 36, 41], BLASTS = [13]
 export const SPIKE = { h: 0.3, back: 1.75, rise: 0.42, kick: 4.5, spin: 5.5 }
 export const ICE = { mu: 0.3 }
-export const DRUM = { r: 0.24, trig: 7, T: +(globalThis.__drumT ?? 1.5), R: 4 }
+export const DRUM = { r: 0.24, trig: 7, T: +(globalThis.__drumT ?? 2.4), R: 4 }
 export const SLICK = { mu: +(globalThis.__slickMu ?? 0.45) }
 export const UPDRAFT = { a: 13, run: +(globalThis.__upRun ?? 10.6), T: 4.6 }
 export const BLAST = { cut: 5.0, trig: 6.5, back: 5, lipDeg: 8, lipLen: 1.0, roadN: 2 }
-import { closest } from './physics.js?v=60'
+import { closest } from './physics.js?v=61'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 
@@ -90,7 +90,7 @@ export function v51post(B) {
       for (let k = Math.max(0, i - 14); k <= j; k++) P[k].nitro = true
       ;(B.v51.slick = B.v51.slick || []).push({ i, j, nm, n: ids.size }) } }
   // v58 本人「障害物としてドラム缶を 1 個。ウィリーで越えるけど、遅かったら爆発に巻き込まれて吹き飛ぶ」: 道に横倒しのドラム缶。
-  //   前輪が 7m 手前に来ると導火線に火がつき、DRUM.T 秒で爆発。その時に DRUM.R m 以内にいると吹き飛ばされる（約 7.5m/s 以上で越えれば間に合う）
+  //   前輪が 7m 手前に来ると導火線に火がつき、DRUM.T 秒で爆発。その時に DRUM.R m 以内にいると吹き飛ばされる（v61 2.4 秒に延ばした: 約 4.6m/s 以上で越えれば間に合う）
   if (!globalThis.__noDrum) { const N = P.length, ok = q => q && q.p && q.kind === 'road' && !q.branch && Math.abs(q.slope || 0) < 0.03 && (q.kap || 0) < 0.01 && q.w >= 3
     let at = -1; for (let i = Math.floor(N * 0.3); i < N * 0.75; i++) { let g = true; for (let j = i - 14; j < i + 8; j++) if (!ok(P[j])) { g = false; break } for (let j = i - 26; g && j < i + 26; j++) if (P[j] && (P[j].nitro || ['lip', 'jump', 'chimney', 'kick', 'hang', 'lift', 'spin', 'gear', 'sense', 'blade', 'vgear', 'crumble', 'trap', 'spike', 'blast', 'fork', 'forkRide', 'seesaw', 'swing', 'slide', 'water', 'drum', 'draw'].includes(P[j].kind) || P[j].door)) g = false
       { let mn = ''; for (const mk of B.marks || []) if (i >= mk.i0) mn = mk.name; if (/鉄球|振り子|大ジャンプ|谷|道を選ぶ|猿|空中回廊/.test(mn)) g = false }

@@ -33,7 +33,7 @@
 - snd/creak_a.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/creak_b.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/door_open.mp3: 50 RPG sound effects（doorOpen_2）/ Kenney / CC0
-- snd/elder_voice.mp3・snd/can_pick.mp3・snd/crow_hit_voice.mp3: 作者の録音
+- snd/elder_voice.mp3・snd/can_pick.mp3・snd/crow_hit_voice.mp3・snd/epi_voice.mp3: 作者の録音
 - snd/creak_c.mp3: 50 RPG sound effects / Kenney / CC0
 - snd/chain_a.mp3: 100 CC0 SFX #2 / rubberduck / CC0
 - snd/chain_b.mp3: 100 CC0 SFX #2 / rubberduck / CC0

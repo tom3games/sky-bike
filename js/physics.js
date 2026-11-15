@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=60'
+import { doorAng } from './traps.js?v=61'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -607,6 +607,7 @@ export class World {
 }
 
 // ------------------------------------------------------------ バイク
+export const NOFRONT_TIP = +(globalThis.__tip ?? 2600)
 export const NOFRONT_HOLD = 1.0 // v56 本人「脱輪から転び始めるまでを少し早く」2.0→1.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
 export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5) } // v52 水が押す強さ（1/秒）と上限（m/s²）
 export const BRK_HOLD = 0.25 // v23: 急ブレーキで後輪を持ち上げるのは、ブレーキ全開をこの秒数（0.25 秒）より長く押し続けた時だけ
@@ -1107,7 +1108,8 @@ function sub(world, b, inpIn, ev) {
     if (inp.lean < -0.3 && b.g[0]) { const tgt = 0.6, e = tgt - rel; tau += e * 9000 - b.w * 900; if (rel > 0.7 && b.w > 0) tau -= b.w * 3000 }
     if (NF.t >= NOFRONT_HOLD) {
       NF.stubT = NF.stub && !(inp.lean < -0.3) ? (NF.stubT || 0) + H : 0
-      if (rel < -0.55 || NF.stubT > 0.45) crash(b, 'head', 0, ev)
+      if (NF.stub && !(inp.lean < -0.3)) tau -= NOFRONT_TIP * Math.min(1, b.speed / 8) /* v61 本人「脱輪から転ぶまでの動きがない。ちゃんと前に倒れていって」: フォークが刺さったら、乗り手ごと前へつんのめる */
+      if (rel < -0.9 || NF.stubT > 1.4) crash(b, 'head', 0, ev)
     }
   }
   // ---- 積分
