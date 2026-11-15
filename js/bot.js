@@ -367,6 +367,8 @@ export function botInput(bot, b) {
   // v51 爆発で消える床: 手前 30m からは全開。爆発したら（G.t0）すぐニトロ
   let blastNit = false
   if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) { if (!path[j].blast && !['road', 'orbit', 'curve', 'pad', 'spin', 'trap', 'spike'].includes(path[j].kind)) break; if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } } }
+  // v62 技が要る近道のウィリー跳ね板（js/v62.js）: 決まった速さで近づき、前輪が板の手前に来たら惰性のウィリー（約 33 度）のまま後輪を板へ
+  if (bot.skill === 'good' && bot.world && !b.hang && !globalThis.__noV62bot) { const v6 = v62Step(bot, b, SQ, sp, air); if (v6) { thr = v6.thr; brk = v6.brk; lean = v6.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
@@ -623,4 +625,27 @@ function kcStep(bot, b, SQ, sp, air) {
   if (m.trig != null || ra > m.trigAt + 0.3) return null
   const vA = +(globalThis.__kcvA ?? KC.vIn) - (bot.react || 0) / 60 * 2
   return { thr: sp < vA - 0.4 ? 1 : sp < vA ? 0.3 : 0, brk: sp > vA + 0.6 ? 0.4 : 0, lean: 0 }
+
+// v62 道の上のウィリー跳ね板。板の印 v62 を先の道から探す。跳ねた後（空中）はふつうの空中の技
+function v62Step(bot, b, SQ, sp, air) {
+  const path = bot.path
+  // 跳んだ後の空中: 着地の角度へ合わせる（先の段・床を見て構える技は使わない）
+  const k = b._k3
+  if (air && k && k.v62 && bot.world && bot.world.time - k.t < 3.5) { const tgt = k.thLand ?? 0.1; return { thr: 0.5, brk: 0, lean: Math.max(-1, Math.min(1, (b.th - tgt) * 3 + b.w * 0.6)) } }
+  let info = null
+  for (let jj = 0; jj < Math.min(SQ.length, 22); jj++) { const q = path[SQ[jj]]; if (q.v62) { info = q.v62; break } if (q.door || ['jump', 'lip', 'hang', 'stepUp', 'lift', 'sense'].includes(q.kind)) break } /* 扉の手前は扉を破る速さのまま（扉の後で落とす） */
+  if (!info || air) return null
+  const m = info.m, f = info.f, al = p => (p[0] - info.start[0]) * f[0] + (p[2] - info.start[2]) * f[2]
+  const Bq = basis(b), fw = wheelCenter(b, Bq, 1, b.s[1]), rw = wheelCenter(b, Bq, 0, b.s[0]), fa = al(fw), ra = al(rw)
+  if (m.trig != null || ra > m.trigEnd) return null
+  const late = (bot.react || 0) / 60, vA = +(globalThis.__v62vA ?? 3.7)
+  let mis = b.psi - info.yaw; while (mis > Math.PI) mis -= 2 * Math.PI; while (mis < -Math.PI) mis += 2 * Math.PI
+  if (Math.abs(mis) > 0.3) return { thr: sp < 2.4 ? 0.7 : 0, brk: sp > 3.2 ? 0.4 : 0, lean: 0 } // 曲がりの途中: ゆっくり
+  const pop = +(globalThis.__v62pop ?? 1.6) + late * vA
+  if (fa < -pop) { bot.v62pw = false; return { thr: sp < vA - 0.3 ? 1 : sp < vA ? 0.3 : 0, brk: sp > vA + 0.5 ? Math.min(1, 0.4 + (sp - vA) * 0.15) : 0, lean: 0 } }
+  bot.k3pop = true
+  const hold = { thr: b.th < 0.4 ? 1 : b.th < 0.55 ? 0.45 : 0, brk: 0, lean: b.th > 0.64 ? 1 : b.th > 0.5 ? 0 : -1 } // アクセルで前輪を上げて 30 度ほどに保つ
+  if (sp > 3.95) return bot.v62pw ? { ...hold, thr: 0, brk: 0.2 } : { thr: 0, brk: 0.3, lean: 0 }
+  if (sp < 2.6 || bot.v62pw) { bot.v62pw = true; return hold } // 遅い（旗から出た所など）: 惰性では前輪が上がらないので、アクセルで上げる
+  return { thr: 0, brk: 0, lean: b.th > m.pitchT + 6 * Math.PI / 180 ? 0 : -1 }
 }

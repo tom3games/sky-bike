@@ -10,6 +10,7 @@ import { WATER } from './physics.js?v=66'
 import { chaseGroup } from './v46.js?v=66'
 import { v51post } from './v51.js?v=66'
 import { v61post } from './v61.js?v=66'
+import { v62post } from './v62.js?v=66'
 import { v36traps } from './traps.js?v=66'
 import { descent } from './v48.js?v=66'
 import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=66'
@@ -920,6 +921,7 @@ function finishCourse(B, o) {
   }
   if (o.climb) v51post(B) // v51 落とし穴の一部をレーザーの床・爆発で消える床に
   if (o.climb) v61post(B) // v61 縁石の曲がり（自動の減速を外す）
-  return { ...o, v51: B.v51 || null, v61: B.v61 || null, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  if (o.climb) v62post(B) // v62 技が要る近道（道の上のウィリー跳ね板）
+  return { ...o, v51: B.v51 || null, v61: B.v61 || null, v62: B.v62 || null, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
 export const COURSES = { practice, stage1, lab16, lab17: P17.lab17, lab49: (...a) => V49.lab49(...a) }
