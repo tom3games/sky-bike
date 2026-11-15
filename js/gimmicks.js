@@ -514,7 +514,7 @@ function buildV16(course, group, M, chainMat, unitCyl) {
       }
       for (const k of kicks) {
         const s = k.sh, f = s.ax[0], rt = s.ax[2], c0 = s.base.c
-        for (const sp of k.springs) { const x = sp.a * s.h[0] * 2, z = sp.l * s.h[2] * 2, top = [s.c[0] + f[0] * x + rt[0] * z, s.c[1] - s.h[1], s.c[2] + f[2] * x + rt[2] * z], bot = [c0[0] + f[0] * x + rt[0] * z, c0[1] - 0.73, c0[2] + f[2] * x + rt[2] * z]; span(sp.m, bot, top, 0.12) }
+        for (const sp of k.springs) { const x = sp.a * s.h[0] * 2, z = sp.l * s.h[2] * 2, top = [s.c[0] + f[0] * x + rt[0] * z, s.c[1] + f[1] * x - s.h[1], s.c[2] + f[2] * x + rt[2] * z], bot = [c0[0] + f[0] * x + rt[0] * z, c0[1] + f[1] * x - 0.73, c0[2] + f[2] * x + rt[2] * z]; span(sp.m, bot, top, 0.12) }
         const st = s.mov.trig != null
         if (S && st && !k.was) { S.play('spring', { vol: 1 }); S.play('clank', { vol: 0.7, rate: 0.9 }) }
         k.was = st

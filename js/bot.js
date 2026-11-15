@@ -5,6 +5,7 @@ import { doorAng } from './traps.js?v=65'
 import { BLADE } from './v37.js?v=65'
 import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=65'
 import { K3 } from './v60.js?v=65'
+import { KC } from './v64.js?v=65'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -323,6 +324,8 @@ export function botInput(bot, b) {
   // v60 跳ね板の三段登り: 決まった速さで近づき、前輪が板の手前に来たら何も押さずに後ろ体重（惰性のウィリー、約 33 度で止まる）のまま板へ。U ターンはゆっくり
   bot.k3pop = false
   if (bot.skill === 'good' && bot.world && !b.hang) { const k3 = k3Step(bot, b, SQ, sp, air); if (k3) { thr = k3.thr; brk = k3.brk; lean = k3.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
+  // v64 斜めの跳ね板から跳ね板へ: 決まった速さで近づき、板の上では水平のまま（重心はまん中）
+  if (bot.skill === 'good' && bot.world && !b.hang) { const kc = kcStep(bot, b, SQ, sp, air); if (kc) { thr = kc.thr; brk = kc.brk; lean = kc.lean; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
   // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る
   if (bot.skill === 'good' && bot.world && !air) for (const h of bot.hz) { if (h.kind !== 'door' || path[bot.i].branch || !(bot.i <= h.i + 4 && h.i - bot.i < 36) || ['fork', 'forkRide'].includes(path[bot.i].kind)) continue // 扉の手前の本線の上だけ（分かれ道の床の上では見ない）
     const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw), dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
@@ -608,4 +611,16 @@ function k3Step(bot, b, SQ, sp, air) {
   bot.k3pop = true
   if (sp > 3.95) return { thr: 0, brk: 0.3, lean: 0 }
   return { thr: 0, brk: 0, lean: -1 }
+}
+
+// v64 斜めの跳ね板から跳ね板へ（js/v64.js）。1 枚目の手前から引き金まで、速さ KC.vIn で入る（遅れる人は少し遅めに合わせる）。跳んだ後はふつうの空中の技
+function kcStep(bot, b, SQ, sp, air) {
+  const path = bot.path
+  let info = null
+  for (let jj = 0; jj < Math.min(SQ.length, 30); jj++) { const q = path[SQ[jj]]; if (q.kc) { info = q.kc; break } if (q.kind === 'jump') break }
+  if (!info || info.n !== 1 || air) return null
+  const m = info.m, f = info.f, rw = wheelCenter(b, basis(b), 0, b.s[0]), ra = (rw[0] - info.start[0]) * f[0] + (rw[2] - info.start[2]) * f[2]
+  if (m.trig != null || ra > m.trigAt + 0.3) return null
+  const vA = +(globalThis.__kcvA ?? KC.vIn) - (bot.react || 0) / 60 * 2
+  return { thr: sp < vA - 0.4 ? 1 : sp < vA ? 0.3 : 0, brk: sp > vA + 0.6 ? 0.4 : 0, lean: 0 }
 }
