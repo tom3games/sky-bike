@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=59'
+import { doorAng } from './traps.js?v=60'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -501,7 +501,7 @@ export class World {
       const L = this.grid.get(key(i, j, k)); if (!L) continue
       for (const id of L) {
         if (this.stamp[id] === this.st) continue; this.stamp[id] = this.st
-        const s = this.shapes[id]
+        const s = this.shapes[id]; if (s.gone) continue // v59 消えた物（爆発したドラム缶など）は細かい区画の側でも拾わない
         if (x + rad < s.min[0] || x - rad > s.max[0] || y + rad < s.min[1] || y - rad > s.max[1] || z + rad < s.min[2] || z - rad > s.max[2]) continue
         out.push(id)
       }
@@ -1373,7 +1373,7 @@ export function shuttlePos(m, t) {
 // 跳ね板: 踏まれてから τ 秒の持ち上がり（0..stroke）。入った速さ ve で跳ね上がる速さが変わる
 export function kickPos(m, t) {
   if (m.trig == null || t < m.trig) return 0
-  const tau = t - m.trig, vpk = Math.min(m.vmax ?? 14, m.k0 + m.kv * (m.ve || 0)), T1 = m.stroke * PI / (2 * vpk)
+  const tau = t - m.trig, vpk = Math.min(m.vmax ?? 14, Math.max(m.vmin || 0, m.k0 + m.kv * (m.ve || 0))) /* v59 vmin: 遅く乗っても弱くならない（本人「ゆっくり乗ったら反応しない」） */, T1 = m.stroke * PI / (2 * vpk)
   if (tau < T1) return m.stroke * (1 - dcos(PI * tau / T1)) / 2
   if (tau < T1 + m.hold) return m.stroke
   const u = (tau - T1 - m.hold) / m.back
@@ -1447,7 +1447,7 @@ function v16Track(world, b, ev) {
       if (on0 || on1) { m.lastTouch = T; if (m.trig == null && !b.crashed) { m.trig = T; if (ev) ev.push({ t: 'topple', p: s.c.slice() }) } }
     } else if (m.type === 'kick') {
       if (on0 || on1) m.lastTouch = T
-      if (m.trig == null && on0 && b.g[0] && on1 && b.g[1] && !b.crashed && (m.armed ?? true)) {
+      if (m.trig == null && on0 && b.g[0] && (on1 && b.g[1] || !b.g[1]) && !b.crashed && (m.armed ?? true)) { // v59 本人「ウィリーで乗ると跳ね台が反応しない」: 後輪だけで乗っていても跳ねる（前輪が別の所に着いている時は跳ねない）
         const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
         if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }); if (m.spin) { b._kickSpin = m.spin; b._kickT = T } // v51 2 枚目の跳ね板: 板を離れた瞬間に前へ回す
           // v38 本人「跳ね板から次の壁まで直撃」: 板の向きを少し後ろへ傾けた形。前へ速すぎる分は跳ねる時に削る（どの速さで乗っても坂か着地の道に下りる）

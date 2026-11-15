@@ -1,9 +1,9 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=59'
-import { VGEAR, holeOnTop } from './v51gear.js?v=59'
-import { doorAng } from './traps.js?v=59'
-import { BLADE } from './v37.js?v=59'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=59'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=60'
+import { VGEAR, holeOnTop } from './v51gear.js?v=60'
+import { doorAng } from './traps.js?v=60'
+import { BLADE } from './v37.js?v=60'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=60'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -343,7 +343,7 @@ export function botInput(bot, b) {
   if (bot.skill === 'good' && !air) { let dm = null; for (let j = Math.max(0, bot.i - 2); j < Math.min(path.length, bot.i + 16); j++) if (path[j].drum) { dm = path[j].drum; break }
     if (dm && !dm.done) { const Bq = basis(b), fw = wheelCenter(b, Bq, 1, 0), rw = wheelCenter(b, Bq, 0, 0), fa = (fw[0] - dm.c[0]) * dm.f[0] + (fw[2] - dm.c[2]) * dm.f[2], ra = (rw[0] - dm.c[0]) * dm.f[0] + (rw[2] - dm.c[2]) * dm.f[2], vA = +(globalThis.__drV ?? 9)
       if (ra > 0.5) { thr = 1; brk = 0; lean = b.th > 0.1 ? 1 : 0 }
-      else if (fa > -(+(globalThis.__drPop ?? 2.4) + (bot.react || 0) / 60 * vA)) { thr = 1; brk = 0; lean = b.th < 0.38 ? -1 : b.th > 0.6 ? 0.3 : -0.4 }
+      else if (fa > -(Math.max(+(globalThis.__drPop ?? 2.4), sp * 0.5) + (bot.react ? +(globalThis.__drHum ?? 0) : 0))) { thr = 1; brk = 0; lean = b.th < 0.38 ? -1 : b.th > 0.6 ? 0.3 : -0.4 }
       else { thr = sp < vA - 0.3 ? 1 : 0; brk = sp > vA + 0.8 ? 0.4 : 0; lean = 0 }
       bot.waiting = true; bot.stuckT = 0 } }
   // v51 黄色いレーザーの床: 5m/s ほどに落として、前輪が光の 2.6m 手前でウィリーを始め、前輪を光の上に通す。後輪が光を越えたら前体重で下ろす
