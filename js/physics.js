@@ -733,7 +733,7 @@ function sub(world, b, inpIn, ev) {
   // 動く足場の上では、足場に対する速さで摩擦と当たりを計算する
   let curId = -1
   // 動く床に乗っている間は、床の座標系で動かす: 位置に床の動きを毎刻み足し（下の積分の後）、b.v は床に対する速さとして扱う
-  { const pick = i => { const cn = b.cn[i]; if (!cn) return -1; const sh = world.shapes[cn.id]; return sh && sh.mov && CARRY.has(sh.mov.type) && !sh.gone ? cn.id : -1 }
+  { const pick = i => { const cn = b.cn[i]; if (!cn) return -1; const sh = world.shapes[cn.id]; return sh && sh.mov && CARRY.has(sh.mov.type) && sh.mov.pitchT == null && !sh.gone ? cn.id : -1 } /* v60 三段登りの跳ね板は乗せて運ばない（跳ねる速さは引き金で直接与える） */
     let nc = !b.crashed && (b.g[0] || b.g[1]) ? Math.max(pick(0), pick(1)) : -1
     // v51 縦に回る歯車: 片方の車輪だけが歯車で、もう片方が止まった床（足場）の時は、体ごと回さない（回すと足場側の車輪が足場へ押し込まれ、前へつんのめった）。その間は面の速さで引っぱるだけ（ふつうの動く面と同じ）
     if (nc >= 0 && world.shapes[nc].mov.seg) { const gid = world.shapes[nc].mov.gid; for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn || cn.id === nc) continue; const m2 = world.shapes[cn.id].mov; if (!m2 || !m2.seg || m2.gid !== gid) nc = -1 } }
@@ -1373,7 +1373,7 @@ export function shuttlePos(m, t) {
 // 跳ね板: 踏まれてから τ 秒の持ち上がり（0..stroke）。入った速さ ve で跳ね上がる速さが変わる
 export function kickPos(m, t) {
   if (m.trig == null || t < m.trig) return 0
-  const tau = t - m.trig, vpk = Math.min(m.vmax ?? 14, Math.max(m.vmin || 0, m.k0 + m.kv * (m.ve || 0))) /* v59 vmin: 遅く乗っても弱くならない（本人「ゆっくり乗ったら反応しない」） */, T1 = m.stroke * PI / (2 * vpk)
+  const tau = t - m.trig, vpk = m.vpk3 ?? Math.min(m.vmax ?? 14, Math.max(m.vmin || 0, m.k0 + m.kv * (m.ve || 0))) /* v59 vmin: 遅く乗っても弱くならない / v60 三段は vpk3 */, T1 = m.stroke * PI / (2 * vpk)
   if (tau < T1) return m.stroke * (1 - dcos(PI * tau / T1)) / 2
   if (tau < T1 + m.hold) return m.stroke
   const u = (tau - T1 - m.hold) / m.back
@@ -1445,6 +1445,23 @@ function v16Track(world, b, ev) {
     const m = s.mov, on0 = b.cn[0] && b.cn[0].id === s.id, on1 = b.cn[1] && b.cn[1].id === s.id
     if (m.type === 'topple') {
       if (on0 || on1) { m.lastTouch = T; if (m.trig == null && !b.crashed) { m.trig = T; if (ev) ev.push({ t: 'topple', p: s.c.slice() }) } }
+    } else if (m.type === 'kick' && m.pitchT != null) {
+      // v60 跳ね板の三段登り: 後輪が板の引き金を過ぎた瞬間に跳ねる（前輪は浮いていてよい）。跳ね上がる速さ vy = k0 + kv × 入った速さ。
+      //   その瞬間の車体の傾き th と目標のウィリーの角度 pitchT の差が ±pitchTol を超えた分だけ、回す（pitchK 倍）。水平・前輪から入ると前へ、立てすぎると後ろへ回される。
+      //   外れた分だけ跳ね上がる速さも減る（1 − pitchLoss × 外れ。水平で約 8 割 → 段に届かない）。板から受ける力で回る分は使わない（跳ね上がりは速さを直接与え、回りは引き金の瞬間の回りに足すだけ）。どの入り方でも同じ入力なら同じ跳び方
+      if (on0 || on1) m.lastTouch = T
+      if (m.trig == null && on0 && b.g[0] && !b.crashed && (m.armed ?? true)) {
+        const rw = wheelCenter(b, basis(b), 0, b.s[0]), along = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]
+        if (along > m.trigAt) {
+          m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false
+          const vy = Math.min(m.vmax ?? 13, m.k0 + m.kv * m.ve), e = b.th - m.pitchT, ex = e > m.pitchTol ? e - m.pitchTol : e < -m.pitchTol ? e + m.pitchTol : 0
+          const dw = clamp(m.pitchK * ex, -7, 7), lose = clamp(1 - (m.pitchLoss ?? 0.6) * Math.abs(ex), 0.5, 1) // 角度が外れた分は回る方へ取られて、跳ね上がりも弱くなる（空中で回りを止めても段に届かない）
+          b.v[1] = Math.max(b.v[1], vy * lose); m.vpk3 = 0.6 * vy * lose /* 板はバイクより遅く上がる（板が後から車輪を押して回したり跳ね上げたりしない） */; b.w += dw; b._k3 = { t: T, th: b.th, e, dw, v: m.ve }
+          if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve, k3: dw })
+        }
+      }
+      if (!on0 && !on1 && m.trig == null && T - (m.lastTouch ?? -1e9) > 0.3) m.armed = true
+      if ((on0 || on1) && m.trig == null && !m.armed) { const rw = wheelCenter(b, basis(b), 0, b.s[0]), al2 = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]; if (al2 < m.trigAt - 0.6) m.armed = true }
     } else if (m.type === 'kick') {
       if (on0 || on1) m.lastTouch = T
       if (m.trig == null && on0 && b.g[0] && (on1 && b.g[1] || !b.g[1]) && !b.crashed && (m.armed ?? true)) { // v59 本人「ウィリーで乗ると跳ね台が反応しない」: 後輪だけで乗っていても跳ねる（前輪が別の所に着いている時は跳ねない）
