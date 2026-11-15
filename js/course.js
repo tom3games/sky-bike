@@ -1,19 +1,19 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=72'
-import * as P16 from './parts16.js?v=72'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=72'
-import { lab16 } from './parts16.js?v=72'
-import * as P17 from './parts17.js?v=72'
-import * as V49 from './v49.js?v=72'
-import { finale } from './finale.js?v=72'
-import { WATER } from './physics.js?v=72'
-import { chaseGroup } from './v46.js?v=72'
-import { v51post } from './v51.js?v=72'
-import { v61post } from './v61.js?v=72'
-import { v62post } from './v62.js?v=72'
-import { v36traps } from './traps.js?v=72'
-import { descent } from './v48.js?v=72'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=72'
+import * as Z from './zones.js?v=73'
+import * as P16 from './parts16.js?v=73'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=73'
+import { lab16 } from './parts16.js?v=73'
+import * as P17 from './parts17.js?v=73'
+import * as V49 from './v49.js?v=73'
+import { finale } from './finale.js?v=73'
+import { WATER } from './physics.js?v=73'
+import { chaseGroup } from './v46.js?v=73'
+import { v51post } from './v51.js?v=73'
+import { v61post } from './v61.js?v=73'
+import { v62post } from './v62.js?v=73'
+import { v36traps } from './traps.js?v=73'
+import { descent } from './v48.js?v=73'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=73'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -311,7 +311,7 @@ export class Builder {
   channel(len, slope, o = {}) {
     const t = this.t, f = this.dir(t.yaw, 0), u = o.u ?? 2.2
     const s = this.road(len, { ...o, slope, mat: 'wetstone', mu: o.mu ?? 0.75, kind: 'water', noOverlap: true })
-    s.flow = [-f[0] * u, 0, -f[2] * u]
+    { const R = this.right(t.yaw), sg = globalThis.__chanS ?? -1; s.flow = [R[0] * u * sg, 0, R[2] * u * sg] } /* v73 見た目どおり横へ流す（止まると横へ押し出されて落ちる）。前は道と逆向きに押し戻していた */
     this.waters.push({ box: s, u: -u })
     this.last = null
     return s
@@ -793,7 +793,8 @@ function towerDressing(B) {
         const h = 0.32 + rr() * 0.3, slope = Math.atan2(s.b, rp)
         const yaw = ph + Math.PI / 2
         const mat = s.mat === 'grate' ? 'rust' : s.mat === 'ice' || s.mat === 'snowrock' ? 'snowrock' : s.mat === 'basalt' ? 'basalt' : s.mat === 'plank' ? 'plankold' : 'ruinwall'
-        B.box({ c: [p[0], y + h / 2 - 0.12, p[2]], h: [len / 2, h / 2 + 0.06, 0.15], yaw, pitch: slope, roll: (rr() - 0.5) * 0.06, mat, tag: 'parapet', zone: s.zone })
+        const roll = (rr() - 0.5) * 0.06, wet = B.shapes.some(z => z.flowR && z.type === 'arc' && Math.abs(z.y0 - y) < 3 && (() => { const dx = p[0] - z.cx, dz = p[2] - z.cz, r = Math.hypot(dx, dz); if (r < z.r1 - 0.5 || r > z.r2 + 2.2) return false; const ph = Math.atan2(-dz, dx); for (const k of [-2, 0, 2]) { const a2 = ph + k * Math.PI; if (a2 > Math.min(z.phi0, z.phi1) - 0.6 / r && a2 < Math.max(z.phi0, z.phi1) + 0.6 / r) return true } return false })()) // v73 横切って外へ流れる水の外側には縁の石を置かない（流されたら落ちる）。乱数の並びは変えない
+        if (!wet) B.box({ c: [p[0], y + h / 2 - 0.12, p[2]], h: [len / 2, h / 2 + 0.06, 0.15], yaw, pitch: slope, roll, mat, tag: 'parapet', zone: s.zone })
       }
       d += len + 0.25 + rr() * 0.8
     }

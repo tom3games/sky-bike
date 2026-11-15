@@ -1,5 +1,5 @@
-import { hbeam } from './course.js?v=72'
-import { WATER } from './physics.js?v=72'
+import { hbeam } from './course.js?v=73'
+import { WATER } from './physics.js?v=73'
 const KICK_VMIN = +(globalThis.__kVmin ?? 6.8), KICK_TRIG = +(globalThis.__kTrig ?? 1.2) // v59 跳ね板: 遅く乗っても跳ねる強さの下限・板に乗ってから跳ねるまで
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
@@ -13,16 +13,16 @@ function xgap(B, len, dy) { const w = B.last ? B.last.w : 3; B.kicker(1.6, 11 * 
 function ocrates(x, heights, gapAng = 0.16, o = {}) {
   for (const h of heights) { x.ostep(h); x.orbit(gapAng, 0, { mat: 'crate', kind: 'crate', mu: o.mu }) }
 }
-// 塔のまわりの道で、進む向きと逆へ流れる水路（止まると押し戻される）
+// 塔のまわりの道を横切って外へ流れる水（v73 までは進む向きと逆へ流れる水路だった）
 function ochannel(x, ang, rise, u = 2.0) {
   const s = x.orbit(ang, rise, { mat: 'wetstone', mu: 0.72, kind: 'water', sweep: 0.05 })
-  s.flowT = -u * x.B.orbitSign
-  x.B.waters.push({ arc: s, u, tan: x.B.orbitSign })
+  s.flowR = u * (globalThis.__chanK ?? 1) /* v73 本人「見た目どおり右へ押し出されて落ちる方が欲しかった」: 道に沿って押し戻すのをやめ、塔の壁から外の縁へ横切って流す（止まると外へ押し出されて落ちる）。見た目も湧き水と同じ（外へ流れて縁から滝） */
+  x.B.waters.push({ arc: s, u })
   return s
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=72'
+import { senseLift, SENSE } from './v49.js?v=73'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
