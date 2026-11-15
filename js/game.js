@@ -8,30 +8,30 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=69'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=69'
-import { COURSES } from './course.js?v=69'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=69'
-import { BikeView, snap } from './bikeview.js?v=69'
-import { createBot, botInput, resetBot } from './bot.js?v=69'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=69'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=69'
-import { Birds } from './birds.js?v=69'
-import { crowPush } from './strike.js?v=69'
-import { buildV35, hankieDataURL } from './v35view.js?v=69'
-import { buildRecorder } from './recorder.js?v=69'
-import { buildV36 } from './v36view.js?v=69'
-import { buildLady } from './lady.js?v=69'
-import { buildElder, ELDER } from './elder.js?v=69'
-import { buildBoulder } from './v41view.js?v=69'
-import { buildMotes } from './motes.js?v=69'
-import { buildMurals } from './murals.js?v=69'
-import { buildV37 } from './v37view.js?v=69'
-import { buildV51 } from './v51view.js?v=69'
-import { buildEpi, wheelProp } from './v48view.js?v=69'
-import { buildSenseLamps } from './v49view.js?v=69'
-import { doorAng } from './traps.js?v=69'
-import { resetDrums } from './physics.js?v=69'
+import { buildGimmicks } from './gimmicks.js?v=70'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=70'
+import { COURSES } from './course.js?v=70'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=70'
+import { BikeView, snap } from './bikeview.js?v=70'
+import { createBot, botInput, resetBot } from './bot.js?v=70'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=70'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=70'
+import { Birds } from './birds.js?v=70'
+import { crowPush } from './strike.js?v=70'
+import { buildV35, hankieDataURL } from './v35view.js?v=70'
+import { buildRecorder } from './recorder.js?v=70'
+import { buildV36 } from './v36view.js?v=70'
+import { buildLady } from './lady.js?v=70'
+import { buildElder, ELDER } from './elder.js?v=70'
+import { buildBoulder } from './v41view.js?v=70'
+import { buildMotes } from './motes.js?v=70'
+import { buildMurals } from './murals.js?v=70'
+import { buildV37 } from './v37view.js?v=70'
+import { buildV51 } from './v51view.js?v=70'
+import { buildEpi, wheelProp } from './v48view.js?v=70'
+import { buildSenseLamps } from './v49view.js?v=70'
+import { doorAng } from './traps.js?v=70'
+import { resetDrums } from './physics.js?v=70'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -961,7 +961,7 @@ function fixedStep() {
   G.inp = inp
   if (inp.skid && (b.g[0] || b.g[1])) { G.skidT = (G.skidT || 0) - DT; if (G.skidT <= 0) { G.skidT = 0.22; Snd.play('gravel', { vol: 0.8, rate: 1.2 }); G.shake = Math.max(G.shake, 0.03) } if (b.cn[0]) dust.emit(b.cn[0].q, 2, 1.6); { const yv = Math.atan2(-b.v[2], b.v[0]); for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (b.g[i] && cn) { slideMk[i].mark(cn.q, cn.nw || cn.n, yv); if (inp.slide) dust.emit(cn.q, 1, 0.9, { col: 0xc9c4b8, up: 1.6, size: 1.5 }) } else slideMk[i].lift() } } /* v68 滑っている間はタイヤの跡（進む向き）と白い煙 */ } else { G.skidT = 0; slideMk[0].lift(); slideMk[1].lift() }
   { let hit = null; for (const sd of b.side || []) if (sd && sd.depth > 0.004 && G.world.shapes[sd.id] && G.world.shapes[sd.id].tag === 'parapet') hit = sd /* v69 滑って石の縁に当たった瞬間: 石と金属の音・火花・石のかけら（強さは当たる前の速さ） */
-    if (hit && !G.wallHitOn && inp.skid) { const k = Math.min(1, Math.max(Math.abs(b.speed), G.wallHitV || 0) / 14); Snd.play('rockbreak', { vol: 0.35 + k * 0.5, rate: 1.15 }); Snd.play('clank', { vol: 0.5 + k * 0.4 }); Snd.play('pebbles', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.08 + k * 0.12); dust.emit(hit.q, 14 + Math.round(k * 22), 5, { col: 0xffb347, up: 5, heavy: 0.9, size: 0.7 }); dust.emit(hit.q, 10, 3, { col: 0x8a857a, up: 2.5, heavy: 1.2, size: 1.1 }); G.wallHits = (G.wallHits || 0) + 1 }
+    if (hit && !G.wallHitOn && inp.skid) { const k = Math.min(1, Math.max(Math.abs(b.speed), G.wallHitV || 0) / 14); Snd.play('rockbreak', { vol: 0.35 + k * 0.5, rate: 1.15 }); Snd.play('clank', { vol: 0.5 + k * 0.4 }); Snd.play('pebbles', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.08 + k * 0.12); dust.emit(hit.q, 14 + Math.round(k * 22), 5, { col: 0xffb347, up: 5, heavy: 0.9, size: 0.7 }); dust.emit(hit.q, 10, 3, { col: 0x8a857a, up: 2.5, heavy: 1.2, size: 1.1 }); G.wallHits = (G.wallHits || 0) + 1; if (bikeView && bikeView.stagger) bikeView.stagger(G.steer && G.steer.curbOut || 1) }
     G.wallHitOn = !!hit; G.wallHitV = Math.abs(b.speed) } // v61 縁石の曲がりで速すぎた: 横滑りの音と砂ぼこり
   if (!G.running && (inp.thr > 0 || inp.brk > 0 || inp.lean)) G.running = true
   const ev = []

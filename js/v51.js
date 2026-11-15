@@ -11,7 +11,7 @@ export const DRUM = { r: 0.24, trig: 7, T: +(globalThis.__drumT ?? 2.4), R: 4 }
 export const SLICK = { mu: +(globalThis.__slickMu ?? 0.45) }
 export const UPDRAFT = { a: 13, run: +(globalThis.__upRun ?? 10.6), T: 4.6 }
 export const BLAST = { cut: 5.0, trig: 6.5, back: 5, lipDeg: 8, lipLen: 1.0, roadN: 2 }
-import { closest } from './physics.js?v=69'
+import { closest } from './physics.js?v=70'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 

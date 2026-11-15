@@ -11,6 +11,7 @@ const PORT = process.env.PORT = process.env.PORT || '6217'
 await import('../server.mjs')
 const br = await chromium.launch({ ...MUTE_LAUNCH, channel: 'chromium', args: [...(MUTE_LAUNCH.args || []), '--use-angle=metal', '--enable-gpu', '--ignore-gpu-blocklist'] })
 const ctx = await br.newContext({ viewport: { width: 960, height: 540 }, locale: 'ja-JP' }); await muteContext(ctx)
+if (process.env.SOFT) await ctx.addInitScript(() => { globalThis.__curbHit = 99 }) // SOFT=1: 投げ出さない（弾かれてよろける所を撮る）
 const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message)); page.on('console', m => { if (m.type() === 'error') errs.push(m.text()) })
 await page.goto(`http://localhost:${PORT}/?stay=1&bot=good`); await page.waitForFunction('window.__skyReady', null, { timeout: 90000 })
 await page.evaluate(() => { window.sky.startRun('stage1'); window.sky.api.buildAll(); if (window.sky.story) window.sky.story.t0 = null })
@@ -31,7 +32,7 @@ const log = []
 for (let k = 0; k < 20; k++) {
   await page.screenshot({ path: `shots/curb/${TAG}_${String(k).padStart(2, '0')}.png` })
   log.push(await page.evaluate(() => { const G = window.sky, b = G.bike; return `hit${G.wallHits || 0} v${b.speed.toFixed(1)}${b.crashed ? ' 転倒:' + b.crashed.why : ''} y${b.p[1].toFixed(1)} ${(document.getElementById('why') || {}).textContent || ''}` }))
-  await rafs(9)
+  await rafs(+(process.env.STEP || 9))
 }
 console.log(log.map((s, k) => k + ': ' + s).join('\n')); console.log('errors', errs.length, errs.slice(0, 3))
 console.log('mute', await page.evaluate(() => window.__muteOk ? window.__muteOk() : 'なし'))

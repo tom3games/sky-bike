@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=69'
+import { BIKE, basis, wheelCenter } from './physics.js?v=70'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -22,6 +22,7 @@ function profile(pts, depth, bevel = 0.012) {
 export class BikeView {
   // v28: ライトを光らせる（0..1）
   flinch() { this._flinch = performance.now() }
+  stagger(side) { this._stag = { t: performance.now(), side: side || 1 } } /* v70 石の縁に当たって弾かれた: 乗り手が外へよろけて戻る（見た目だけ） */
   setLamp(k) { if (!this.lampM) return; this.lampM.emissiveIntensity = 0.05 + k * 6; this.lampLight.intensity = k * 600; this.lampGlow.visible = k > 0.02; this.lampGlow.material.opacity = Math.min(1, k) }
   constructor(scene, o = {}) {
     this.root = new THREE.Group(); this.root.name = o.ghost ? 'ghost' : 'bike'
@@ -144,13 +145,15 @@ export class BikeView {
     // 左右の向きを1回だけ実測（模型の左足が車体の z の負の側か）
     if (!this.sideSign) { const l = this.body.worldToLocal(B['UpperLeg.L'].getWorldPosition(new THREE.Vector3())); this.sideSign = l.z < 0 ? 1 : -1 }
     // 腰（体の座標）。前体重で前へ・後ろ体重で後ろへ、縮むほど低く
-    const hip = V(-0.13 + L * 0.09, 0.5 - C * 0.16, 0)
+    const sg = this._stag ? (performance.now() - this._stag.t) / 900 : 2, sw = sg < 1 ? this._stag.side * (1 - sg) * (1 - sg) * Math.cos(sg * Math.PI * 3) : 0 // v70 よろけ: 当たった側へ体が流れ、揺り戻して収まる（0.9 秒）
+    const hip = V(-0.13 + L * 0.09, 0.5 - C * 0.16 - Math.abs(sw) * 0.05, sw * 0.13)
     const cur = this.body.worldToLocal(B.Hips.getWorldPosition(new THREE.Vector3()))
     this.rider.position.add(hip.clone().sub(cur)); this.rider.updateMatrixWorld(true)
     // 胴を前へ倒す（車体の横の軸のまわり）
     const lat = new THREE.Vector3(0, 0, 1).transformDirection(this.body.matrixWorld)
     const bend = (b, ang) => { if (!b) return; const wq = b.getWorldQuaternion(new THREE.Quaternion()), q = new THREE.Quaternion().setFromAxisAngle(lat, -ang), pq = b.parent.getWorldQuaternion(new THREE.Quaternion()); b.quaternion.copy(pq.invert().multiply(q.multiply(wq))); b.updateMatrixWorld(true) }
     bend(B.Abdomen, 0.5 + L * 0.25 + C * 0.15); bend(B.Chest || B.Torso, 0.28 + L * 0.15); bend(B.Head, -(0.55 + L * 0.3 + C * 0.1))
+    if (sw) { const fw = new THREE.Vector3(1, 0, 0).transformDirection(this.body.matrixWorld), rollB = (b, ang) => { if (!b) return; const wq = b.getWorldQuaternion(new THREE.Quaternion()), q = new THREE.Quaternion().setFromAxisAngle(fw, ang), pq = b.parent.getWorldQuaternion(new THREE.Quaternion()); b.quaternion.copy(pq.invert().multiply(q.multiply(wq))); b.updateMatrixWorld(true) }; rollB(B.Abdomen, sw * 0.45); rollB(B.Chest || B.Torso, sw * 0.3); rollB(B.Head, sw * 0.2) }
     const W = p => this.body.localToWorld(V(...p))
     const fwd = new THREE.Vector3(1, 0, 0).transformDirection(this.body.matrixWorld), up = new THREE.Vector3(0, 1, 0).transformDirection(this.body.matrixWorld)
     for (const n of ['L', 'R']) {
