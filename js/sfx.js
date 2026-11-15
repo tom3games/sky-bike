@@ -58,6 +58,7 @@ const Snd = {
   now() { return this.ctx ? this.ctx.currentTime : 0 },
   pick(name) { const a = this.files[name]; if (!a || !a.length) return null; if (a.length === 1) return a[0]; let i; do { i = Math.floor(Math.random() * a.length) } while (a.length > 1 && a[i] === this.last[name]); this.last[name] = a[i]; return a[i] },
   play(name, o = {}) {
+    if (typeof window !== 'undefined') { const L = window.__sndLog || (window.__sndLog = []); if (L.length < 400) L.push(name) } // 検査用: 鳴らした音の名前
     this.played[name] = (this.played[name] || 0) + 1
     if (!this.ctx || this.away) return null; const url = o.url || this.pick(name), buf = this.bufs[url]
     if (!buf || buf === 'loading') { if (!this.bufs[url]) this.load(); return null }

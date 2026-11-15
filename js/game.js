@@ -8,29 +8,29 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=55'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=55'
-import { COURSES } from './course.js?v=55'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=55'
-import { BikeView, snap } from './bikeview.js?v=55'
-import { createBot, botInput, resetBot } from './bot.js?v=55'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=55'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=55'
-import { Birds } from './birds.js?v=55'
-import { crowPush } from './strike.js?v=55'
-import { buildV35, hankieDataURL } from './v35view.js?v=55'
-import { buildV36 } from './v36view.js?v=55'
-import { buildLady } from './lady.js?v=55'
-import { buildElder, ELDER } from './elder.js?v=55'
-import { buildBoulder } from './v41view.js?v=55'
-import { buildMotes } from './motes.js?v=55'
-import { buildMurals } from './murals.js?v=55'
-import { buildV37 } from './v37view.js?v=55'
-import { buildV51 } from './v51view.js?v=55'
-import { buildEpi, wheelProp } from './v48view.js?v=55'
-import { buildSenseLamps } from './v49view.js?v=55'
-import { doorAng } from './traps.js?v=55'
-import { resetDrums } from './physics.js?v=55'
+import { buildGimmicks } from './gimmicks.js?v=56'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=56'
+import { COURSES } from './course.js?v=56'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=56'
+import { BikeView, snap } from './bikeview.js?v=56'
+import { createBot, botInput, resetBot } from './bot.js?v=56'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=56'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=56'
+import { Birds } from './birds.js?v=56'
+import { crowPush } from './strike.js?v=56'
+import { buildV35, hankieDataURL } from './v35view.js?v=56'
+import { buildV36 } from './v36view.js?v=56'
+import { buildLady } from './lady.js?v=56'
+import { buildElder, ELDER } from './elder.js?v=56'
+import { buildBoulder } from './v41view.js?v=56'
+import { buildMotes } from './motes.js?v=56'
+import { buildMurals } from './murals.js?v=56'
+import { buildV37 } from './v37view.js?v=56'
+import { buildV51 } from './v51view.js?v=56'
+import { buildEpi, wheelProp } from './v48view.js?v=56'
+import { buildSenseLamps } from './v49view.js?v=56'
+import { doorAng } from './traps.js?v=56'
+import { resetDrums } from './physics.js?v=56'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -164,7 +164,7 @@ function adaptRes(dt) {
 }
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
+Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], elderVoice: ['snd/elder_voice.mp3'], canPick: ['snd/can_pick.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -757,11 +757,11 @@ function elderHold(inp) {
   }
   V.hold = (V.hold || 0) + 1; inp.lean = 0; inp.nitro = 0
   if (b.speed < -0.25) { inp.thr = 0.5; inp.brk = 0 } else if (b.speed > 0.25) { inp.thr = 0; inp.brk = 1 } else { inp.thr = 0; inp.brk = V.hold % 20 ? 1 : 0 } // 下がっているのを止める（ブレーキだと下がり続けるので、少しアクセル）
-  if (V.ph === 'stop' && Math.abs(b.speed) < 0.3 && (!E.ready || E.t > 1.4)) { V.ph = 'talk'; V.t = 0; E.state = 'talk'; talkShow(t('eld')) }
+  if (V.ph === 'stop' && Math.abs(b.speed) < 0.3 && (!E.ready || E.t > 1.4)) { V.ph = 'talk'; V.t = 0; E.state = 'talk'; talkShow(t('eld')); Snd.play('elderVoice', { vol: 1 }) }
 }
 function elderStep(dt) {
   const V = G.vl; if (!V) return
-  if (V.ph === 'stop') { V.t += dt; if (V.t > 4) { V.ph = 'talk'; V.t = 0; if (G.elder) G.elder.state = 'talk'; talkShow(t('eld')) } } // 止まりきらない時も先へ
+  if (V.ph === 'stop') { V.t += dt; if (V.t > 4) { V.ph = 'talk'; V.t = 0; if (G.elder) G.elder.state = 'talk'; talkShow(t('eld')); Snd.play('elderVoice', { vol: 1 }) } } // 止まりきらない時も先へ
   else if (V.ph === 'talk') { V.t += dt; if (V.t > (V.n > 1 ? 1.6 : 3.0)) elderNext() }
   else if (V.ph === 'fade') {
     V.ft += dt; const fd = $('fade')
@@ -973,7 +973,7 @@ function fixedStep() {
   G.cpIdx = G.R.cp
   if (j.finish) { finish(); return }
   if (G.epi && epiStep(j, b)) return
-  if (j.can) { Snd.play('clank', { vol: 0.5, rate: 1.3 }); Snd.play('whoosh', { vol: 0.3, rate: 1.4 }) }
+  if (j.can) Snd.play('canPick', { vol: 0.9 }) // v55 本人の録音（燃料の缶を拾った時）
   if (j.refill) Snd.play('whoosh', { vol: 0.35, rate: 1.2, delay: 0.25 })
   if (j.gate != null) { const cp = c.cps[j.gate]; if (cp.rest) { (G.R.restSeen = G.R.restSeen || {})[j.gate] = true; contUnlock(j.gate); Snd.play('save', { vol: 0.55 }); Snd.play('cloth', { vol: 0.7, delay: 0.1 }) } else Snd.play('gate', { vol: 0.5, rate: 0.8 }); toast(cp.name, cp.rest ? t('rest') : fmt(G.time)); flash('on') }
   if (!wasAir) { const cn = b.cn[0] || b.cn[1]; G.lastTag = cn ? G.world.shapes[cn.id].tag : G.lastTag }
