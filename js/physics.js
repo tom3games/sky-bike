@@ -1462,7 +1462,16 @@ function v16Track(world, b, ev) {
       if (on0 || on1) m.lastTouch = T
       if (m.trig == null && on0 && b.g[0] && !b.crashed && (m.armed ?? true)) {
         const rw = wheelCenter(b, basis(b), 0, b.s[0]), along = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]
-        if (along > m.trigAt) {
+        if (m.v62) {
+          // v62 技が要る近道のウィリー跳ね板（js/v62.js）: 前輪が浮いて、車体の角度が pitchT ± pitchTol の間にある時だけ跳ねる。外れていればただの床（ふつうの道のまま）。
+          //   跳び方は板ごとに決まっている（入った速さによらず、上の段の着地点へ）。空中で着地の角度 thLand へ向かうように回す
+          if (along > m.trigAt && along < m.trigEnd && !b.g[1] && Math.abs(b.th - m.pitchT) <= m.pitchTol) {
+            m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false
+            b.v[0] = m.f[0] * m.vf; b.v[2] = m.f[2] * m.vf; b.v[1] = m.vy; m.vpk3 = 0.6 * m.vy; b.w = (m.thLand - b.th) / m.tf
+            b._k3 = { t: T, th: b.th, e: b.th - m.pitchT, dw: 0, v: m.ve, v62: m.v62, thLand: m.thLand }
+            if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve, v62: m.v62 })
+          }
+        } else if (along > m.trigAt) {
           m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false
           const vy = Math.min(m.vmax ?? 13, m.k0 + m.kv * m.ve), e = b.th - m.pitchT, ex = e > m.pitchTol ? e - m.pitchTol : e < -m.pitchTol ? e + m.pitchTol : 0
           const dw = clamp(m.pitchK * ex, -7, 7), lose = clamp(1 - (m.pitchLoss ?? 0.6) * Math.abs(ex), 0.5, 1) // 角度が外れた分は回る方へ取られて、跳ね上がりも弱くなる（空中で回りを止めても段に届かない）
