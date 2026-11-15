@@ -3,6 +3,8 @@
 //  2 明るい草原の浮き島（霧を抜けると急に昼。違和感 3 つ・錆びた古いトライアルバイク 3 台・草に隠れた穴 1 つ・跳ね台）
 //  3 風車の羽根に乗って運ばれる（ゆっくり回る羽根の上を根元から先へ。羽根が傾くので体重で耐え、先で次の足場へ）
 //  4 ワイヤーの綱渡り（谷に張った太いケーブルの上をタイヤで渡る。たわみ・横風。落ちたら手前の旗）
+import { vgears, vgearDims } from './v51gear.js?v=50'
+import { datan2 } from './physics.js?v=50'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const DEG = Math.PI / 180
 export const BLADE = { L: 12.6, r0: 0.8, W: 3.0, TH: 0.3, w: 0.27, wc: 0.21, n: 4, aBoard: -18 * DEG, aTop: 22 * DEG, x0: 2.2 }
@@ -45,14 +47,24 @@ export function v37(B) {
   for (const [len, sl] of [[8, 4], [8, -4], [6, 0]]) B.road(len, { ...G, slope: sl * DEG })
   { const rise = B.kicker(2.6, 13 * DEG, { w: 3.4, mat: 'plank', thick: 0.6 }); B.gap(3.6, rise - 0.45, 'jump'); B.path[B.path.length - 1].vJump = 7 } // 跳ね台
   B.road(10, { ...G, back: 0 })
-  for (const [len, sl] of [[7, -3], [7, 5], [6, 0]]) B.road(len, { ...G, slope: sl * DEG })
+  // v51 草原の後ろ半分に三つの歯車を入れる。終わり（風車の前の旗）の位置・高さ・向きは前と同じ（後の区間・大ジャンプ・城を動かさない）。前の形の終わりを同じ計算で出しておく
+  const E = (() => { let p = B.t.p.slice(); for (const [len, sl] of [[7, -3], [7, 5], [6, 0]]) p = add3(p, B.dir(myaw, sl * DEG), len); p = add3(p, B.dir(myaw), 1.7); p = add3(p, B.dir(myaw), 12); const m1 = p.slice(); p = add3(p, B.dir(myaw), 6); return { m1, p } })()
+  B.road(+(globalThis.__mdX ?? 7), { ...G }) // 跳ね台の着地から穴まで（速く跳んでも着地が穴にかからない長さ）
   const holeAt = B.t.p.slice()
-  B.gap(1.7, 0, 'jump'); B.path[B.path.length - 1].vJump = 6; B.path[B.path.length - 1].hidden = true // 草に隠れた穴
-  B.road(12, { ...G, back: 0 })
-  const m1 = B.t.p.slice()
-  B.v37.meadow = { a: m0, b: m1, yaw: myaw, hole: holeAt }
+  B.gap(1.7, 0, 'jump'); B.path[B.path.length - 1].vJump = 6; B.path[B.path.length - 1].hidden = true // 草に隠れた穴（前より 13m 手前）
+  B.road(4, { ...G, back: 0 })
+  { const dy = E.p[1] - B.t.p[1], L = 2.5; B.road(L, { ...G, slope: datan2(dy, Math.sqrt(L * L - dy * dy)) }) } // 前の形の上り下りの分（0.24m）をここで上がる
+  B.road(1, { ...G })
+  B.cp('歯車の前', { w: 6, rest: true })
+  B.mark('三つの歯車')
+  { const fw = (E.p[0] - B.t.p[0]) * B.dir(myaw)[0] + (E.p[2] - B.t.p[2]) * B.dir(myaw)[2], D = vgearDims(), appr = 3, exitL = fw - D.span - appr
+    B.road(appr, { w: 3.4, mat: 'plank', thick: 0.6 })
+    const pit0 = B.t.p.slice()
+    vgears(B)
+    B.road(exitL, { w: 3.4, mat: 'plank', thick: 0.6, kind: 'landing' })
+    B.v37.meadow = { a: m0, b: E.m1, yaw: myaw, hole: holeAt, pit: [((pit0[0] - m0[0]) * Math.cos(myaw) - (pit0[2] - m0[2]) * Math.sin(myaw)) - 0.3, ((pit0[0] - m0[0]) * Math.cos(myaw) - (pit0[2] - m0[2]) * Math.sin(myaw)) + D.span + 0.3, 3.3] } } // 島の見た目は前と同じ大きさ（歯車の所だけ穴）
+  B.t.p = E.p.slice(); B.last = { slope: 0, yaw: myaw, w: 6 } // 前の形と同じ終わり（後の道の継ぎ目も同じに）
   // ---------------- 3 風車の羽根（草原の端の風車）
-  B.road(6, { ...G })
   B.cp('風車の前', { w: 6, rest: true })
   B.closeMark()
   B.mark('風車の羽根')

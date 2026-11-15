@@ -259,7 +259,7 @@ export function buildCourse(course, scene, nowZones = null) {
   }
   if (typeof window !== 'undefined' && window.__loadMarks) window.__loadMarks.far = Math.round(performance.now() - t0)
   for (const s of course.shapes) {
-    if (HIDE.has(s.tag)) continue
+    if (HIDE.has(s.tag) || s.noView) continue // v51 歯車の縁の板は歯車の模型で見せる
     if (s.mov) {
       let g
       if (s.type === 'box') g = new THREE.BoxGeometry(s.h[0] * 2, s.h[1] * 2, s.h[2] * 2)

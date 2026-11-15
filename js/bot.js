@@ -1,5 +1,6 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
 import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=50'
+import { VGEAR, holeOnTop } from './v51gear.js?v=50'
 import { doorAng } from './traps.js?v=50'
 import { BLADE } from './v37.js?v=50'
 import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=50'
@@ -315,6 +316,8 @@ export function botInput(bot, b) {
       else { const vc = onS && onS.mov.cont ? 4.4 : 3.2; thr = sp < (nearTip ? 4.5 : vc) ? 1 : 0; brk = sp > vc + 1 && !nearTip ? 0.4 : 0 }
       bot.waiting = true; bot.stuckT = 0; break }
   }
+  // v51 三つの歯車: 歯車の手前の足場で止まって待ち、渡り切るまで（今から ＋ 遅れ ＋ 渡る時間）欠けが山にかからない時に出る。山の上は決まった速さ。渡ったら次の足場で止まる
+  if (bot.skill === 'good' && bot.world && !b.hang) { const vg = vgearStep(bot, b, sp, air); if (vg) { thr = vg.thr; brk = vg.brk; lean = vg.lean; bot.waiting = !!vg.wait; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
   // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る
   if (bot.skill === 'good' && bot.world && !air) for (const h of bot.hz) { if (h.kind !== 'door' || path[bot.i].branch || !(bot.i <= h.i + 4 && h.i - bot.i < 36) || ['fork', 'forkRide'].includes(path[bot.i].kind)) continue // 扉の手前の本線の上だけ（分かれ道の床の上では見ない）
     const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw), dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
@@ -528,4 +531,34 @@ function v17Lift(bot, b, SQ, PV, c) {
   if (e < 0.4 + Math.max(0, sp) * 0.45) return { thr: 0, brk: Math.abs(sp) > 0.1 ? 1 : 0.6, lean: b.th > 0.1 ? 0.6 : 0, wait: true }
   if (Math.abs(sp) < 0.8) return { thr: 0.5, brk: 0, lean: b.th > 0.1 ? 1 : 0, wait: true }
   return { thr: 0, brk: 0, lean: b.th > 0.1 ? 1 : 0, wait: true }
+}
+
+// v51 三つの歯車の bot。x は歯車の区間の始まり（A）から前への距離。歯車 k の山の真ん中は X[k]、山の両端の縁は X[k] ± xLip
+function vgearStep(bot, b, sp, air) {
+  const n = (bot.course.notes || []).find(q => q.kind === 'vgear'); if (!n) return null
+  const f0 = [Math.cos(n.yaw), 0, -Math.sin(n.yaw)], A = n.A, D = n.D, xs = p => (p[0] - A[0]) * f0[0] + (p[2] - A[2]) * f0[2]
+  const lat = Math.abs(-(b.p[0] - A[0]) * f0[2] + (b.p[2] - A[2]) * f0[0])
+  const B = basis(b), xf = xs(wheelCenter(b, B, 1, b.s[1])), xr = xs(wheelCenter(b, B, 0, b.s[0])), xc = xs(b.p)
+  if (lat > 3 || Math.abs(b.p[1] - 0.8 - A[1]) > 2.5 || xf < -6 || xr > D.span + 0.5) { bot.vgGo = -1; return null }
+  const X = n.gears.map(g => D.xBody + g.k * D.d), T = bot.world.time, late = (bot.react || 0) / 60
+  // 今いる歯車（後輪がまだ山を出ていない最初の歯車）と、次に乗る歯車（縁が前輪より先にある最初の歯車）
+  let k = 0; while (k < 3 && xr > X[k] + D.xLip + 0.15) k++
+  let kk = 0; while (kk < 3 && xf > X[kk] - D.xLip - 0.05) kk++
+  if (k >= 3) { bot.vgGo = -1; return null }
+  const plan = j => { const g = n.gears[j], fwd = g.w < 0, vt = fwd ? 2.4 : +(globalThis.__gVt2 ?? 3.2), vw = Math.max(1, vt + (fwd ? 1 : -1) * Math.abs(g.w) * VGEAR.R); return { g, vt, vw } }
+  const cur = plan(k), dx = xc - X[k], slope = Math.abs(dx) < VGEAR.R * 0.6 ? -Math.atan(dx / Math.sqrt(VGEAR.R * VGEAR.R - dx * dx)) : 0
+  const ln = slope > 0.12 ? 0.6 : slope < -0.12 ? -0.25 : 0
+  const go = vt => ({ thr: sp < vt - 0.2 ? 1 : sp < vt + 0.3 ? 0.3 : 0, brk: sp > vt + 0.9 ? 0.4 : 0, lean: ln })
+  const onCur = xf > X[k] - D.xLip - 0.05 // 今の歯車の山にかかっている
+  if (kk >= 3 || bot.vgGo === kk) return go(kk >= 3 ? cur.vt : plan(kk).vt)
+  if (onCur && xf < X[k] + 0.3) { bot.vgGo = k; return go(cur.vt) } // 山を越えるまでは今の歯車の速さで
+  const { g, vt, vw } = plan(kk)
+  const wait = X[kk] - D.xLip - 0.75 - xf // 待つ所（前輪が縁の 0.75m 手前）までの距離
+  const tIn = Math.max(0, wait + 0.75) / Math.max(1.2, Math.min(vt + 1, Math.max(sp, 1.2))) + late + 0.15, tOut = tIn + (2 * D.xLip + BIKE.front[0] - BIKE.rear[0] + 0.6) / vw + 0.5
+  let safe = true; for (let t = 0; t <= tOut; t += 0.1) if (holeOnTop(g, T + t)) { safe = false; break }
+  if (safe) { bot.vgGo = kk; return go(onCur ? cur.vt : vt) }
+  // 待つ: 待つ所まで、止まれる速さで近づいて止まる（強いブレーキで前転しない）
+  const vMax = Math.sqrt(2 * 1.8 * Math.max(0, wait - (bot.react ? 0.35 : 0))) * 0.9
+  if (wait > 0.15) return { thr: sp < Math.min(vMax, 2.5) - 0.3 ? 0.6 : 0, brk: sp > vMax + 0.1 ? Math.min(0.8, 0.3 + (sp - vMax) * 0.4) : 0, lean: onCur ? Math.min(ln, 0) : 0, wait: true }
+  return { thr: 0, brk: Math.abs(sp) > 0.2 ? 0.7 : 1, lean: 0, wait: true }
 }

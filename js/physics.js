@@ -406,6 +406,7 @@ export class World {
       if (m.type === 'slide') { const k = m.amp * dsin(t * m.w + (m.ph || 0)); s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
       else if (m.type === 'sense') { if (t === 0) { m.st = 'wait'; m.load = 0; m.idle = 0 } if ((m.st === 'go' || m.st === 'back') && t - m.t0 >= senseDur(m)) { m.st = m.st === 'go' ? 'end' : 'wait'; m.idle = 0; m.load = 0 } const o = senseAt(m, t); s.c = [B0.c[0] + o.p[0], B0.c[1] + o.p[1], B0.c[2] + o.p[2]] }
       else if (m.type === 'lift') { const k = liftPos(m, t).k; s.c = [B0.c[0] + m.axis[0] * k, B0.c[1] + m.axis[1] * k, B0.c[2] + m.axis[2] * k] }
+      else if (m.type === 'blade' && m.seg) { const a = bladeAng(m, t).a, cy = dcos(m.yaw), sy = dsin(m.yaw), ca = dcos(a), sa = dsin(a); s.c = [m.hub[0] + cy * ca * m.rc, m.hub[1] + sa * m.rc, m.hub[2] - sy * ca * m.rc]; s.ax = makeBox({ c: s.c, h: s.h, yaw: m.yaw, pitch: a - PI / 2 }).ax; s.gone = sa < m.solidSin; const e = m.bound; s.min = [s.c[0] - e, s.c[1] - e, s.c[2] - e]; s.max = [s.c[0] + e, s.c[1] + e, s.c[2] + e] } // v51 縦に回る歯車の縁の一枚（円の接線の向きの板。上の方だけ当たりあり＝欠けた所から落ちたら下まで抜ける）
       else if (m.type === 'blade') { const a = bladeAng(m, t).a, cy = dcos(m.yaw), sy = dsin(m.yaw), ca = dcos(a), sa = dsin(a), f = [cy * ca, sa, -sy * ca], u = [-cy * sa, ca, sy * sa]; s.c = [m.hub[0] + f[0] * m.rc - u[0] * m.th / 2, m.hub[1] + f[1] * m.rc - u[1] * m.th / 2, m.hub[2] + f[2] * m.rc - u[2] * m.th / 2]; s.ax = makeBox({ c: s.c, h: s.h, yaw: m.yaw, pitch: a }).ax } // v37 風車の羽根
       else if (m.type === 'spin' && s.type === 'box') { const nb = makeBox({ c: B0.c, h: s.h, yaw: B0.yaw + m.rate * t, pitch: B0.pitch, roll: B0.roll }); s.ax = nb.ax }
       else if (m.type === 'pend') { const st = pendState(m, t); s.c = [m.pivot[0] + m.across[0] * st.x, m.pivot[1] - st.y, m.pivot[2] + m.across[2] * st.x]; if (s.type === 'sph') { s.min = s.c.map(v => v - s.r); s.max = s.c.map(v => v + s.r) } }
@@ -684,7 +685,9 @@ function sub(world, b, inpIn, ev) {
   let curId = -1
   // 動く床に乗っている間は、床の座標系で動かす: 位置に床の動きを毎刻み足し（下の積分の後）、b.v は床に対する速さとして扱う
   { const pick = i => { const cn = b.cn[i]; if (!cn) return -1; const sh = world.shapes[cn.id]; return sh && sh.mov && CARRY.has(sh.mov.type) && !sh.gone ? cn.id : -1 }
-    const nc = !b.crashed && (b.g[0] || b.g[1]) ? Math.max(pick(0), pick(1)) : -1
+    let nc = !b.crashed && (b.g[0] || b.g[1]) ? Math.max(pick(0), pick(1)) : -1
+    // v51 縦に回る歯車: 片方の車輪だけが歯車で、もう片方が止まった床（足場）の時は、体ごと回さない（回すと足場側の車輪が足場へ押し込まれ、前へつんのめった）。その間は面の速さで引っぱるだけ（ふつうの動く面と同じ）
+    if (nc >= 0 && world.shapes[nc].mov.seg) { const gid = world.shapes[nc].mov.gid; for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn || cn.id === nc) continue; const m2 = world.shapes[cn.id].mov; if (!m2 || !m2.seg || m2.gid !== gid) nc = -1 } }
     if (nc !== (b.carryId ?? -1)) {
       if (b.carryId >= 0) { const u = world.shapeVel(world.shapes[b.carryId], b.p) || [0, 0, 0]; b.v[0] += u[0]; b.v[1] += u[1]; b.v[2] += u[2] } // 床を離れる時: 床の速さを持って出る
       if (nc >= 0) { const u = world.shapeVel(world.shapes[nc], b.p) || [0, 0, 0]; b.v[0] -= u[0]; b.v[1] -= u[1]; b.v[2] -= u[2] } // 乗った時: 床に対する速さにする
