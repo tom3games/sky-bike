@@ -3,6 +3,7 @@ import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physi
 import { VGEAR, holeOnTop } from './v51gear.js?v=59'
 import { doorAng } from './traps.js?v=59'
 import { BLADE } from './v37.js?v=59'
+import { K3 } from './v60.js?v=59'
 import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=59'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
@@ -319,6 +320,9 @@ export function botInput(bot, b) {
   }
   // v51 三つの歯車: 歯車の手前の足場で止まって待ち、渡り切るまで（今から ＋ 遅れ ＋ 渡る時間）欠けが山にかからない時に出る。山の上は決まった速さ。渡ったら次の足場で止まる
   if (bot.skill === 'good' && bot.world && !b.hang) { const vg = vgearStep(bot, b, sp, air); if (vg) { thr = vg.thr; brk = vg.brk; lean = vg.lean; bot.waiting = !!vg.wait; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
+  // v60 跳ね板の三段登り: 決まった速さで近づき、前輪が板の手前に来たら何も押さずに後ろ体重（惰性のウィリー、約 33 度で止まる）のまま板へ。U ターンはゆっくり
+  bot.k3pop = false
+  if (bot.skill === 'good' && bot.world && !b.hang) { const k3 = k3Step(bot, b, SQ, sp, air); if (k3) { thr = k3.thr; brk = k3.brk; lean = k3.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
   // v36 落とし扉: 扉の 3m 手前で止まって待ち、扉が閉じた直後に全開で渡る
   if (bot.skill === 'good' && bot.world && !air) for (const h of bot.hz) { if (h.kind !== 'door' || path[bot.i].branch || !(bot.i <= h.i + 4 && h.i - bot.i < 36) || ['fork', 'forkRide'].includes(path[bot.i].kind)) continue // 扉の手前の本線の上だけ（分かれ道の床の上では見ない）
     const hx2 = Math.cos(h.yaw), hz2 = -Math.sin(h.yaw), dx = h.p[0] - b.p[0], dz = h.p[2] - b.p[2], da = dx * hx2 + dz * hz2, lat = Math.abs(-dx * hz2 + dz * hx2)
@@ -363,7 +367,7 @@ export function botInput(bot, b) {
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
-  if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach')) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
+  if (inp.thr <= 0.05 && inp.brk <= 0.05 && inp.lean < -0.6 && Math.abs(sp) > 0.9 && Math.abs(sp) < 3.1 && !b.standOn && b.g[1] && !(bot.sn && bot.sn.ph !== 'approach') && !bot.k3pop) inp = { ...inp, lean: -0.5625 } // v36: 惰性の後ろ体重だけで前輪が上がるようにしたので、bot の今までの技（転がりながら後ろ体重で構える）は前輪を上げない強さにしておく
   // v48b 空中で、着地のすぐ先に曲がりがあると分かっている時は、着いた瞬間に効くようにブレーキを先に押しておく（人も着地の前から構える。反応の遅れで着いてから押すと曲がりの外へ飛ぶ: 旗 39 の浮き島）
   if (!b.g[0] && !b.g[1] && bot.skill === 'good' && bot.react > 0 && sp > 6 && !globalThis.__noPreBrake) { let k = bot.i; for (let n = 0; n < 6 && path[k] && (path[k].kind === 'jump' || path[k].kind === 'lip' || !path[k].w); n++) k++
     if (path[k]) { const cap = cornerCap({ path, i: k }, b); if (cap < sp - 1.5) inp = { ...inp, thr: 0, brk: Math.max(inp.brk || 0, 0.7) } } }
@@ -472,7 +476,7 @@ function v16Input(bot, b, SQ, PV, c) {
   if (g0 && !c.air) return hold(g0.gear.vIn || 10)
   // 跳ね板: 決まった速さで入る
   const kj = ahead(24, (q, dd) => q.kickJump ? q : undefined)
-  if (kj && !c.air && (cur.kind === 'kick' || ahead(24, (q, dd) => q.kind === 'kick' && dd < 16 ? true : undefined))) {
+  if (kj && !kj.k3jump && !cur.k3 && !c.air && (cur.kind === 'kick' || ahead(24, (q, dd) => q.kind === 'kick' && dd < 16 ? true : undefined))) {
     const near = cur.kind === 'kick' || ahead(8, (q, dd) => q.kind === 'kick' && dd < 4 ? true : undefined)
     if (near) return { thr: sp < kj.vJump - 1.0 ? 0.6 : 0, brk: 0, lean: 0 } // 板の上ではアクセルを開けない（跳ね上がる瞬間に前が上がる）
     return hold(kj.vJump)
@@ -584,4 +588,24 @@ function vgearStep(bot, b, sp, air) {
   const vMax = Math.sqrt(2 * 1.8 * Math.max(0, wait - (bot.react ? 0.35 : 0))) * 0.9
   if (wait > 0.15) return { thr: sp < Math.min(vMax, 2.5) - 0.3 ? 0.6 : 0, brk: sp > vMax + 0.1 ? Math.min(0.8, 0.3 + (sp - vMax) * 0.4) : 0, lean: onCur ? Math.min(ln, 0) : 0, wait: true }
   return { thr: 0, brk: Math.abs(sp) > 0.2 ? 0.7 : 1, lean: 0, wait: true }
+}
+
+// v60 跳ね板の三段登り（js/v60.js）。板の手前 info を先の道から探す。跳ねた後（空中）はふつうの空中の技（着地の面に合わせる）
+function k3Step(bot, b, SQ, sp, air) {
+  const path = bot.path
+  let info = null
+  for (let jj = 0; jj < Math.min(SQ.length, 26); jj++) { const q = path[SQ[jj]]; if (q.k3) { info = q.k3; break } if (q.kind === 'jump' || q.kind === 'uturn' && jj > 8) break }
+  if (!info || air) return null
+  const m = info.m, f = info.f, al = p => (p[0] - info.start[0]) * f[0] + (p[2] - info.start[2]) * f[2]
+  const Bq = basis(b), fw = wheelCenter(b, Bq, 1, b.s[1]), rw = wheelCenter(b, Bq, 0, b.s[0]), fa = al(fw), ra = al(rw)
+  if (m.trig != null || ra > m.trigAt + 0.3) return null
+  const late = (bot.react || 0) / 60, vA = +(globalThis.__k3vA ?? K3.vIn)
+  let mis = b.psi - info.yaw; while (mis > Math.PI) mis -= 2 * Math.PI; while (mis < -Math.PI) mis += 2 * Math.PI
+  if (Math.abs(mis) > 0.3) return { thr: sp < 2.4 ? 0.7 : 0, brk: sp > 3.2 ? 0.4 : 0, lean: 0 } // U ターンの途中: ゆっくり
+  const pop = +(globalThis.__k3pop ?? 1.6) + late * vA
+  if (fa < -pop || globalThis.__k3level) return { thr: sp < vA - 0.3 ? 1 : sp < vA ? 0.3 : 0, brk: sp > vA + 0.5 ? 0.4 : 0, lean: 0 }
+  // 惰性のウィリー（何も押さずに後ろ体重）。速すぎる時は軽くブレーキ（惰性のウィリーは 4m/s まで）
+  bot.k3pop = true
+  if (sp > 3.95) return { thr: 0, brk: 0.3, lean: 0 }
+  return { thr: 0, brk: 0, lean: -1 }
 }
