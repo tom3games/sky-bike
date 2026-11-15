@@ -1,7 +1,7 @@
 // ハンドルは自動（Trials と同じく、人が操るのはアクセル・ブレーキ・重心の前後だけ）。
 // コースの線（path）をなぞる向きにハンドルを切る。ゲームと検査（bot）で同じものを使う。
 // 速すぎると曲がり切れずに外へふくらむ（ハンドルの切れる量は physics.js が速さで絞る）。だから曲がり角の前はブレーキ。
-import { STEER_DK } from './physics.js?v=61'
+import { STEER_DK } from './physics.js?v=62'
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 
 // 向きのずれ・目標点へのずれ・横のずれ・曲がりの先取り の重み（tools/steertest.mjs で決めた）
@@ -89,15 +89,17 @@ export function steerFor(st, b, lat = 0) {
 export const ALAT = 8, ADEC = 7
 export const ICE_ALAT = 2.2 // v51 氷の曲がり: 横に踏ん張れる加速度（氷の摩擦 0.25 ほど）
 export const CURB_K = 1.1
-// v61 縁石の曲がり（soft）: 今いる曲がりで、曲がれる速さを超えていたら true（横滑り）。速さの限りは自動減速の 1.15 倍
+// v61 縁石の曲がり: 今いる曲がりで、曲がれる速さ（自動減速の 1.07 倍）を超えたら横滑り（1）、さらにその 1.2 倍を超えたら乗り手が外へ投げ出される（2）
+export const CURB_THROW = +(globalThis.__curbThrow ?? 1.2)
 export function curbSkid(st, b) {
-  const path = st.path, q = path[st.i]; if (!q || q.curb !== 1) return (st.skid = false)
-  let kmax = 0; for (let k = st.i, n = 0; k >= 0 && n < 6; k = nextI(path, k), n++) if (path[k].curb === 1) kmax = Math.max(kmax, path[k].kap || 0)
-  if (kmax < 0.015) return false
-  const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4))
-  const lim = Math.sqrt(alat * 1.15 / kmax)
-  if (b.speed > lim) st.skid = true; else if (b.speed < lim * 0.75) st.skid = false // 一度滑ったら、限りの 3/4 まで落ちるまで滑り続ける（下手だと遅くなる分）
-  return !!st.skid
+  const path = st.path, q = path[st.i]; if (!q || !q.curb) return (st.skid = 0)
+  let kmax = 0, turn = 0; for (let k = st.i, n = 0; k >= 0 && n < 6; k = nextI(path, k), n++) if (path[k].curb) { kmax = Math.max(kmax, path[k].kap || 0); const z = path[nextI(path, k)]; if (z && z.yaw != null) { let d = z.yaw - path[k].yaw; turn += Math.atan2(Math.sin(d), Math.cos(d)) } }
+  if (kmax < 0.015) return (st.skid = 0)
+  const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4)), lim = Math.sqrt(alat * 1.15 / kmax)
+  st.curbOut = turn > 0 ? -1 : 1 /* 外側（右手 [sin, cos] の向きの符号） */
+  if (b.speed > lim * (q.curb === 1 ? CURB_THROW + 0.15 : CURB_THROW)) return (st.skid = 2) /* 前の 2 か所は投げ出されるまでの幅を広く */
+  if (b.speed > lim) st.skid = 1; else if (b.speed < lim * 0.75) st.skid = 0 // 一度滑ったら、限りの 3/4 まで落ちるまで滑り続ける（下手だと遅くなる分）
+  return st.skid
 }
 export function cornerCap(st, b, o = {}) {
   const path = st.path, sp = Math.max(0, b.speed), look = sp * sp / (2 * ADEC) + 8
@@ -117,7 +119,7 @@ export function cornerCap(st, b, o = {}) {
 }
 export function assist(st, b, inp) {
   if (!b.g[0] && !b.g[1]) return inp
-  { const sk = curbSkid(st, b); if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がり（soft）で速すぎる: 横滑りして大きく減速
+  { const sk = curbSkid(st, b); if (sk === 2) return { ...inp, thr: 0, ab: 1, skid: 1, curbThrow: st.curbOut }; if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がりで速すぎる: 横滑りして大きく減速／かなり速いと投げ出される
   const over = b.speed - cornerCap(st, b)
   if (over <= 0) return inp
   return { ...inp, thr: over > 0.4 ? 0 : inp.thr, ab: Math.round(Math.min(1, over * 0.6) * 8) / 8 }

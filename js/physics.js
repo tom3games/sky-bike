@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=61'
+import { doorAng } from './traps.js?v=62'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -1104,6 +1104,7 @@ function sub(world, b, inpIn, ev) {
   }
   // ---- v51 前輪が無い時のウィリーの補助: 後ろ体重なら、地面から約 37 度（25〜45 度の間）に保つ。全開でも後ろへ回らない。
   //      後ろ体重をやめると前へ倒れ、フォークの先が刺さる・頭から行くと転倒（頭を打った）
+  if (inp.curbThrow && !b.crashed && (b.g[0] || b.g[1])) { crash(b, 'curb', b.speed, ev); b.crashed.side = inp.curbThrow } // v61 縁石の曲がりにかなり速く入った: 乗り手が外へ投げ出される
   if (b.noFront && !b.crashed) {
     const NF = b.noFront, n0 = b.g[0] && b.cn[0] ? (b.cn[0].nw || b.cn[0].n) : [0, 1, 0], rel = B.f[0] * n0[0] + B.f[1] * n0[1] + B.f[2] * n0[2]
     if (inp.lean < -0.3 && b.g[0]) { const tgt = 0.6, e = tgt - rel; tau += e * 9000 - b.w * 900; if (rel > 0.7 && b.w > 0) tau -= b.w * 3000 }
@@ -1183,8 +1184,9 @@ function sub(world, b, inpIn, ev) {
       const c0 = b.g[0] && b.cn[0] ? b.cn[0] : b.cn[1], n = c0 ? (c0.nw || c0.n) : null
       if (n) { const Bq = basis(b); mis = Math.asin(Math.max(-1, Math.min(1, Bq.f[0] * n[0] + Bq.f[1] * n[1] + Bq.f[2] * n[2]))) * 57.3
         const am = Math.abs(mis), air1 = Math.min(1, (b.airT - 0.25) / 0.5)
-        loss = am > LAND.ok ? Math.min(LAND.max, (am - LAND.ok) / LAND.span * LAND.max) * air1 : 0
+        loss = am > LAND.ok && am < 60 && !(b.knockT > 0) && !b.knocked ? Math.min(LAND.max, (am - LAND.ok) / LAND.span * LAND.max) * air1 : 0 /* 60 度を超える＝はじかれた・倒れた後は数えない */
         if (loss > 0) { const vn = b.v[0] * n[0] + b.v[1] * n[1] + b.v[2] * n[2]; for (let k = 0; k < 3; k++) { const vt = b.v[k] - n[k] * vn; b.v[k] -= vt * loss } } } }
+    if (b.airT > 0.25 && globalThis.__landLog && !b.ghost) globalThis.__landLog.push({ p: b.p.slice(), mis, loss, air: b.airT, v: b.speed })
     if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact, mis, loss }); b.airT = 0 }
   if (b.crashed) b.crashed.t += H
   if (b.thudT > 0) b.thudT -= H
