@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=58'
+import { doorAng } from './traps.js?v=59'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -273,6 +273,16 @@ function blastTrack(world, b, ev) {
     if (ev) ev.push({ t: 'blast', p: [G.start[0] + G.f[0] * G.len / 2, G.start[1], G.start[2] + G.f[2] * G.len / 2] })
   }
 }
+// v58 導火線のドラム缶: 前輪が trig m 手前に来たら火がつき、T 秒で爆発。その時 R m 以内なら吹き飛ばす（上へ・ドラム缶から離れる向き・回す）
+function fuseTrack(world, b, ev) {
+  for (const s of world.fuses) { const m = s.mov; if (m.done || b.ghost) continue
+    if (m.t0 == null) { if (b.crashed) continue; const B = basis(b), c = wheelCenter(b, B, 1, 0), al = (c[0] - m.c[0]) * m.f[0] + (c[2] - m.c[2]) * m.f[2]; if (al > -m.trig && al < 0.5 && Math.abs(c[1] - m.c[1]) < 2.5 && Math.hypot(c[0] - m.c[0], c[2] - m.c[2]) < m.trig + 2) { m.t0 = world.time; if (ev) ev.push({ t: 'fuse', p: m.c.slice() }) } continue }
+    if (world.time - m.t0 < m.T) continue
+    m.done = true; s.gone = true; if (ev) ev.push({ t: 'blast', p: m.c.slice(), drum: true })
+    const d = [b.p[0] - m.c[0], b.p[1] - m.c[1], b.p[2] - m.c[2]], L = Math.hypot(d[0], d[1], d[2])
+    if (L < m.R && !b.crashed) { const k = 1 - L / m.R, h = Math.hypot(d[0], d[2]) || 1; b.v[0] += d[0] / h * 5 * k; b.v[2] += d[2] / h * 5 * k; b.v[1] += 5 + 5 * k; b.w += (d[0] * m.f[0] + d[2] * m.f[2] > 0 ? -1 : 1) * (5 + 7 * k); b.g = [false, false]; b.blown = world.time; if (ev) ev.push({ t: 'blown' }) }
+  }
+}
 function spikeTrack(world, b, ev) {
   for (const s of world.spikes) { const m = s.mov; if (m.t0 != null || b.ghost || b.crashed) continue
     const B = basis(b)
@@ -283,7 +293,7 @@ function spikeTrack(world, b, ev) {
       break }
   }
 }
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'spike') m.t0 = null; if (m.type === 'blast') { m.G.t0 = null; s.gone = false } if (m.type === 'blastLip') s.gone = true; if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'spike') m.t0 = null; if (m.type === 'fuse') { m.t0 = null; m.done = false; s.gone = false } if (m.type === 'blast') { m.G.t0 = null; s.gone = false } if (m.type === 'blastLip') s.gone = true; if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
 // v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
@@ -395,6 +405,7 @@ export class World {
       if (s.mov && s.mov.type === 'girder') this.girders = true
       if (s.mov && s.mov.type === 'blade') this.blades = true
       if (s.mov && s.mov.type === 'spike') { (this.spikes = this.spikes || []).push(s); s.mov.t0 = null }
+      if (s.mov && s.mov.type === 'fuse') { (this.fuses = this.fuses || []).push(s); s.mov.t0 = null; s.mov.done = false; s.gone = false }
       if (s.mov && s.mov.type === 'blastLip') { s.gone = true }
       if (s.mov && s.mov.type === 'blast') { this.blasts = this.blasts || []; if (!this.blasts.includes(s.mov.G)) this.blasts.push(s.mov.G); s.mov.G.t0 = null; (s.mov.G.boxes = s.mov.G.boxes || []).includes(s) || s.mov.G.boxes.push(s) }
       if (s.mov && s.mov.type === 'sense') { (this.senses = this.senses || []).push(s); s.mov.st = 'wait'; s.mov.load = 0; s.mov.idle = 0; s.mov.t0 = 0 }
@@ -683,6 +694,7 @@ export function stepBike(world, b, inp, ev) {
   if (!b.ghost && world.blades) bladeTrack(world, b)
   if (!b.ghost && world.spikes) spikeTrack(world, b, ev)
   if (!b.ghost && world.blasts) blastTrack(world, b, ev)
+  if (!b.ghost && world.fuses) fuseTrack(world, b, ev)
   if (!b.ghost) v16Track(world, b, ev)
   if (b._kickSpin) { if (!b.g[0] && !b.g[1]) { b.w += b._kickSpin; b._kickSpin = 0 } else if (world.time - b._kickT > 1.5) b._kickSpin = 0 }
   b.steps++

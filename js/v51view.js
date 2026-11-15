@@ -37,9 +37,18 @@ export function buildV51(course, scene) {
   }
   const gustK = (g, t) => { const v = Math.sin(t * g.w + g.ph); return v > 0.55 ? (v - 0.55) / 0.45 : 0 }
   let bt = -1, bp = null
+  // 導火線の火花（ドラム缶の上で、火がついてから爆発まで）
+  const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: null, color: 0xffc860, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0, toneMapped: false })); spark.scale.set(0.35, 0.35, 1); group.add(spark)
+  const drums = (course.decor || []).filter(x => x.kind === 'fuseDrum')
+  for (const D of drums) { const sh = D.shape, ax = [sh.b[0] - sh.a[0], sh.b[1] - sh.a[1], sh.b[2] - sh.a[2]], L = Math.hypot(...ax)
+    const mat = new THREE.MeshStandardMaterial({ color: 0x8a2a1c, roughness: 0.7, metalness: 0.4 }), ring = new THREE.MeshStandardMaterial({ color: 0x3a2a22, roughness: 0.6, metalness: 0.6 })
+    const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CylinderGeometry(sh.r, sh.r, Math.min(L, 0.9), 18), mat); body.castShadow = true; g.add(body)
+    for (const y of [-0.28, 0, 0.28]) { const r = new THREE.Mesh(new THREE.TorusGeometry(sh.r + 0.005, 0.018, 6, 18), ring); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r) }
+    g.position.set((sh.a[0] + sh.b[0]) / 2, (sh.a[1] + sh.b[1]) / 2, (sh.a[2] + sh.b[2]) / 2); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ax[0] / L, ax[1] / L, ax[2] / L)); group.add(g); D.mesh = g }
   return {
     group,
     blast(p) { bt = 0; bp = p },
+    fuse() {},
     update(dt, world, cam) {
       const t = world.time
       for (const L of lasers) { const m = L.d.spike.mov, on = m.t0 == null, flick = on ? 0.85 + 0.15 * Math.sin(t * 37 + L.d.beam[0]) : 0
@@ -47,6 +56,7 @@ export function buildV51(course, scene) {
         L.beam.visible = on && near; L.glow.visible = L.glow2.visible = on && near; L.glow.material.opacity = 0.55 * flick }
       for (const W of winds) { const k = gustK(W.g, t), near = !cam || (cam.x > W.g.min[0] - 60 && cam.x < W.g.max[0] + 60 && cam.z > W.g.min[2] - 60 && cam.z < W.g.max[2] + 60); W.pts.visible = near; if (!near) continue
         W.pts.material.opacity = 0.15 + 0.55 * k; for (let i = 0; i < W.seed.length; i++) { const r = W.seed[i]; r[1] = (r[1] + dt * (0.05 + 0.6 * k) * (0.6 + r[0] * 0.8)) % 1; W.pos[i * 3 + 1] = W.y0 + W.H * r[1] } W.pts.geometry.attributes.position.needsUpdate = true }
+      for (const D of drums) { if (D.mesh) D.mesh.visible = !D.m.done; const m = D.m, on = m.t0 != null && !m.done; spark.visible = on; if (on) { const r = 0.25 + Math.random() * 0.25; spark.scale.set(r, r, 1); spark.material.opacity = 0.7 + Math.random() * 0.3; spark.position.set(m.c[0] + D.shape.r * 0, m.c[1] + D.shape.r + 0.15 + Math.random() * 0.1, m.c[2]) } }
       if (bt >= 0 && bp) { bt += dt; const s1 = 1.5 + 6 * Math.min(1, bt / 0.15), s2 = 2.5 + 6 * Math.min(1, bt / 1.4)
         fire.visible = bt < 0.6; fire.position.set(bp[0], bp[1] + 0.8 + bt * 2, bp[2]); fire.scale.set(s1, s1, 1); fire.material.opacity = Math.max(0, 1 - bt / 0.6)
         smoke.visible = bt < 2.4; smoke.position.set(bp[0], bp[1] + 1.2 + bt * 1.3, bp[2]); smoke.scale.set(s2, s2, 1); smoke.material.opacity = Math.min(0.7, bt * 3) * Math.max(0, 1 - bt / 2.4)

@@ -1,9 +1,9 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=58'
-import { VGEAR, holeOnTop } from './v51gear.js?v=58'
-import { doorAng } from './traps.js?v=58'
-import { BLADE } from './v37.js?v=58'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=58'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=59'
+import { VGEAR, holeOnTop } from './v51gear.js?v=59'
+import { doorAng } from './traps.js?v=59'
+import { BLADE } from './v37.js?v=59'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=59'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -339,6 +339,13 @@ export function botInput(bot, b) {
   // v35 回る筒: 助走から筒を出るまで全開（人も同じ。遅いと真上で落ちる）
   if (b._dph || cur.kind === 'drum' || cur.kind === 'drumRun' || SQ.slice(0, 30).some(j => path[j].kind === 'drum')) { thr = 1; brk = 0; lean = 0; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 }
   { let ch = null; for (let j = bot.i; j < Math.min(path.length, bot.i + 45); j++) { if (path[j].chase) { ch = j; break } if (path[j].kind === 'jump' || path[j].kind === 'lip') break } /* 曲がりは自動の減速（assist）に任せて、アクセルは離さない（人も全開のまま角を抜ける） */ if (bot.skill === 'good' && ch != null && !air) { thr = 1; brk = 0; if (path[ch].chase.nitro) nitroNeed = true; if (path[bot.i].chase || ch - bot.i < 4) lean = b.th > 0.3 ? 0.6 : 0 } } // v51 追ってくる崩れの上は全開（全開の時の後輪の進みに合わせて崩れが追ってくる）
+  // v58 導火線のドラム缶: 8m/s ほどで近づき、前輪がドラム缶の 2.4m 手前でウィリー、後輪が越えたら前体重。火がついたら全開のまま
+  if (bot.skill === 'good' && !air) { let dm = null; for (let j = Math.max(0, bot.i - 2); j < Math.min(path.length, bot.i + 16); j++) if (path[j].drum) { dm = path[j].drum; break }
+    if (dm && !dm.done) { const Bq = basis(b), fw = wheelCenter(b, Bq, 1, 0), rw = wheelCenter(b, Bq, 0, 0), fa = (fw[0] - dm.c[0]) * dm.f[0] + (fw[2] - dm.c[2]) * dm.f[2], ra = (rw[0] - dm.c[0]) * dm.f[0] + (rw[2] - dm.c[2]) * dm.f[2], vA = +(globalThis.__drV ?? 9)
+      if (ra > 0.5) { thr = 1; brk = 0; lean = b.th > 0.1 ? 1 : 0 }
+      else if (fa > -(+(globalThis.__drPop ?? 2.4) + (bot.react || 0) / 60 * vA)) { thr = 1; brk = 0; lean = b.th < 0.38 ? -1 : b.th > 0.6 ? 0.3 : -0.4 }
+      else { thr = sp < vA - 0.3 ? 1 : 0; brk = sp > vA + 0.8 ? 0.4 : 0; lean = 0 }
+      bot.waiting = true; bot.stuckT = 0 } }
   // v51 黄色いレーザーの床: 5m/s ほどに落として、前輪が光の 2.6m 手前でウィリーを始め、前輪を光の上に通す。後輪が光を越えたら前体重で下ろす
   if (bot.skill === 'good' && !air) { let sp0 = null; for (let j = Math.max(0, bot.i - 3); j < Math.min(path.length, bot.i + 14); j++) if (path[j].spike) { sp0 = path[j].spike; break }
     if (sp0 && sp0.t0 == null) { const Bq = basis(b), fw = wheelCenter(b, Bq, 1, 0), rw = wheelCenter(b, Bq, 0, 0), fa = (fw[0] - sp0.beam[0]) * sp0.f[0] + (fw[2] - sp0.beam[2]) * sp0.f[2], ra = (rw[0] - sp0.beam[0]) * sp0.f[0] + (rw[2] - sp0.beam[2]) * sp0.f[2]
