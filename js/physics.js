@@ -1465,13 +1465,14 @@ function v16Track(world, b, ev) {
       //   その瞬間の車体の傾き th と目標のウィリーの角度 pitchT の差が ±pitchTol を超えた分だけ、回す（pitchK 倍）。水平・前輪から入ると前へ、立てすぎると後ろへ回される。
       //   外れた分だけ跳ね上がる速さも減る（1 − pitchLoss × 外れ。水平で約 8 割 → 段に届かない）。板から受ける力で回る分は使わない（跳ね上がりは速さを直接与え、回りは引き金の瞬間の回りに足すだけ）。どの入り方でも同じ入力なら同じ跳び方
       if (on0 || on1) m.lastTouch = T
-      if (m.trig == null && on0 && b.g[0] && !b.crashed && (m.armed ?? true)) {
+      if (m.trig == null && (on0 && b.g[0] || m.anyWheel && on1 && b.g[1]) && !b.crashed && (m.armed ?? true)) { /* v64 m.anyWheel: 空中から着く板は、どちらの車輪が先に着いても跳ねる（前輪で着いて弾んで回る前に） */
         const rw = wheelCenter(b, basis(b), 0, b.s[0]), along = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]
         if (along > m.trigAt) {
-          m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; b.lastKickT = T
-          const vy = Math.min(m.vmax ?? 13, m.k0 + m.kv * m.ve), e = b.th - m.pitchT, ex = e > m.pitchTol ? e - m.pitchTol : e < -m.pitchTol ? e + m.pitchTol : 0
+          m.trig = T; m.ve = Math.max(0, m.chain ? b.v[0] * m.f[0] + b.v[2] * m.f[2] : b.speed); m.armed = false; b.lastKickT = T /* v64 斜めの跳ね板から跳ね板へ（m.chain）: 入った速さは前向きの水平の速さ（空中から着いても同じ） */
+          const vy = Math.min(m.vmax ?? 13, Math.max(m.vmin || 0, m.k0 + m.kv * m.ve)), e = b.th - (m.pitch0 || 0) - m.pitchT, ex = e > m.pitchTol ? e - m.pitchTol : e < -m.pitchTol ? e + m.pitchTol : 0
           const dw = clamp(m.pitchK * ex, -7, 7), lose = clamp(1 - (m.pitchLoss ?? 0.6) * Math.abs(ex), 0.5, 1) // 角度が外れた分は回る方へ取られて、跳ね上がりも弱くなる（空中で回りを止めても段に届かない）
           b.v[1] = Math.max(b.v[1], vy * lose); m.vpk3 = 0.6 * vy * lose /* 板はバイクより遅く上がる（板が後から車輪を押して回したり跳ね上げたりしない） */; b.w += dw; b._k3 = { t: T, th: b.th, e, dw, v: m.ve }
+          if (m.chain) { const vf = b.v[0] * m.f[0] + b.v[2] * m.f[2]; let add = vy * lose * (m.fwd || 0); if (m.vfCap != null && vf + add > m.vfCap) add -= (vf + add - m.vfCap) * (1 - (m.vfK ?? 0.4)); b.v[0] += m.f[0] * add; b.v[2] += m.f[2] * add; b._k3.vf = vf + add } /* v64: 斜めの板は前へも押す・vfCap を超えた前向きの速さは vfK 倍だけ残す（速く入るほど遠くへ行くが、伸びは緩やか）（跳ね上がりは上の max で下向きの速さを打ち消すので、空中から着いた板でも同じ高さ） */
           if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve, k3: dw })
         }
       }
