@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=53'
+import { doorAng } from './traps.js?v=54'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -597,6 +597,7 @@ export class World {
 
 // ------------------------------------------------------------ バイク
 export const NOFRONT_HOLD = 2.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
+export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5) } // v52 水が押す強さ（1/秒）と上限（m/s²）
 export const BRK_HOLD = 0.25 // v23: 急ブレーキで後輪を持ち上げるのは、ブレーキ全開をこの秒数（0.25 秒）より長く押し続けた時だけ
 export const BIKE = {
   m: 180, Ip: 60, g: 9.81,
@@ -798,6 +799,7 @@ function sub(world, b, inpIn, ev) {
     { const sh = world.shapes[con.id]; if (sh.mud) Ft -= clamp(vt, -3, 3) * sh.mud } // 泥: 車輪が沈んで重い
     { const sh = world.shapes[con.id]; if (sh.mov && sh.mov.type === 'gear') Ft -= clamp(vt * sh.mov.grip, -0.9 * lim, 0.9 * lim) } // v16 歯車: 歯にタイヤが噛んで、面の速さに引っぱられる（逆らうと進めない）
     let Fl = -clamp(vl * 2600, -lim, lim)
+    { const sh = world.shapes[con.id]; if (sh.flow || sh.flowR) Fl *= WATER.lat } // v52 横切る水の上ではタイヤが横に踏ん張りにくい（流される）
     if (b.oilSide && world.shapes[con.id].oil) Fl *= 0.08 // v36 油の上で滑り始めたら、横は踏ん張れない
     if (globalThis.__dbgF) globalThis.__dbgF(i, vt, Ft, lim, N, vl)
     const tot = Math.sqrt(Ft * Ft + Fl * Fl)
@@ -912,6 +914,12 @@ function sub(world, b, inpIn, ev) {
   if (!b.ghost && b._crList && b._crList.length) b._crList = b._crList.filter(id => { const sh = world.shapes[id]; if (sh.gone) return false; const dt = world.time - (sh.lastTouch ?? -1e9); if (dt > 1.0) return false
     const away = closest(sh, b.p[0], b.p[1], b.p[2]).d
     if (dt > 0.12 && away > 1.3 && b.speed > 0.5 && (!b.cn[0] || b.cn[0].id !== id) && (!b.cn[1] || b.cn[1].id !== id)) { /* 板を越えて前へ進んだ時だけ（手前で止まって下がった時は崩さない） */ sh.gone = true; sh.goneAt = world.time; if (ev) ev.push({ t: 'crumble', id: sh.id, fast: true }); return false } return true })
+  // ---- v52 本人「水が流れる所、あまり押されている感じがしない」: 水に浸かった車輪ごとに、流れとの速さの差に比べた力で押す（流れの向きの成分だけ・上限あり）
+  if (!b.ghost && !b.crashed) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; const sh = cn && world.shapes[cn.id]; if (!sh) continue
+    const u = sh.flow || (sh.flowR ? flowRad(sh, cn.q) : sh.flowT ? flowTan(sh, cn.q) : null); if (!u) continue
+    const ul = Math.hypot(u[0], u[2]); if (ul < 0.1) continue
+    const e = [u[0] / ul, u[2] / ul], va = b.v[0] * e[0] + b.v[2] * e[1], d = Math.max(-WATER.cap, Math.min(WATER.cap, (ul - va) * WATER.k))
+    fx += P.m * 0.5 * d * e[0]; fz += P.m * 0.5 * d * e[1] }
   // ---- 風（決まった強弱で吹く）
   for (const wd of world.winds) {
     if (b.p[0] < wd.min[0] || b.p[0] > wd.max[0] || b.p[1] < wd.min[1] || b.p[1] > wd.max[1] || b.p[2] < wd.min[2] || b.p[2] > wd.max[2]) continue

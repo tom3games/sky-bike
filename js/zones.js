@@ -1,4 +1,5 @@
-import { hbeam } from './course.js?v=53'
+import { hbeam } from './course.js?v=54'
+import { WATER } from './physics.js?v=54'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -20,7 +21,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=53'
+import { senseLift, SENSE } from './v49.js?v=54'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
@@ -546,7 +547,7 @@ export function ruins(x) {
   x.tower({ sign: 1, r: 18, name: '廃墟の塔' })
   B.mark('湧き水の流れ')
   orbit(0.12, 0)
-  { const s = orbit(0.3, 0, { mat: 'wetstone', mu: 0.7, kind: 'water' }); s.flowR = 1.8; B.waters.push({ arc: s, u: 1.8 }) }
+  { const s = orbit(0.3, 0, { mat: 'wetstone', mu: 0.7, kind: 'water' }); s.flowR = 1.8 * WATER.uMul; B.waters.push({ arc: s, u: 1.8 * WATER.uMul }) }
   orbit(0.5, 0.6)
   x.ogap(3.6, -0.4)
   orbit(0.5, 1.0); otorch()
