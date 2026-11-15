@@ -1,7 +1,7 @@
 // 仕掛けの見た目: 振り子の鉄球の鎖・跳ね橋の鎖・湧き水の流れと滝としぶき・落石の予兆（小石と影）・突風の雪煙・セーブの旗。
 // 当たりは physics.js（同じデータ）。ここは見せるだけ。update は音を鳴らすための出来事を返す
 import * as THREE from 'three'
-import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=71'
+import { dropState, hingeAng, gustK, bridgePose, shuttlePos } from './physics.js?v=72'
 
 let seed = 11
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
@@ -85,13 +85,13 @@ export function buildGimmicks(course, scene, M) {
   const waters = []
   for (const wv of course.waters || []) {
     if (wv.box) { // まっすぐな水路（箱の道の上の水の面）。流れる向きに模様を動かす
-      const s = wv.box, tx = wTex.clone(); tx.needsUpdate = true; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(s.h[2] * 2 / 2.4, s.h[0] * 2 / 2.4)
+      const s = wv.box, tx = wTex.clone(); tx.needsUpdate = true; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.repeat.set(s.h[2] * 2 / 2.4, s.h[0] * 2 / 2.4); tx.rotation = Math.PI / 2 /* v72 模様の流れる向きを道の向き（押す向き）に */
       const mat = waterMat.clone(); mat.map = tx
       const g = new THREE.PlaneGeometry(s.h[0] * 2, s.h[2] * 2); g.rotateX(-Math.PI / 2)
       const mesh = new THREE.Mesh(g, mat); mesh.name = 'water'; mesh.renderOrder = 2
       const m4 = new THREE.Matrix4().makeBasis(new THREE.Vector3(...s.ax[0]), new THREE.Vector3(...s.ax[1]), new THREE.Vector3(...s.ax[2])); mesh.quaternion.setFromRotationMatrix(m4)
       mesh.position.set(s.c[0] + s.ax[1][0] * (s.h[1] + 0.035), s.c[1] + s.ax[1][1] * (s.h[1] + 0.035), s.c[2] + s.ax[1][2] * (s.h[1] + 0.035)); group.add(mesh)
-      waters.push({ s: null, box: s, tex: tx, dir: 'x', sp: wv.u < 0 ? -0.6 : 0.6, center: s.c })
+      waters.push({ s: null, box: s, tex: tx, dir: 'x', sp: wv.u * 0.232 /* 模様の速さ＝押す速さ */, center: s.c })
       continue
     }
     const s = wv.arc; if (!s) continue
@@ -111,9 +111,9 @@ export function buildGimmicks(course, scene, M) {
     { const sp = [], su = [], si = [], m2 = 10
       for (let i = 0; i <= m2; i++) { const ph = s.phi0 + (s.phi1 - s.phi0) * (0.2 + 0.6 * i / m2), y = s.y0 + s.b * (ph - s.phi0); for (const [j, dy, dr] of [[0, 1.5, 0.02], [1, 0.03, 0.3]]) { const r = s.r1 + dr; sp.push(s.cx + r * Math.cos(ph), y + dy, s.cz - r * Math.sin(ph)); su.push(i / m2 * 2, j * 1.4) } if (i < m2) { const a = i * 2; si.push(a, a + 1, a + 2, a + 1, a + 3, a + 2) } }
       const g2 = new THREE.BufferGeometry(); g2.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3)); g2.setAttribute('uv', new THREE.Float32BufferAttribute(su, 2)); g2.setIndex(si); g2.computeVertexNormals()
-      const spout = new THREE.Mesh(g2, fallMat); spout.renderOrder = 2; spout.name = 'water'; group.add(spout) }
+      const spout = new THREE.Mesh(g2, fallMat); spout.renderOrder = 2; spout.name = 'water'; group.add(spout); if (wv.tan) spout.visible = false /* v72 道に沿って流れる水に、壁から横へ噴き出す水は付けない（横へ流れて見える） */ }
     const mid = (s.phi0 + s.phi1) / 2, ym = s.y0 + s.b * (mid - s.phi0)
-    if (wv.tan) { const tx = wTex.clone(); tx.needsUpdate = true; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.rotation = Math.PI / 2; const mat = waterMat.clone(); mat.map = tx; mesh.material = mat; fall.visible = false; waters.push({ s, tex: tx, dir: 'tan', sp: 0.7 * wv.tan, center: [s.cx + (s.r1 + s.r2) / 2 * Math.cos(mid), ym, s.cz - (s.r1 + s.r2) / 2 * Math.sin(mid)] }) }
+    if (wv.tan) { const tx = wTex.clone(); tx.needsUpdate = true; tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.rotation = Math.PI / 2; const mat = waterMat.clone(); mat.map = tx; mesh.material = mat; fall.visible = false; waters.push({ s, tex: tx, dir: 'tan', sp: 0.7 * wv.tan * Math.abs(s.flowT || 2.9) / 2.9 /* 模様の速さ＝押す速さ */, center: [s.cx + (s.r1 + s.r2) / 2 * Math.cos(mid), ym, s.cz - (s.r1 + s.r2) / 2 * Math.sin(mid)] }) }
     else waters.push({ s, center: [s.cx + (s.r1 + s.r2) / 2 * Math.cos(mid), ym, s.cz - (s.r1 + s.r2) / 2 * Math.sin(mid)] })
   }
   const spray = points(scene, 260, 0xc9dcd8, 0.5, false)
@@ -205,7 +205,7 @@ export function buildGimmicks(course, scene, M) {
       }
       // 水
       wTex.offset.y = -tm * 0.55; fallTex.offset.y = tm * 1.6
-      for (const w of waters) if (w.tex) { if (w.dir === 'x') w.tex.offset.y = tm * w.sp; else w.tex.offset.x = -tm * w.sp }
+      for (const w of waters) if (w.tex) { if (w.dir === 'x') w.tex.offset.y = tm * w.sp; else w.tex.offset.y = -tm * w.sp } /* v72 本人「左から右に流れて見えるのに右へ押されない」: 模様が押す向きと直角に動いていた（回した模様は offset.y で道の向きに動く） */
       let nearW = 1e9
       for (const w of waters) {
         const dx = camPos.x - w.center[0], dy = camPos.y - w.center[1], dz = camPos.z - w.center[2]; nearW = Math.min(nearW, Math.sqrt(dx * dx + dy * dy + dz * dz))

@@ -1,7 +1,7 @@
 // SKY BIKE v65 兄の録音機（本人の案）: 野宿の跡「ここまでは二人で来た。」の少し先の道の上に、古い携帯の録音機が落ちている。
 // 前輪が近づくと拾い、勝手に再生が始まる。声は入れない（本人「セリフだけで」）: 吹き出しに兄の言葉「ひとりじゃこれ以上はキツそうだ…」→ 主人公「…兄の声だ」
 import * as THREE from 'three'
-import { campSpot, traceSpots } from './v35view.js?v=71'
+import { campSpot, traceSpots } from './v35view.js?v=72'
 
 export function recorderSpot(course) {
   const cs = campSpot(course); if (!cs) return null
