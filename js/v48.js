@@ -119,6 +119,7 @@ export function descent(B, base, yaw0) {
   // v51 本人「下山の最後の方で前輪が脱輪する」: 最後のジャンプの後の平らな土の道に前輪が乗ると外れる（physics の wheelOff / noFront）。
   //   2 秒後に前へ倒れ始め、後ろ体重のウィリーなら全開で小屋まで行ける。跳ぶ所はこの先に無い。ウィリーで走る分だけ平らな所を 10→18m
   { const s = B.road(18, DT); s.wheelOff = true; E.wheelOffI = B.path.length - 18 }
+  B.road(+(globalThis.__woExtra ?? 36), { ...DT, slope: 1.5 * DEG }) // v56 本人「後輪だけで走るタイミングがなかった。ゴールまでの距離を少し伸ばして」: ウィリーで走る道を 36m 足す（ゆるい登り）
   // 小さな山: 少し登って、頂上の平らな所（小屋の前）
   B.road(14, { ...DT, slope: 6 * DEG })
   B.road(6, { ...DT, slope: 3 * DEG })

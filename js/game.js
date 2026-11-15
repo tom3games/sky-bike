@@ -8,29 +8,29 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=56'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=56'
-import { COURSES } from './course.js?v=56'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=56'
-import { BikeView, snap } from './bikeview.js?v=56'
-import { createBot, botInput, resetBot } from './bot.js?v=56'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=56'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=56'
-import { Birds } from './birds.js?v=56'
-import { crowPush } from './strike.js?v=56'
-import { buildV35, hankieDataURL } from './v35view.js?v=56'
-import { buildV36 } from './v36view.js?v=56'
-import { buildLady } from './lady.js?v=56'
-import { buildElder, ELDER } from './elder.js?v=56'
-import { buildBoulder } from './v41view.js?v=56'
-import { buildMotes } from './motes.js?v=56'
-import { buildMurals } from './murals.js?v=56'
-import { buildV37 } from './v37view.js?v=56'
-import { buildV51 } from './v51view.js?v=56'
-import { buildEpi, wheelProp } from './v48view.js?v=56'
-import { buildSenseLamps } from './v49view.js?v=56'
-import { doorAng } from './traps.js?v=56'
-import { resetDrums } from './physics.js?v=56'
+import { buildGimmicks } from './gimmicks.js?v=57'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=57'
+import { COURSES } from './course.js?v=57'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=57'
+import { BikeView, snap } from './bikeview.js?v=57'
+import { createBot, botInput, resetBot } from './bot.js?v=57'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=57'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=57'
+import { Birds } from './birds.js?v=57'
+import { crowPush } from './strike.js?v=57'
+import { buildV35, hankieDataURL } from './v35view.js?v=57'
+import { buildV36 } from './v36view.js?v=57'
+import { buildLady } from './lady.js?v=57'
+import { buildElder, ELDER } from './elder.js?v=57'
+import { buildBoulder } from './v41view.js?v=57'
+import { buildMotes } from './motes.js?v=57'
+import { buildMurals } from './murals.js?v=57'
+import { buildV37 } from './v37view.js?v=57'
+import { buildV51 } from './v51view.js?v=57'
+import { buildEpi, wheelProp } from './v48view.js?v=57'
+import { buildSenseLamps } from './v49view.js?v=57'
+import { doorAng } from './traps.js?v=57'
+import { resetDrums } from './physics.js?v=57'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -164,7 +164,7 @@ function adaptRes(dt) {
 }
 
 // ------------------------------------------------------------ 音（風・火・鎖のきしみ・遠くの崩落。鳥はいない）
-Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], elderVoice: ['snd/elder_voice.mp3'], canPick: ['snd/can_pick.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
+Snd.def({ pusu: ['snd/pusu_0.mp3', 'snd/pusu_1.mp3', 'snd/pusu_2.mp3'], mudfart: ['snd/mudfart_0.mp3', 'snd/mudfart_1.mp3', 'snd/mudfart_2.mp3'], land: ['snd/land1.mp3', 'snd/land2.mp3', 'snd/land3.mp3'], crash: ['snd/crash1.mp3', 'snd/crash2.mp3'], clank: ['snd/clank1.mp3', 'snd/clank2.mp3'], spring: 'snd/spring.mp3', gate: 'snd/gate.mp3', finish: 'snd/finish.mp3', swish: 'snd/swish.mp3', crack: ['snd/crack1.mp3', 'snd/crack2.mp3'], creak: ['snd/creak_a.mp3', 'snd/creak_b.mp3', 'snd/creak_c.mp3'], chain: ['snd/chain_a.mp3', 'snd/chain_b.mp3'], rumble: ['snd/rumble_a.mp3', 'snd/rumble_b.mp3', 'snd/rumble_c.mp3'], splash: ['snd/splash1.mp3', 'snd/splash2.mp3'], save: 'snd/save.mp3', cloth: 'snd/cloth.mp3', rockfall: 'snd/rockfall.mp3', rockbreak: 'snd/rockbreak.mp3', pebbles: 'snd/pebbles.mp3', ballhit: 'snd/ballhit.mp3', whoosh: 'snd/whoosh.mp3', scream: 'snd/fall_ahhh.mp3', grunt: ['snd/grunt1.mp3', 'snd/grunt2.mp3', 'snd/grunt3.mp3'], gravel: ['snd/gravel1.mp3', 'snd/gravel2.mp3', 'snd/gravel3.mp3'], flap: 'snd/flap.mp3', caw: ['snd/crow_caw.mp3', 'snd/crow_0.mp3'], boom: 'snd/explosion.mp3', horn: 'snd/horn_0.mp3', monkey: ['snd/monkey_0.mp3', 'snd/monkey_1.mp3', 'snd/monkey_2.mp3', 'snd/monkey_3.mp3', 'snd/monkey_4.mp3', 'snd/monkey_5.mp3'], monkeyTaunt: ['snd/monkey_taunt.mp3'], manVoice: ['snd/man_voice.mp3'], oneeVoice: ['snd/onee_voice.mp3'], elderVoice: ['snd/elder_voice.mp3'], doorOpen: 'snd/door_open.mp3', canPick: ['snd/can_pick.mp3'], bgmBuild: 'snd/bgm_final_build.mp3', bgmClimax: 'snd/bgm_final_climax.mp3', bgmGate: 'snd/bgm_gate.mp3', patter: ['snd/patter_01.mp3', 'snd/patter_02.mp3'] })
 try { Snd.muted = localStorage.getItem('sky-mute') === '1' } catch (e) {}
 function startAudio() {
   Snd.init()
@@ -1065,6 +1065,7 @@ function epiStep(j, b) {
     P.t += DT; const sh = G.epiV && G.epiV.silh
     if (sh) sh.visible = P.t > 0.7 && P.t < 1.8
     if (P.t > 1.8 && !P.dark) { P.dark = true; $('letter').classList.add('on', 'quiet') }
+    if (P.t > 2.6 && !P.door) { P.door = true; Snd.play('doorOpen', { vol: 0.9 }) } // v57 本人「結果画面が出る前に扉が開く音」: 窓の人影が消えて暗くなった後、小屋の扉が開く
     if (P.t > 4.4 && !P.shown) { P.shown = true; G.state = 'result'; G.epi = null; P.done() } return true }
   const rest = c.cps[G.R.rest]
   if (!j.respawn && rest && b.p[1] < Math.min(rest.p[1], epiFloor(b)) - 16) { why(t('net')); respawn({ cp: G.R.rest }, false); return true }

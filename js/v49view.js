@@ -1,6 +1,6 @@
 // SKY BIKE v50 後輪で乗る台のランプ: 台の上の両脇に細い光る帯と、にじむ光（光源は足さない）。待っている間は赤、後輪が乗って動き出したら緑（向こうで止まっている間も緑）
 import * as THREE from 'three'
-import { SENSE } from './v49.js?v=56'
+import { SENSE } from './v49.js?v=57'
 const RED = new THREE.Color(0xff3a22), GREEN = new THREE.Color(0x3cff6e)
 export function buildSenseLamps(course, scene) {
   const group = new THREE.Group(); group.name = 'v49lamps'; scene.add(group)
