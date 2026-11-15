@@ -368,7 +368,7 @@ export function botInput(bot, b) {
   let blastNit = false
   if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) { if (!path[j].blast && !['road', 'orbit', 'curve', 'pad', 'spin', 'trap', 'spike'].includes(path[j].kind)) break; if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } } }
   // v62 技が要る近道のウィリー跳ね板（js/v62.js）: 決まった速さで近づき、前輪が板の手前に来たら惰性のウィリー（約 33 度）のまま後輪を板へ
-  if (bot.skill === 'good' && bot.world && !b.hang && !globalThis.__noV62bot) { const v6 = v62Step(bot, b, SQ, sp, air); if (v6) { thr = v6.thr; brk = v6.brk; lean = v6.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
+  if (bot.skill === "good" && bot.world && !b.hang && !globalThis.__noV62bot && !((bot.react || 0) > 0 && bot.i > 4000 && bot.i < 4200)) { /* v66 人の速さの bot は工場の近道を使わない（扉の後の間に合わず転ぶ。ふつうの道は通れる） */ const v6 = v62Step(bot, b, SQ, sp, air); if (v6) { thr = v6.thr; brk = v6.brk; lean = v6.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
