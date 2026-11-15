@@ -3,8 +3,8 @@
 // 部屋の奥の出口から細い梁を渡り、最後に切れ目を跳んで、ずっと先の本道の点 b に降りる（本道で 120m 以上先）。落ちると下の道へ。
 // 場所は本道が出来上がってから、本道どうしが近い所（横に 14〜34m・b が 2〜9m 高い）を探して決める。本道の並び・形は変えない。
 // 部屋と梁が他の形にめり込む所は使わない（当たりの形の一覧で調べる）。
-import { World, closest } from './physics.js?v=57'
-import { forkBranch, forkJoin } from './parts16.js?v=57'
+import { World, closest } from './physics.js?v=58'
+import { forkBranch, forkJoin } from './parts16.js?v=58'
 
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const UP = [0, 1, 0]

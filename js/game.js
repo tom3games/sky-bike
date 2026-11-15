@@ -8,29 +8,29 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=57'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=57'
-import { COURSES } from './course.js?v=57'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=57'
-import { BikeView, snap } from './bikeview.js?v=57'
-import { createBot, botInput, resetBot } from './bot.js?v=57'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=57'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=57'
-import { Birds } from './birds.js?v=57'
-import { crowPush } from './strike.js?v=57'
-import { buildV35, hankieDataURL } from './v35view.js?v=57'
-import { buildV36 } from './v36view.js?v=57'
-import { buildLady } from './lady.js?v=57'
-import { buildElder, ELDER } from './elder.js?v=57'
-import { buildBoulder } from './v41view.js?v=57'
-import { buildMotes } from './motes.js?v=57'
-import { buildMurals } from './murals.js?v=57'
-import { buildV37 } from './v37view.js?v=57'
-import { buildV51 } from './v51view.js?v=57'
-import { buildEpi, wheelProp } from './v48view.js?v=57'
-import { buildSenseLamps } from './v49view.js?v=57'
-import { doorAng } from './traps.js?v=57'
-import { resetDrums } from './physics.js?v=57'
+import { buildGimmicks } from './gimmicks.js?v=58'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=58'
+import { COURSES } from './course.js?v=58'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=58'
+import { BikeView, snap } from './bikeview.js?v=58'
+import { createBot, botInput, resetBot } from './bot.js?v=58'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=58'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=58'
+import { Birds } from './birds.js?v=58'
+import { crowPush } from './strike.js?v=58'
+import { buildV35, hankieDataURL } from './v35view.js?v=58'
+import { buildV36 } from './v36view.js?v=58'
+import { buildLady } from './lady.js?v=58'
+import { buildElder, ELDER } from './elder.js?v=58'
+import { buildBoulder } from './v41view.js?v=58'
+import { buildMotes } from './motes.js?v=58'
+import { buildMurals } from './murals.js?v=58'
+import { buildV37 } from './v37view.js?v=58'
+import { buildV51 } from './v51view.js?v=58'
+import { buildEpi, wheelProp } from './v48view.js?v=58'
+import { buildSenseLamps } from './v49view.js?v=58'
+import { doorAng } from './traps.js?v=58'
+import { resetDrums } from './physics.js?v=58'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -570,7 +570,7 @@ function placeBike(b) { G.spawnHold = true;
   ladyReset()
   if (G.vl && G.vl.ph !== 'fade') { if (G.vl.ph === 'talk') talkOff(); G.vl.ph = 'idle'; if (G.elder) G.elder.hide() } // v49 出し直したら村の男は帰る
   if (G.wheelProp) G.wheelProp.hide(); if (G.woT) { clearTimeout(G.woT); G.woT = 0; talkOff() } // v51 出し直したら前輪は付いている（新しいバイク）
-  G.strikeVis = false // 体当たりのカラスも戻る（バイクは新しく作るので、当たった印も消える）
+  G.strikeVis = false; G.strikeWarn = false // 体当たりのカラスも戻る（バイクは新しく作るので、当たった印も消える）
   if (G.bot) resetBot(G.bot, b)
   G.camPos.set(NaN, 0, 0)
   if (bikeView) bikeView.resetRider()
@@ -904,18 +904,22 @@ function flash(kind) { const f = $('flash'); f.className = kind; requestAnimatio
 function strikeStep(b, main) {
   const S = G.birds && G.birds.striker; if (!S || !G.course.climb) return
   const r = crowPush(b, S); if (!r || !main) return
-  if (r.t === 'near' && !G.strikeVis && r.along > -Math.max(5, b.speed * 0.6)) {
+  // v57 本人「カラスがぶつかってくるのはどこ？（気づかなかった）」: 約 2 秒前に前で鳴き、約 1.2 秒前に横の上空から大きく弧を描いて来る（道に影）。当たると羽が多く散り、画面が少し揺れ、乗り手は 1.4 秒のけぞる
+  if (r.t === 'near' && !G.strikeWarn && r.along > -Math.max(16, b.speed * 2.0)) { G.strikeWarn = true; Snd.play('caw', { vol: 0.95, rate: 1.1 }) }
+  if (r.t === 'near' && !G.strikeVis && r.along > -Math.max(9, b.speed * 1.2)) {
     G.strikeVis = true
-    const hx = Math.cos(S.yaw), hz = -Math.sin(S.yaw), rx = Math.sin(S.yaw), rz = Math.cos(S.yaw), dur = Math.max(0.35, -r.along / Math.max(1, b.speed))
-    const to = [S.p[0], S.p[1] + 1.7, S.p[2]], from = [to[0] + rx * S.side * 9 + hx * 2, to[1] + 1.2, to[2] + rz * S.side * 9 + hz * 2]
+    const hx = Math.cos(S.yaw), hz = -Math.sin(S.yaw), rx = Math.sin(S.yaw), rz = Math.cos(S.yaw), dur = Math.max(0.8, -r.along / Math.max(1, b.speed))
+    const to = [S.p[0], S.p[1] + 1.7, S.p[2]], from = [to[0] + rx * S.side * 7 + hx * 14, to[1] + 4.2, to[2] + rz * S.side * 7 + hz * 14] /* 斜め前の上空から（斜め後ろのカメラに入る） */
     G.birds.strikeStart(from, to, dur); Snd.play('flap', { vol: 0.7, rate: 1.4 })
   }
   if (r.t === 'hit') {
     G.strikeN = (G.strikeN || 0) + 1
     const p = G.birds.strikeHit(r.h[0], r.h[1]) || [b.p[0], b.p[1] + 0.9, b.p[2]]
     Snd.play('caw', { vol: 1, rate: 1.45 }); Snd.play('flap', { vol: 0.9, rate: 1.7 }); Snd.play('grunt', { vol: 0.8 })
-    dust.emit(p, 26, 2.6, { col: 0x1a1a1e, up: 1.5, size: 0.7 }) // 羽が散る
-    dust.emit(p, 10, 2.0, { col: 0x3a3a40, up: 0.8, size: 0.5 })
+    dust.emit(p, 48, 3.2, { col: 0x1a1a1e, up: 2.2, size: 0.8 }) // 羽が散る
+    dust.emit(p, 18, 2.4, { col: 0x3a3a40, up: 1.2, size: 0.55 })
+    G.shake = Math.max(G.shake || 0, 0.22)
+    flash('bad') // v57 本人「ダメージ受けたときの赤くなるやつも」
     if (bikeView && bikeView.flinch) bikeView.flinch()
   }
 }

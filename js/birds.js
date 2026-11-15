@@ -2,7 +2,7 @@
 // 当たり判定なし（見た目と音だけ）。出し直したら、また止まっている。
 // 絵: Crow（Poly by Google・CC BY 3.0）を止まっている姿に、飛ぶ時は体を前へ倒して羽を 2 枚（翼の形の板）足して羽ばたかせる。
 // 全部の鳥を 1 つの InstancedMesh でまとめて描き、カメラから遠い群れ（130m 超）は描かない。
-import { strikerSpot } from './strike.js?v=57'
+import { strikerSpot } from './strike.js?v=58'
 import * as THREE from 'three'
 
 const FAR = 130
@@ -57,6 +57,8 @@ export class Birds {
     this.blocker = blockerSpot(course)
     if (this.blocker) this.flocks.push(this.blocker)
     this.striker = strikerSpot(course); if (this.striker) this.striker.birds = [{ off: [0, 0], yaw: this.striker.yaw, ph: 0 }]
+    // v57 体当たりのカラスの影（道の上。最初から置いて見えない濃さにしておく＝途中で新しいシェーダを作らない）
+    if (this.striker) { const g = new THREE.CircleGeometry(0.55, 20); g.rotateX(-Math.PI / 2); this.shadow = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0, depthWrite: false })); this.shadow.position.set(this.striker.p[0], this.striker.p[1] + 0.04, this.striker.p[2]); this.shadow.renderOrder = 2; scene.add(this.shadow) }
     if (this.striker) this.flocks.push(this.striker)
     this.total = this.flocks.reduce((a, f) => a + f.birds.length, 0)
     this.ready = false
@@ -83,6 +85,7 @@ export class Birds {
   }
   // 止まっている姿へ戻す（出し直し・コースの読み直し）
   reset() {
+    if (this.shadow) this.shadow.material.opacity = 0
     for (const f of this.flocks) { f.state = f.strike ? 'wait' : 'perch'; f.t = 0; for (const b of f.birds) { b.pos = [f.p[0] + Math.cos(f.yaw) * b.off[0] + Math.sin(f.yaw) * b.off[1], f.p[1], f.p[2] - Math.sin(f.yaw) * b.off[0] + Math.cos(f.yaw) * b.off[1]]; b.vel = [0, 0, 0]; b.fy = b.yaw; b.hop = 0 } }
   }
   // 群れを飛び立たせる（クラクション。from: 鳴らした所）
@@ -118,6 +121,7 @@ export class Birds {
       f.t += dt
       for (const b of f.birds) { if (f.t < b.delay) continue; if (!f.strike || f.hit) b.vel[1] += (f.hit ? -4 : 1.6) * dt; if (f.hit) b.spin = (b.spin || 0) + dt * 9; for (let k = 0; k < 3; k++) b.pos[k] += b.vel[k] * dt }
       if (f.t > 9) f.state = 'gone'
+      if (f === this.striker && this.shadow) { const b = f.birds[0], h = Math.max(0, b.pos[1] - f.p[1]); this.shadow.position.set(b.pos[0], f.p[1] + 0.04, b.pos[2]); const k = f.hit ? 0 : Math.max(0, 1 - h / 7); this.shadow.material.opacity = 0.5 * k; this.shadow.scale.setScalar(1.6 - k * 0.8) }
     }
     if (!this.ready) return ev
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(0, 0, 0, 'YXZ'), sc = new THREE.Vector3(1, 1, 1), zero = new THREE.Vector3(0, 0, 0), pos = new THREE.Vector3()
@@ -133,11 +137,12 @@ export class Birds {
           const look = Math.sin(tt * 0.9) > 0.85 ? 0.5 : 0
           const hop = Math.max(0, Math.sin(tt * 1.7) - 0.97) * 3
           e.set(Math.sin(tt * 6) * 0.04 * look, b.yaw + Math.sin(tt * 0.37) * 0.4 + look, 0); q.setFromEuler(e)
-          m.compose(pos.set(b.pos[0], b.pos[1] + hop * 0.12, b.pos[2]), q, sc); this.body.setMatrixAt(k++, m)
+          sc.setScalar(1); m.compose(pos.set(b.pos[0], b.pos[1] + hop * 0.12, b.pos[2]), q, sc); this.body.setMatrixAt(k++, m)
           hide(); this.wings.setMatrixAt(kw++, m); this.wings.setMatrixAt(kw++, m)
           continue
         }
         // 飛んでいる: 体を前へ倒し、進む向きを向いて、翼を速く羽ばたかせる
+        sc.setScalar(f === this.striker ? 2.1 : 1) // v57 体当たりのカラスは 2 倍の大きさ（遠くからでも見える）
         const ft = f.t - b.delay, fl = Math.sin(tt * 26 + ft * 4) * (0.9 - Math.min(0.4, ft * 0.08))
         e.set(f.hit ? (b.spin || 0) : 0, b.fy, f.hit ? (b.spin || 0) * 0.7 : -0.25 - Math.min(0.35, ft * 0.6)); q.setFromEuler(e)
         pos.set(b.pos[0], b.pos[1] + 0.12, b.pos[2])
