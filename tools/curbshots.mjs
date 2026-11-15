@@ -30,7 +30,7 @@ const rafs = n => page.evaluate(async n => { for (let k = 0; k < n; k++) await n
 const log = []
 for (let k = 0; k < 20; k++) {
   await page.screenshot({ path: `shots/curb/${TAG}_${String(k).padStart(2, '0')}.png` })
-  log.push(await page.evaluate(() => { const G = window.sky, b = G.bike; return `v${b.speed.toFixed(1)}${b.crashed ? ' 転倒:' + b.crashed.why : ''} y${b.p[1].toFixed(1)} ${(document.getElementById('why') || {}).textContent || ''}` }))
+  log.push(await page.evaluate(() => { const G = window.sky, b = G.bike; return `hit${G.wallHits || 0} v${b.speed.toFixed(1)}${b.crashed ? ' 転倒:' + b.crashed.why : ''} y${b.p[1].toFixed(1)} ${(document.getElementById('why') || {}).textContent || ''}` }))
   await rafs(9)
 }
 console.log(log.map((s, k) => k + ': ' + s).join('\n')); console.log('errors', errs.length, errs.slice(0, 3))
