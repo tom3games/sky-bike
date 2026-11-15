@@ -1,4 +1,4 @@
-import { hbeam } from './course.js?v=51'
+import { hbeam } from './course.js?v=52'
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
 //   3 重さと力で世界を動かす（シーソー・体当たりで扉を壊す）4 速さが生む山場（追ってくる溶岩・崩れる橋）
@@ -20,7 +20,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=51'
+import { senseLift, SENSE } from './v49.js?v=52'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
@@ -517,9 +517,9 @@ export function ruins(x) {
     // v51 本人「跳ね板が 2 連続する所も。2 個目はウィリーで空中で角度を合わせないと、とんでもない飛び方」: 1 枚目（今まで通り）→ すぐ 2 枚目（跳ねる時に前へ回す）。
     //   全体の前への長さと高さの差は 1 枚だった時と同じ（後の道を動かさない）
     const s0 = B.t.p.slice(), f0 = B.dir(B.t.yaw), X = 15 + 3.8 + 3.2 + 9 * Math.cos(30 * x.DEG) + 5, Y = 2.4 - 9 * Math.sin(30 * x.DEG)
-    B.road(6, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, { beam: false, k0: 7.4, kv: 0, vxMax: 7.5, rampLen: 4, after: 2 })
+    B.road(6, { w: 3.2, mat: B.omat, thick: 1.0, back: 0 }); x.P.springPlank(B, globalThis.__kickClamp ? { beam: false, k0: 7.4, kv: 0, vxMax: 7.5, rampLen: 4, after: 2 } : { beam: false, k0: +(globalThis.__kA0 ?? 4.4), kv: +(globalThis.__kAv ?? 0.45), rampLen: 4, after: 2, v: +(globalThis.__kV ?? 6.5) }) /* v52 本人「跳ね板の、どの速さでも同じ所に着く補正を外す」: 入る速さで跳ぶ高さも遠さも変わる */
     const dx = (B.t.p[0] - s0[0]) * f0[0] + (B.t.p[2] - s0[2]) * f0[2], dy = B.t.p[1] - s0[1], X2 = X - dx, Y2 = Y - dy, a2 = 25 * x.DEG, r2 = 1.0, g2 = 3.0, rl2 = (r2 - Y2) / Math.sin(a2), af2 = X2 - 3.8 - g2 - rl2 * Math.cos(a2)
-    x.P.springPlank(B, { beam: false, k0: 7.0, kv: 0, vxMax: 7, rise: r2, gap: g2, ang: 25, rampLen: rl2, after: af2, spin: +(globalThis.__kickSpin ?? -3.6), tol: 20 }) } /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
+    x.P.springPlank(B, { beam: false, ...(globalThis.__kickClamp ? { k0: 7.0, kv: 0, vxMax: 7 } : { k0: +(globalThis.__kB0 ?? 5.0), kv: +(globalThis.__kBv ?? 0.45), v: +(globalThis.__kV ?? 6.5) }), rise: r2, gap: g2, ang: 25, rampLen: rl2, after: af2, spin: +(globalThis.__kickSpin ?? -3.6), tol: 20 }) } /* v29 本人「最初の跳ね板のあと、頭上の枠いらない」: 着地坂の上の鉄骨の梁と柱を取った */; orbit(0.35, 0.3); otorch()
   B.mark('ウィリーの溝'); orbit(0.3, 0)
   // v38 本人「最初の跳ね板の後の段差、横から落ちにくく」: 段の手前から段の上まで、両脇に低い縁石（高さ約 0.35m・丸い・当たりあり）。道幅・段の高さはそのまま
   { const p0 = B.t.p.slice(), yaw = B.t.yaw, f = B.dir(yaw), R = B.right(yaw), w = 3.2, r = 0.2, off = w / 2 + r + 0.04
