@@ -1,7 +1,7 @@
 // SKY BIKE v36 塔の壁の古い壁画 4 枚（世界が崩れた理由。字幕は出さない）。手で描いた線と色あせた顔料・剥がれ・ひび・煤
 // ① 谷の町の人々が天空城を見上げる ② 人々が行列になって塔を登る ③ 城の光が強くなり、塔の上で人が消えていく（長い腕の小さな影が増える）④ 塔が崩れ、谷が霧に沈む（瓦礫に影が住みつく）
 import * as THREE from 'three'
-import { World, closest } from './physics.js?v=62'
+import { World, closest } from './physics.js?v=63'
 
 let seed = 9
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)

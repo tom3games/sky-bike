@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=62'
+import { doorAng } from './traps.js?v=63'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -607,7 +607,10 @@ export class World {
 }
 
 // ------------------------------------------------------------ バイク
-export const LAND = { ok: +(globalThis.__landOk ?? 14), span: 30, max: +(globalThis.__landMax ?? 0.4) } // v61 着地: 坂とのずれが ok 度までは減速なし、そこから span 度で最大 max（前向きの速さの割合）を失う
+const DEG2 = Math.PI / 180
+export const KICK_DIRECT = +(globalThis.__kickDirect ?? 0.9), KICK_DV = +(globalThis.__kickDv ?? 7.5)
+export const KICK_LEAD = +(globalThis.__kickLead ?? 0), KICK_ANY = !!(globalThis.__kickAny ?? 0)
+export const LAND = { crash: +(globalThis.__landCrashDeg ?? 35), ok: +(globalThis.__landOk ?? 20), span: 30, max: +(globalThis.__landMax ?? 0.3) } // v61 着地: 坂とのずれが ok 度までは減速なし、そこから span 度で最大 max（前向きの速さの割合）を失う
 export const NOFRONT_TIP = +(globalThis.__tip ?? 2600)
 export const NOFRONT_HOLD = 1.0 // v56 本人「脱輪から転び始めるまでを少し早く」2.0→1.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
 export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5) } // v52 水が押す強さ（1/秒）と上限（m/s²）
@@ -890,7 +893,7 @@ function sub(world, b, inpIn, ev) {
     } else if (!oil && (b.g[0] || b.g[1])) b.oilSide = 0 }
   // ---- v16 傾いた着地点（landTol の付いた面）: 空中から降りた瞬間、車体の傾きが面と合っていなければ転倒（弾かれて落ちる）
   if (!b.crashed && b.airT > 0.25) for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (!cn || !b.g[i]) continue; const sh = world.shapes[cn.id]; if (!sh.landTol) continue
-    const n = cn.nw || cn.n, sa = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]; if (Math.abs(sa) > dsin(sh.landTol)) { crash(b, 'land', 0, ev); b.v[0] += n[0] * 2.5; b.v[1] += n[1] * 2.5; b.v[2] += n[2] * 2.5; break } }
+    const n = cn.nw || cn.n, sa = B.f[0] * n[0] + B.f[1] * n[1] + B.f[2] * n[2]; if (n[1] > 0.5 && Math.abs(sa) > dsin(Math.max(sh.landTol, LAND.crash * DEG2))) { /* v62 本人「ちゃんと着地してるのに角度悪かったと出る」: 坂の上の面だけで判定（裏・側面に当たった時は数えない）、35 度までは転ばず速さを失うだけ */ if (globalThis.__landCrash) globalThis.__landCrash.push({ wheel: i, deg: +(Math.asin(sa) * 57.3).toFixed(1), tol: +(sh.landTol * 57.3).toFixed(0), n: n.map(x => +x.toFixed(2)), feat: cn.feat, other: b.g[1 - i], th: +(b.th * 57.3).toFixed(0), slope: sh.pitch != null ? +(sh.pitch * 57.3).toFixed(0) : null }); crash(b, 'land', 0, ev); b.v[0] += n[0] * 2.5; b.v[1] += n[1] * 2.5; b.v[2] += n[2] * 2.5; break } }
   // ---- 最高速度がなかった時の速さとの差 vx（v11 と同じ走りをした時の速さ - 今の速さ）。アクセルを離す・ブレーキで消える
   { const v = Math.max(0, b.speed), vx = b.vx || 0
     let d = (b.vxAcc || 0) / P.m * H - 0.35 * ((v + vx) * (v + vx) - v * v) / P.m * H
@@ -1184,7 +1187,7 @@ function sub(world, b, inpIn, ev) {
       const c0 = b.g[0] && b.cn[0] ? b.cn[0] : b.cn[1], n = c0 ? (c0.nw || c0.n) : null
       if (n) { const Bq = basis(b); mis = Math.asin(Math.max(-1, Math.min(1, Bq.f[0] * n[0] + Bq.f[1] * n[1] + Bq.f[2] * n[2]))) * 57.3
         const am = Math.abs(mis), air1 = Math.min(1, (b.airT - 0.25) / 0.5)
-        loss = am > LAND.ok && am < 60 && !(b.knockT > 0) && !b.knocked ? Math.min(LAND.max, (am - LAND.ok) / LAND.span * LAND.max) * air1 : 0 /* 60 度を超える＝はじかれた・倒れた後は数えない */
+        loss = am > LAND.ok && am < 60 && !(b.knockT > 0) && !b.knocked && !world.shapes[c0.id].landTol && !(world.time - (b.lastKickT ?? -1e9) < 3) /* 跳ね板で跳んだ後（3 秒）と着地坂は、元から角度の判定がある（二重にしない） */ ? Math.min(LAND.max, (am - LAND.ok) / LAND.span * LAND.max) * air1 : 0 /* 60 度を超える＝はじかれた・倒れた後は数えない */
         if (loss > 0) { const vn = b.v[0] * n[0] + b.v[1] * n[1] + b.v[2] * n[2]; for (let k = 0; k < 3; k++) { const vt = b.v[k] - n[k] * vn; b.v[k] -= vt * loss } } } }
     if (b.airT > 0.25 && globalThis.__landLog && !b.ghost) globalThis.__landLog.push({ p: b.p.slice(), mis, loss, air: b.airT, v: b.speed })
     if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact, mis, loss }); b.airT = 0 }
@@ -1465,7 +1468,7 @@ function v16Track(world, b, ev) {
       if (m.trig == null && on0 && b.g[0] && !b.crashed && (m.armed ?? true)) {
         const rw = wheelCenter(b, basis(b), 0, b.s[0]), along = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]
         if (along > m.trigAt) {
-          m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false
+          m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; b.lastKickT = T
           const vy = Math.min(m.vmax ?? 13, m.k0 + m.kv * m.ve), e = b.th - m.pitchT, ex = e > m.pitchTol ? e - m.pitchTol : e < -m.pitchTol ? e + m.pitchTol : 0
           const dw = clamp(m.pitchK * ex, -7, 7), lose = clamp(1 - (m.pitchLoss ?? 0.6) * Math.abs(ex), 0.5, 1) // 角度が外れた分は回る方へ取られて、跳ね上がりも弱くなる（空中で回りを止めても段に届かない）
           b.v[1] = Math.max(b.v[1], vy * lose); m.vpk3 = 0.6 * vy * lose /* 板はバイクより遅く上がる（板が後から車輪を押して回したり跳ね上げたりしない） */; b.w += dw; b._k3 = { t: T, th: b.th, e, dw, v: m.ve }
@@ -1476,9 +1479,11 @@ function v16Track(world, b, ev) {
       if ((on0 || on1) && m.trig == null && !m.armed) { const rw = wheelCenter(b, basis(b), 0, b.s[0]), al2 = (rw[0] - m.start[0]) * m.f[0] + (rw[2] - m.start[2]) * m.f[2]; if (al2 < m.trigAt - 0.6) m.armed = true }
     } else if (m.type === 'kick') {
       if (on0 || on1) m.lastTouch = T
-      if (m.trig == null && on0 && b.g[0] && (on1 && b.g[1] || !b.g[1]) && !b.crashed && (m.armed ?? true)) { // v59 本人「ウィリーで乗ると跳ね台が反応しない」: 後輪だけで乗っていても跳ねる（前輪が別の所に着いている時は跳ねない）
+      if (m.trig == null && on0 && b.g[0] && (KICK_ANY || on1 && b.g[1] || !b.g[1]) && !b.crashed && (m.armed ?? true)) { // v59 本人「ウィリーで乗ると跳ね台が反応しない」: 後輪だけで乗っていても跳ねる（前輪が別の所に着いている時は跳ねない）
         const along = (b.p[0] - m.start[0]) * m.f[0] + (b.p[2] - m.start[2]) * m.f[2]
-        if (along > m.trigAt) { m.trig = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve }); if (m.spin) { b._kickSpin = m.spin; b._kickT = T } // v51 2 枚目の跳ね板: 板を離れた瞬間に前へ回す
+        if (along > m.trigAt - KICK_LEAD * Math.max(0, b.speed - 6)) { m.trig = T; b.lastKickT = T; m.ve = Math.max(0, b.speed); m.armed = false; if (ev) ev.push({ t: 'kick', p: s.c.slice(), v: m.ve })
+          if (m.direct && m.ve > KICK_DV) { const vpk = Math.min(m.vmax ?? 14, Math.max(m.vmin || 0, m.k0 + m.kv * m.ve)); b.v[1] = Math.max(b.v[1], vpk * m.direct); m.vpk3 = 0.6 * vpk } /* v62 本人「跳ね台で体が埋まる」: 速く乗ると板が後輪の下で遅れて跳ね上がり、車体を立てて板にめり込ませていた。跳ね上がる速さはバイクに直接与え、板はそれより遅く上がる（三段の跳ね板と同じ） */
+          if (m.spin) { b._kickSpin = m.spin; b._kickT = T } // v51 2 枚目の跳ね板: 板を離れた瞬間に前へ回す
           // v38 本人「跳ね板から次の壁まで直撃」: 板の向きを少し後ろへ傾けた形。前へ速すぎる分は跳ねる時に削る（どの速さで乗っても坂か着地の道に下りる）
           if (m.vxMax != null) { const vf = b.v[0] * m.f[0] + b.v[2] * m.f[2]; if (vf > m.vxMax) { const d = vf - m.vxMax; b.v[0] -= m.f[0] * d; b.v[2] -= m.f[2] * d } } }
       }
