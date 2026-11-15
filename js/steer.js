@@ -1,7 +1,7 @@
 // ハンドルは自動（Trials と同じく、人が操るのはアクセル・ブレーキ・重心の前後だけ）。
 // コースの線（path）をなぞる向きにハンドルを切る。ゲームと検査（bot）で同じものを使う。
 // 速すぎると曲がり切れずに外へふくらむ（ハンドルの切れる量は physics.js が速さで絞る）。だから曲がり角の前はブレーキ。
-import { STEER_DK } from './physics.js?v=70'
+import { STEER_DK } from './physics.js?v=71'
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 
 // 向きのずれ・目標点へのずれ・横のずれ・曲がりの先取り の重み（tools/steertest.mjs で決めた）
@@ -111,13 +111,14 @@ export function curbSkid(st, b) {
 //   返り: 外側の符号（当たっていなければ 0）。縁の無い所では投げ出さない（そのまま道の外へ落ちる）
 export function curbHit(st, b) {
   const path = st.path, q = path[st.i]
-  if (!q || !q.p || q.yaw == null || !q.w || st.curbI == null) { st.vo1 = st.vo2 = 0; return 0 }
+  if (!q || !q.p || q.yaw == null || !q.w || st.curbI == null) { st.vo1 = st.vo2 = 0; st.touch = 0; return 0 }
   const rt = [Math.sin(q.yaw), Math.cos(q.yaw)], out = st.curbOut, vNow = (b.v[0] * rt[0] + b.v[2] * rt[1]) * out
   const vo = Math.max(vNow, st.vo1 || 0, st.vo2 || 0); st.vo2 = st.vo1 || 0; st.vo1 = vNow // 当たった後は速さが消えるので、直前 2 コマの大きい方
-  if (st.i < st.curbI || st.i > st.curbI + 4 || vo < CURB_HIT) return 0
+  st.touch = 0
+  if (st.i < st.curbI || st.i > st.curbI + 4) return 0
   { const lat = ((b.p[0] - q.p[0]) * rt[0] + (b.p[2] - q.p[2]) * rt[1]) * out; if (lat < q.w / 2 - 1.3 || lat > q.w / 2 + 0.7 || Math.abs(b.p[1] - 0.8 - q.p[1]) > 0.7) return 0 } // 外側の端の近く・道の高さにいる時だけ（道の外へ落ちていく途中で下の物に当たっても数えない）
-  for (const sd of b.side || []) if (sd && sd.depth > 0.004) return out
-  return 0
+  for (const sd of b.side || []) if (sd && sd.depth > 0.004) st.touch = 1 // 縁に触れている（弱い当たりも。v71 ハンドルを取られる）
+  return st.touch && vo >= CURB_HIT ? out : 0
 }
 export function cornerCap(st, b, o = {}) {
   const path = st.path, sp = Math.max(0, b.speed), look = sp * sp / (2 * ADEC) + 8
@@ -135,7 +136,15 @@ export function cornerCap(st, b, o = {}) {
   }
   return cap
 }
+// v71 石の縁に当たって弾かれた直後は、ハンドルを取られる（WOB_N コマ。縁から離れる向きへ切れて、揺り戻しながら収まる。その間は道をなぞる自動のハンドルが抜け、収まるにつれて戻る）。立て直すまでアクセルを緩める
+export const WOB_N = +(globalThis.__wobN ?? 80), WOB_A = +(globalThis.__wobA ?? 1) /* 約 1.3 秒・横に 0.4m ほど振られる（tools/curbtest.mjs の HIT=99 で測った） */
 export function assist(st, b, inp) {
+  const was = st.touch, r = assist0(st, b, inp)
+  if (st.touch && !was && !r.curbThrow && b.speed > 4) st.wob = WOB_N
+  if (st.wob > 0 && (b.g[0] || b.g[1])) { const k = st.wob / WOB_N; st.wob--; return { ...r, steer: Math.max(-1, Math.min(1, (r.steer || 0) * (1 - k) - st.curbOut * WOB_A * k * Math.cos((1 - k) * Math.PI * 2.5))), wob: 1 } }
+  return r
+}
+function assist0(st, b, inp) {
   if (!b.g[0] && !b.g[1]) return inp
   { const sk = curbSkid(st, b), hit = curbHit(st, b); if (hit) return { ...inp, thr: 0, skid: 1, curbThrow: hit }; if (sk === 2) return { ...inp, thr: 0, ab: SLIDE_AB, skid: 1, slide: 1 }; if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がりで速すぎる: 横滑りして大きく減速／かなり速いと投げ出される
   const over = b.speed - cornerCap(st, b)
