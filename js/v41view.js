@@ -1,7 +1,7 @@
 // SKY BIKE v41 落石の坂の見た目: 坂の上に止まっている大きな丸い岩（ごつごつ）。転がる間は道のりに合わせて回る。割れたら消える（破片と土煙は game.js）
 import * as THREE from 'three'
-import { pathS } from './run.js?v=63'
-import { ROCK } from './v41.js?v=63'
+import { pathS } from './run.js?v=64'
+import { ROCK } from './v41.js?v=64'
 
 export function buildBoulder(course, group, M) {
   const B = course.boulder; if (!B) return null
