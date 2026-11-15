@@ -88,6 +88,17 @@ export function steerFor(st, b, lat = 0) {
 // 見極めの場所（q.wide）とジャンプの先は数えない（そこは速さを読むのが遊び）
 export const ALAT = 8, ADEC = 7
 export const ICE_ALAT = 2.2 // v51 氷の曲がり: 横に踏ん張れる加速度（氷の摩擦 0.25 ほど）
+export const CURB_K = 1.1
+// v61 縁石の曲がり（soft）: 今いる曲がりで、曲がれる速さを超えていたら true（横滑り）。速さの限りは自動減速の 1.15 倍
+export function curbSkid(st, b) {
+  const path = st.path, q = path[st.i]; if (!q || q.curb !== 1) return (st.skid = false)
+  let kmax = 0; for (let k = st.i, n = 0; k >= 0 && n < 6; k = nextI(path, k), n++) if (path[k].curb === 1) kmax = Math.max(kmax, path[k].kap || 0)
+  if (kmax < 0.015) return false
+  const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4))
+  const lim = Math.sqrt(alat * 1.15 / kmax)
+  if (b.speed > lim) st.skid = true; else if (b.speed < lim * 0.75) st.skid = false // 一度滑ったら、限りの 3/4 まで落ちるまで滑り続ける（下手だと遅くなる分）
+  return !!st.skid
+}
 export function cornerCap(st, b, o = {}) {
   const path = st.path, sp = Math.max(0, b.speed), look = sp * sp / (2 * ADEC) + 8
   let cap = 99, d = 0
@@ -98,13 +109,15 @@ export function cornerCap(st, b, o = {}) {
     let wmin = 9; for (let j = k, n = 0; j >= 0 && n < 5; j = nextI(path, j), n++) if (path[j].w) wmin = Math.min(wmin, path[j].w)
     const alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4))
     if (q.ice && o.ice && q.kap > 0.015) { const v = Math.sqrt(ICE_ALAT / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * 3.5 * Math.max(0, d - 2))) } // 氷は自動では減速しない（bot が速さを読む時だけ数える）
-    else if (!q.wide && !q.ice && !o.iceOnly && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
+    else if (q.curb && o.curb && q.kap > 0.015) { const v = Math.sqrt(alat * CURB_K / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) } // v61 縁石は自動では減速しない（bot が読む時だけ）
+    else if (!q.wide && !q.ice && !q.curb && !o.iceOnly && q.kap > 0.015) { const v = Math.sqrt(alat / q.kap); cap = Math.min(cap, Math.sqrt(v * v + 2 * ADEC * Math.max(0, d - 0.5))) }
     const a = q.p, c = path[nk].p; if (a && c) d += Math.hypot(c[0] - a[0], c[2] - a[2])
   }
   return cap
 }
 export function assist(st, b, inp) {
   if (!b.g[0] && !b.g[1]) return inp
+  { const sk = curbSkid(st, b); if (sk) return { ...inp, thr: 0, ab: 1, skid: 1 } } // v61 縁石の曲がり（soft）で速すぎる: 横滑りして大きく減速
   const over = b.speed - cornerCap(st, b)
   if (over <= 0) return inp
   return { ...inp, thr: over > 0.4 ? 0 : inp.thr, ab: Math.round(Math.min(1, over * 0.6) * 8) / 8 }

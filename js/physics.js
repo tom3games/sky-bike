@@ -607,6 +607,7 @@ export class World {
 }
 
 // ------------------------------------------------------------ バイク
+export const LAND = { ok: +(globalThis.__landOk ?? 14), span: 30, max: +(globalThis.__landMax ?? 0.4) } // v61 着地: 坂とのずれが ok 度までは減速なし、そこから span 度で最大 max（前向きの速さの割合）を失う
 export const NOFRONT_TIP = +(globalThis.__tip ?? 2600)
 export const NOFRONT_HOLD = 1.0 // v56 本人「脱輪から転び始めるまでを少し早く」2.0→1.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
 export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5) } // v52 水が押す強さ（1/秒）と上限（m/s²）
@@ -1177,7 +1178,14 @@ function sub(world, b, inpIn, ev) {
       const vx = b.v[0], vz = b.v[2]; b.v[0] = vx * c + vz * s; b.v[2] = -vx * s + vz * c
     }
   }
-  if (air) b.airT += H; else { if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact }); b.airT = 0 }
+  if (air) b.airT += H; else { let mis = 0, loss = 0
+    if (b.airT > 0.25 && !b.crashed) { // v61 本人が選んだ案 1「着地の角度で速さが残る」: 坂に車体を合わせて着くと速さはそのまま、ずれた分だけ前向きの速さを失う
+      const c0 = b.g[0] && b.cn[0] ? b.cn[0] : b.cn[1], n = c0 ? (c0.nw || c0.n) : null
+      if (n) { const Bq = basis(b); mis = Math.asin(Math.max(-1, Math.min(1, Bq.f[0] * n[0] + Bq.f[1] * n[1] + Bq.f[2] * n[2]))) * 57.3
+        const am = Math.abs(mis), air1 = Math.min(1, (b.airT - 0.25) / 0.5)
+        loss = am > LAND.ok ? Math.min(LAND.max, (am - LAND.ok) / LAND.span * LAND.max) * air1 : 0
+        if (loss > 0) { const vn = b.v[0] * n[0] + b.v[1] * n[1] + b.v[2] * n[2]; for (let k = 0; k < 3; k++) { const vt = b.v[k] - n[k] * vn; b.v[k] -= vt * loss } } } }
+    if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact, mis, loss }); b.airT = 0 }
   if (b.crashed) b.crashed.t += H
   if (b.thudT > 0) b.thudT -= H
 }

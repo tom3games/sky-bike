@@ -45,6 +45,15 @@ export function buildV51(course, scene) {
     const g = new THREE.Group(); const body = new THREE.Mesh(new THREE.CylinderGeometry(sh.r, sh.r, Math.min(L, 0.9), 18), mat); body.castShadow = true; g.add(body)
     for (const y of [-0.28, 0, 0.28]) { const r = new THREE.Mesh(new THREE.TorusGeometry(sh.r + 0.005, 0.018, 6, 18), ring); r.rotation.x = Math.PI / 2; r.position.y = y; g.add(r) }
     g.position.set((sh.a[0] + sh.b[0]) / 2, (sh.a[1] + sh.b[1]) / 2, (sh.a[2] + sh.b[2]) / 2); g.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(ax[0] / L, ax[1] / L, ax[2] / L)); group.add(g); D.mesh = g }
+  // v61 縁石（赤と白）: 自動の減速が外れた曲がりの両側。前後 3 点ぶん長く敷いて、手前から見える
+  { const cs = (course.decor || []).filter(x => x.kind === 'curb'), P = course.path, list = []
+    for (const D of cs) for (let i = Math.max(1, D.i0 - 4); i <= Math.min(P.length - 2, D.i1 + 3); i++) { const q = P[i], z = P[i + 1]; if (!q.p || !z.p || q.branch) continue
+      const len = Math.hypot(z.p[0] - q.p[0], z.p[2] - q.p[2]); if (len < 0.05 || len > 3) continue
+      const yaw = Math.atan2(-(z.p[2] - q.p[2]), z.p[0] - q.p[0]), rt = [Math.sin(yaw), Math.cos(yaw)], hw = (q.w || 4) / 2 - 0.13
+      for (const sg of [-1, 1]) list.push({ x: (q.p[0] + z.p[0]) / 2 + rt[0] * hw * sg, y: (q.p[1] + z.p[1]) / 2 + 0.03, z: (q.p[2] + z.p[2]) / 2 + rt[1] * hw * sg, yaw, len, pitch: Math.atan2(z.p[1] - q.p[1], len), red: i % 2 === 0 }) }
+    if (list.length) { const geo = new THREE.BoxGeometry(1, 0.07, 0.26), mat = new THREE.MeshStandardMaterial({ roughness: 0.8 }), im = new THREE.InstancedMesh(geo, mat, list.length), o = new THREE.Object3D(), red = new THREE.Color(0xb3261e), wht = new THREE.Color(0xe8e2d6)
+      list.forEach((c, k) => { o.position.set(c.x, c.y, c.z); o.rotation.set(0, c.yaw, c.pitch, 'YXZ'); o.scale.set(c.len, 1, 1); o.updateMatrix(); im.setMatrixAt(k, o.matrix); im.setColorAt(k, c.red ? red : wht) })
+      im.receiveShadow = true; group.add(im) } }
   return {
     group,
     blast(p) { bt = 0; bp = p },

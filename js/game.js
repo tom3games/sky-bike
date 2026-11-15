@@ -929,6 +929,7 @@ function fixedStep() {
   const b = G.bike, c = G.course
   const inp = G.epi && G.epi.ph === 'end' ? { thr: 0, brk: b.speed > 0.2 ? 1 : 0, lean: b.noFront ? -1 : 0, steer: 0 } : gatherInput() // v51 前輪が外れたまま着いたら、ウィリーのまま止まる // 止まったらブレーキを離す（押し続けると下がる） // v48 小屋の前で止まる
   G.inp = inp
+  if (inp.skid && (b.g[0] || b.g[1])) { G.skidT = (G.skidT || 0) - DT; if (G.skidT <= 0) { G.skidT = 0.22; Snd.play('gravel', { vol: 0.8, rate: 1.2 }); G.shake = Math.max(G.shake, 0.03) } if (b.cn[0]) dust.emit(b.cn[0].q, 2, 1.6) } else G.skidT = 0 // v61 縁石の曲がりで速すぎた: 横滑りの音と砂ぼこり
   if (!G.running && (inp.thr > 0 || inp.brk > 0 || inp.lean)) G.running = true
   const ev = []
   G.prev = snap(b)
@@ -944,7 +945,7 @@ function fixedStep() {
       Snd.play('crash', { vol: 0.9 }); Snd.play('clank', { vol: 0.7, delay: 0.12 }); G.shake = 0.2; flash('bad')
       why(t('why_' + e.why) + (e.why === 'hard' ? ` ${e.v.toFixed(1)}m/s` : ''))
     }
-    if (e.t === 'land') { const k = Math.min(1, e.impact / 9); Snd.play('land', { vol: 0.25 + k * 0.7 }); if (e.impact > 3) Snd.play('spring', { vol: k * 0.5 }); G.shake = Math.max(G.shake, k * 0.08) }
+    if (e.t === 'land') { const k = Math.min(1, e.impact / 9); Snd.play('land', { vol: 0.25 + k * 0.7 }); if (e.impact > 3) Snd.play('spring', { vol: k * 0.5 }); G.shake = Math.max(G.shake, k * 0.08); if (e.loss > 0.06) { Snd.play('clank', { vol: 0.4 + e.loss, rate: 0.8 }); Snd.play('gravel', { vol: 0.7 }); G.shake = Math.max(G.shake, 0.06 + e.loss * 0.3); if (b.cn[0]) dust.emit(b.cn[0].q, 8 + Math.round(e.loss * 40), 2.5) } G.landLoss = e.loss } /* v61 着地の角度がずれて速さを失った: ガシャンと砂ぼこり（文字は出さない） */
     if (e.t === 'hop') Snd.play('spring', { vol: 0.5 })
     if (e.t === 'wheelOff') wheelOffFx(b)
     if (e.t === 'nitro') Snd.play('whoosh', { vol: 0.8 })
