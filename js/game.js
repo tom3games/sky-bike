@@ -8,30 +8,30 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=67'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=67'
-import { COURSES } from './course.js?v=67'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=67'
-import { BikeView, snap } from './bikeview.js?v=67'
-import { createBot, botInput, resetBot } from './bot.js?v=67'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=67'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=67'
-import { Birds } from './birds.js?v=67'
-import { crowPush } from './strike.js?v=67'
-import { buildV35, hankieDataURL } from './v35view.js?v=67'
-import { buildRecorder } from './recorder.js?v=67'
-import { buildV36 } from './v36view.js?v=67'
-import { buildLady } from './lady.js?v=67'
-import { buildElder, ELDER } from './elder.js?v=67'
-import { buildBoulder } from './v41view.js?v=67'
-import { buildMotes } from './motes.js?v=67'
-import { buildMurals } from './murals.js?v=67'
-import { buildV37 } from './v37view.js?v=67'
-import { buildV51 } from './v51view.js?v=67'
-import { buildEpi, wheelProp } from './v48view.js?v=67'
-import { buildSenseLamps } from './v49view.js?v=67'
-import { doorAng } from './traps.js?v=67'
-import { resetDrums } from './physics.js?v=67'
+import { buildGimmicks } from './gimmicks.js?v=68'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=68'
+import { COURSES } from './course.js?v=68'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=68'
+import { BikeView, snap } from './bikeview.js?v=68'
+import { createBot, botInput, resetBot } from './bot.js?v=68'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=68'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=68'
+import { Birds } from './birds.js?v=68'
+import { crowPush } from './strike.js?v=68'
+import { buildV35, hankieDataURL } from './v35view.js?v=68'
+import { buildRecorder } from './recorder.js?v=68'
+import { buildV36 } from './v36view.js?v=68'
+import { buildLady } from './lady.js?v=68'
+import { buildElder, ELDER } from './elder.js?v=68'
+import { buildBoulder } from './v41view.js?v=68'
+import { buildMotes } from './motes.js?v=68'
+import { buildMurals } from './murals.js?v=68'
+import { buildV37 } from './v37view.js?v=68'
+import { buildV51 } from './v51view.js?v=68'
+import { buildEpi, wheelProp } from './v48view.js?v=68'
+import { buildSenseLamps } from './v49view.js?v=68'
+import { doorAng } from './traps.js?v=68'
+import { resetDrums } from './physics.js?v=68'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -614,7 +614,7 @@ function startRun(id, from) {
   resetDrums(G.world) // v35 回る筒の口を最初の形へ
   $('letter').classList.remove('on', 'quiet', 'peek'); G.ending = null; G.epi = null; if (G.epiV && G.epiV.silh) G.epiV.silh.visible = false; bgmStop(1.0); if (G.v35 && G.v35.tracks) G.v35.tracks.visible = false
   G.hank = false; G.hm = { ph: 'wait' }; G.ly = { ph: 'wait' }; G.ladyDone = false; G.vl = { ph: 'idle', n: 0 }; if (G.elder) G.elder.hide(); if (G.recorder) G.recorder.reset(); G.story = { seen: {}, t0: G.course.climb ? 0.6 : null }; storyOff(); talkOff()
-  for (const cn of G.course.cans || []) cn.t = null; skid.clear()
+  for (const cn of G.course.cans || []) cn.t = null; skid.clear(); slideMk[0].clear(); slideMk[1].clear()
   if (cont != null) contSetup(cont)
   spawnAt(cont ?? 0)
   if (cont != null) toast(G.course.cps[cont].name)
@@ -959,7 +959,7 @@ function fixedStep() {
   const b = G.bike, c = G.course
   const inp = G.epi && G.epi.ph === 'end' ? { thr: 0, brk: b.speed > 0.2 ? 1 : 0, lean: b.noFront ? -1 : 0, steer: 0 } : gatherInput() // v51 前輪が外れたまま着いたら、ウィリーのまま止まる // 止まったらブレーキを離す（押し続けると下がる） // v48 小屋の前で止まる
   G.inp = inp
-  if (inp.skid && (b.g[0] || b.g[1])) { G.skidT = (G.skidT || 0) - DT; if (G.skidT <= 0) { G.skidT = 0.22; Snd.play('gravel', { vol: 0.8, rate: 1.2 }); G.shake = Math.max(G.shake, 0.03) } if (b.cn[0]) dust.emit(b.cn[0].q, 2, 1.6) } else G.skidT = 0 // v61 縁石の曲がりで速すぎた: 横滑りの音と砂ぼこり
+  if (inp.skid && (b.g[0] || b.g[1])) { G.skidT = (G.skidT || 0) - DT; if (G.skidT <= 0) { G.skidT = 0.22; Snd.play('gravel', { vol: 0.8, rate: 1.2 }); G.shake = Math.max(G.shake, 0.03) } if (b.cn[0]) dust.emit(b.cn[0].q, 2, 1.6); { const yv = Math.atan2(-b.v[2], b.v[0]); for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (b.g[i] && cn) { slideMk[i].mark(cn.q, cn.nw || cn.n, yv); if (inp.slide) dust.emit(cn.q, 1, 0.9, { col: 0xc9c4b8, up: 1.6, size: 1.5 }) } else slideMk[i].lift() } } /* v68 滑っている間はタイヤの跡（進む向き）と白い煙 */ } else { G.skidT = 0; slideMk[0].lift(); slideMk[1].lift() } // v61 縁石の曲がりで速すぎた: 横滑りの音と砂ぼこり
   if (!G.running && (inp.thr > 0 || inp.brk > 0 || inp.lean)) G.running = true
   const ev = []
   G.prev = snap(b)
@@ -1314,7 +1314,7 @@ const dust = (() => {
   }
 })()
 // タイヤの跡（急ブレーキ・空回り）: 道の面に貼る黒い帯。古い物から消える
-const skid = (() => {
+const mkSkid = () => {
   const N = 600, g = new THREE.PlaneGeometry(0.16, 0.42); g.rotateX(-Math.PI / 2)
   const m = new THREE.MeshBasicMaterial({ color: 0x0a0908, transparent: true, opacity: 0.55, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2 })
   const im = new THREE.InstancedMesh(g, m, N); im.frustumCulled = false; im.count = 0; scene.add(im)
@@ -1329,7 +1329,8 @@ const skid = (() => {
     lift() { last = null },
     clear() { im.count = 0; k = 0; last = null },
   }
-})()
+}
+const skid = mkSkid(), slideMk = [mkSkid(), mkSkid()] /* v68 縁石の曲がりで滑った跡（後輪・前輪）。どこから滑ったかが残る */
 // 路面とのやりとり: 後輪が巻き上げる粒（路面ごとに色と重さ）、急ブレーキの跡と砂利の音、ニトロの火の粉
 let gravT = 0
 function surfaceFx(b, dt) {

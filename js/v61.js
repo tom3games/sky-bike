@@ -15,4 +15,16 @@ export function v61post(B) {
     for (let k = i; k <= j; k++) P[k].curb = type
     B.v61.curbs.push({ i0: i, i1: j, type, name: nm }); B.decor.push({ kind: 'curb', i0: i, i1: j, type })
     want.delete(nm); i = j }
+  // v68 縁石の曲がりの外側に低い石の縁を置く（滑って勢いよく当たると投げ出される steer.js curbHit）。もう縁がある所・別の道が通る所には置かない
+  const wr = a => Math.atan2(Math.sin(a), Math.cos(a))
+  for (const D of B.v61.curbs) {
+    let turn = 0; for (let k = D.i0; k < D.i1; k++) if (P[k].yaw != null && P[k + 1].yaw != null) turn += wr(P[k + 1].yaw - P[k].yaw)
+    const out = turn > 0 ? 1 : -1
+    for (let i = Math.max(1, D.i0 - 1); i <= Math.min(P.length - 2, D.i1 + 3); i++) { const q = P[i], z = P[i + 1]; if (!q.p || !z.p || q.branch || z.branch) continue
+      const len = Math.hypot(z.p[0] - q.p[0], z.p[2] - q.p[2]); if (len < 0.05 || len > 3) continue
+      const yaw = Math.atan2(-(z.p[2] - q.p[2]), z.p[0] - q.p[0]), off = ((q.w || 4) / 2 + 0.1) * out
+      const c = [(q.p[0] + z.p[0]) / 2 + Math.sin(yaw) * off, (q.p[1] + z.p[1]) / 2, (q.p[2] + z.p[2]) / 2 + Math.cos(yaw) * off]
+      if (B.shapes.some(s => s.tag === 'parapet' && s.c && Math.hypot(s.c[0] - c[0], s.c[2] - c[2]) < 1.0 && Math.abs(s.c[1] - c[1]) < 1)) continue
+      if (P.some((t, k) => Math.abs(k - i) > 12 && t.p && Math.hypot(t.p[0] - c[0], t.p[2] - c[2]) < (t.w || 4) / 2 + 0.6 && Math.abs(t.p[1] - c[1]) < 1.5)) continue
+      B.box({ c: [c[0], c[1] + 0.05, c[2]], h: [len / 2 + 0.1, 0.42, 0.13], yaw, pitch: Math.atan2(z.p[1] - q.p[1], len), mat: 'ruinwall', tag: 'parapet', curbWall: 1 }) } }
 }
