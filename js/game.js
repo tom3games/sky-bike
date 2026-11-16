@@ -8,30 +8,30 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=74'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=74'
-import { COURSES } from './course.js?v=74'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=74'
-import { BikeView, snap } from './bikeview.js?v=74'
-import { createBot, botInput, resetBot } from './bot.js?v=74'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=74'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=74'
-import { Birds } from './birds.js?v=74'
-import { crowPush } from './strike.js?v=74'
-import { buildV35, hankieDataURL } from './v35view.js?v=74'
-import { buildRecorder } from './recorder.js?v=74'
-import { buildV36 } from './v36view.js?v=74'
-import { buildLady } from './lady.js?v=74'
-import { buildElder, ELDER } from './elder.js?v=74'
-import { buildBoulder } from './v41view.js?v=74'
-import { buildMotes } from './motes.js?v=74'
-import { buildMurals } from './murals.js?v=74'
-import { buildV37 } from './v37view.js?v=74'
-import { buildV51 } from './v51view.js?v=74'
-import { buildEpi, wheelProp } from './v48view.js?v=74'
-import { buildSenseLamps } from './v49view.js?v=74'
-import { doorAng } from './traps.js?v=74'
-import { resetDrums } from './physics.js?v=74'
+import { buildGimmicks } from './gimmicks.js?v=75'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=75'
+import { COURSES } from './course.js?v=75'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=75'
+import { BikeView, snap } from './bikeview.js?v=75'
+import { createBot, botInput, resetBot } from './bot.js?v=75'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=75'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=75'
+import { Birds } from './birds.js?v=75'
+import { crowPush } from './strike.js?v=75'
+import { buildV35, hankieDataURL } from './v35view.js?v=75'
+import { buildRecorder } from './recorder.js?v=75'
+import { buildV36 } from './v36view.js?v=75'
+import { buildLady } from './lady.js?v=75'
+import { buildElder, ELDER } from './elder.js?v=75'
+import { buildBoulder } from './v41view.js?v=75'
+import { buildMotes } from './motes.js?v=75'
+import { buildMurals } from './murals.js?v=75'
+import { buildV37 } from './v37view.js?v=75'
+import { buildV51 } from './v51view.js?v=75'
+import { buildEpi, wheelProp } from './v48view.js?v=75'
+import { buildSenseLamps } from './v49view.js?v=75'
+import { doorAng } from './traps.js?v=75'
+import { resetDrums } from './physics.js?v=75'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -1209,7 +1209,7 @@ function updateCamera(dt, alpha) {
   CO.idle += dt
   if (CO.idle > 2 && Math.abs(b.speed) > 1.5 && !G.fallFrom) { const k = Math.min(1, dt * 1.2); CO.yaw -= CO.yaw * k; CO.pitch -= CO.pitch * k }
   const a = G.camYaw + Math.PI + G.camSide * G.camAng * Math.max(0, 1 - Math.abs(CO.yaw) * 1.5) + CO.yaw
-  const EK = G.epi ? 0.74 : 1 /* v51 本人「下山はカメラちょっと寄った方が爽快感ある」 */, dist = (6.4 + 4.6 * (G.millK || 0) + 3.2 * (G.gearK || 0)) * EK * (1 - CO.pitch * 0.25), hgt = 2.7 * (G.epi ? 0.8 : 1) + CO.pitch * 4.2 + 1.0 * (G.millK || 0) + 2.4 * (G.gearK || 0)
+  const EK = G.epi ? 0.74 : 1 /* v51 本人「下山はカメラちょっと寄った方が爽快感ある」 */, dist = (6.4 + 4.6 * (G.millK || 0) + 3.2 * (G.gearK || 0)) * EK * (1 - CO.pitch * 0.25), hgt = 2.7 * (G.epi ? 0.8 : 1) + CO.pitch * 4.2 + 3.6 * (G.millK || 0) + 2.4 * (G.gearK || 0)
   const lookYaw = G.camYaw + CO.yaw, hx = Math.cos(lookYaw), hz = -Math.sin(lookYaw)
   let lookUp = 0
   const ah2 = path[Math.min(path.length - 1, si + 9)]; if (ah2 && ah2.p) lookUp = Math.max(G.epi ? -4 : -1.5, Math.min(3, ah2.p[1] + 0.8 - bp.y)) // v48 下山は下りが続くので、先の道が画面の下へ切れないように少し下も見る

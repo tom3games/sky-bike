@@ -101,10 +101,11 @@ for (const cid of ids) {
       const B = basis(b)
       if (process.env.TR) { const [tl, tv, t0, t1] = process.env.TR.split(',').map(Number); if (lat === tl && vMul === tv && s >= t0 && s <= t1) console.log(s, b.p.map(v => v.toFixed(2)).join(','), 'v', b.v.map(v => v.toFixed(1)).join(','), 'th', (b.th * 57.3).toFixed(0), 'g', +b.g[0] + '' + +b.g[1], 'd', b.cn.map(c => c ? c.depth.toFixed(3) + w.shapes[c.id].tag : '-').join(' '), 'susp', b.s.map(v => v.toFixed(2)).join(',')) }
       if (!b.g[0] || !b.g[1]) lastAir = s
+      if (process.env.TRS) { const [tl, tv, t0, t1] = process.env.TRS.split(',').map(Number); if (lat === tl && vMul === tv && s >= t0 && s <= t1) console.log('STATE', JSON.stringify({ s, time: w.time, b, kick: w.shapes.filter(z => z.mov && z.mov.type === 'kick' && Math.hypot(z.c[0] - b.p[0], z.c[2] - b.p[2]) < 8).map(z => ({ id: z.id, c: z.c, trig: z.mov.trig, ax: z.ax })) })) }
       for (let i = 0; i < 2 && !b.crashed; i++) {
         const cc = wheelCenter(b, B, i, b.s[i])
         // すり抜け: 車輪の中心が形の中
-        for (const id of w.near(cc[0], cc[1], cc[2], 0.4)) { const o = closest(w.shapes[id], cc[0], cc[1], cc[2], { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); if (o.d < -0.02) { tun++; if (exTun.length < 5) exTun.push({ cid, lat, vMul, s, p: cc.map(v => +v.toFixed(2)), tag: w.shapes[id].tag }) } }
+        for (const id of w.near(cc[0], cc[1], cc[2], 0.4)) { const o = closest(w.shapes[id], cc[0], cc[1], cc[2], { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); if (o.d < -0.02) { tun++; if (exTun.length < 5) exTun.push({ cid, lat, vMul, s, p: cc.map(v => +v.toFixed(2)), tag: w.shapes[id].tag }); if (process.env.TUNLOG) console.log('TUN', JSON.stringify({ lat, vMul, s, wheel: i, p: cc.map(v => +v.toFixed(2)), d: +o.d.toFixed(3), tag: w.shapes[id].tag, mov: w.shapes[id].mov ? w.shapes[id].mov.type : null, sp: +b.speed.toFixed(2), vv: +Math.hypot(b.v[0], b.v[1], b.v[2]).toFixed(2), g: +b.g[0] + '' + +b.g[1], th: +(b.th * 57.3).toFixed(0), bi: bot.i, kind: c.path[bot.i] && c.path[bot.i].kind, cn: b.cn.map(z => z ? w.shapes[z.id].tag : '-').join('/') })) } }
         // めり込み: 接地の深さ（底づきした後も残る深さ）
         const cn = b.cn[i]; deep[i] = cn && cn.depth > 0.07 ? deep[i] + 1 : 0
         if (deep[i] === 4) { pen++; if (exPen.length < 5) exPen.push({ cid, lat, vMul, s, depth: +cn.depth.toFixed(3), tag: w.shapes[cn.id].tag, p: cn.q.map(v => +v.toFixed(2)) }) }

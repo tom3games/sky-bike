@@ -1,8 +1,9 @@
 // SKY BIKE v37 の見た目: 明るい草原の浮き島（昼の空・揺れる草・同じ花が等間隔・縁で止まった霧の壁・動かない雲・錆びた古いトライアルバイク 3 台）・風車（塔・軸・帆）
 // 真っ暗な通路は区間の明るさ（game.js ZONEP.tunnel）とヘッドライトで。光の数は変えない（月の光の色と強さを変えるだけ）
 import * as THREE from 'three'
-import { bladeAng } from './physics.js?v=74'
+import { bladeAng } from './physics.js?v=75'
 
+const SLOT_HALF = 3.6
 let seed = 37
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647)
 function canvasT(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
@@ -35,13 +36,23 @@ export function buildV37(course, scene, M) {
   // v51 歯車の所だけ島に四角い穴（下の空が見える。欠けから落ちると穴の底を抜けて落ちる）。穴の壁は暗い土と石
   const ctrAl = Math.hypot(md.b[0] - md.a[0], md.b[2] - md.a[2]) / 2, pit = md.pit
   const islBox = (al0, al1, la0, la1, mat = groundM, y0 = ctr[1] - 6, y1 = ctr[1]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(al1 - al0, y1 - y0, la1 - la0), mat), ac = (al0 + al1) / 2 - ctrAl, lc = (la0 + la1) / 2; m.position.set(ctr[0] + f[0] * ac + r[0] * lc, (y0 + y1) / 2, ctr[2] + f[2] * ac + r[2] * lc); m.rotation.y = md.yaw; m.receiveShadow = true; group.add(m); return m }
+  /* 風車の羽根が通る帯: 軸の位置（島の道に沿った al・横の la）から、羽根と帆の幅＋余白、羽根の長さ＋余白 */
+  const millN = (course.notes || []).find(n => n.kind === 'windmill' && n.blades && n.blades[0] && n.blades[0].mov && n.blades[0].mov.cont)
+  const slot = pit && millN ? (() => { const dx = millN.hub[0] - ctr[0], dz = millN.hub[2] - ctr[2], hAl = dx * f[0] + dz * f[2] + ctrAl, hLa = dx * r[0] + dz * r[2], rr = Math.hypot(...millN.blades[0].h) + millN.blades[0].mov.rc + 0.6; return { s0: hAl - SLOT_HALF, s1: hAl + SLOT_HALF, l0: hLa - rr, l1: hLa + rr } })() : null
   if (pit) {
     const a0 = ctrAl - len / 2, a1 = ctrAl + len / 2
     // 島を歯車の所で二つに割る（裂け目に歯車が噛み合って橋になる。欠けから落ちると空へ落ちる）。割れた面は土と岩の色
     const cliffM = new THREE.MeshStandardMaterial({ color: 0x5c5248, roughness: 1 }), y0 = ctr[1] - 6, e = 0.6
-    /* v74 本人「風車の所、緑の地面があるのに当たりが無い。羽が地面から出てくる。その部分の地面の見た目は消して」: 歯車の穴より先（風車の下）の緑の島をやめた。穴の向こうは板の道の下の岩の柱だけ */
     islBox(a0, pit[0] - e, -W / 2, W / 2)
-    islBox(pit[0] - e, pit[0], -W / 2, W / 2, cliffM, y0 + 0.4, ctr[1] - 0.25); islBox(pit[1], pit[1] + e, -2.4, 2.4, cliffM, y0 + 0.4, ctr[1] - 0.25)
+    islBox(pit[0] - e, pit[0], -W / 2, W / 2, cliffM, y0 + 0.4, ctr[1] - 0.25); islBox(pit[1], pit[1] + e, -W / 2, W / 2, cliffM, y0 + 0.4, ctr[1] - 0.25)
+    /* v75 本人「羽が地面から回転して出てくる、その部分だけ地面の見た目を消して」: 歯車の穴の向こうの島は v73 のまま残し、風車の羽根が回って通る帯（slot）だけ島を割る。割れた面は土と岩の色 */
+    if (slot) { const s0 = Math.max(pit[1] + e + 0.7, slot.s0), s1 = Math.min(a1 - 0.7, slot.s1), l0 = Math.max(-W / 2, slot.l0), l1 = Math.min(W / 2, slot.l1)
+      slot.s0 = s0; slot.s1 = s1; slot.l0 = l0; slot.l1 = l1
+      islBox(pit[1] + e, s0 - e, -W / 2, W / 2); islBox(s1 + e, a1, -W / 2, W / 2)
+      islBox(s0 - e, s0, l0, l1, cliffM, y0 + 0.4, ctr[1] - 0.25); islBox(s1, s1 + e, l0, l1, cliffM, y0 + 0.4, ctr[1] - 0.25)
+      if (l0 > -W / 2 + 0.05) { islBox(s0 - e, s1 + e, -W / 2, l0 - e); islBox(s0 - e, s1 + e, l0 - e, l0, cliffM, y0 + 0.4, ctr[1] - 0.25) }
+      if (l1 < W / 2 - 0.05) { islBox(s0 - e, s1 + e, l1 + e, W / 2); islBox(s0 - e, s1 + e, l1, l1 + e, cliffM, y0 + 0.4, ctr[1] - 0.25) }
+    } else islBox(pit[1] + e, a1, -W / 2, W / 2)
   } else { const isl = new THREE.Mesh(new THREE.BoxGeometry(len, 6, W), groundM); isl.position.set(ctr[0], ctr[1] - 3, ctr[2]); isl.rotation.y = md.yaw; isl.receiveShadow = true; group.add(isl) }
   const under = new THREE.Mesh(new THREE.ConeGeometry(W * 0.55, 30, 7), new THREE.MeshStandardMaterial({ color: 0x5c5248, roughness: 1 })); under.rotation.x = Math.PI; under.position.set(ctr[0] - (pit ? f[0] * 8 : 0), ctr[1] - 21, ctr[2] - (pit ? f[2] * 8 : 0)); group.add(under) // 歯車の穴の下は空ける（歯車の下の端が岩に刺さらない）
   // 揺れる草（細い板の束。頂点を時間で揺らす）
@@ -52,7 +63,7 @@ export function buildV37(course, scene, M) {
   const NG = 2600, grass = new THREE.InstancedMesh(blade, grassMat, NG), m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler()
   seed = 5; let gi = 0
   const roadNear = (x, z) => { const dx = x - ctr[0], dz = z - ctr[2], lat = dx * r[0] + dz * r[2]; return Math.abs(lat) < 3.2 }
-  const inPit = (al, la) => pit && al + ctrAl > pit[0] - 0.7 /* 穴から先は島が無い */
+  const inPit = (al, la) => (pit && al + ctrAl > pit[0] - 0.7 && al + ctrAl < pit[1] + 0.7) || (slot && al + ctrAl > slot.s0 - 0.9 && al + ctrAl < slot.s1 + 0.9 && la > slot.l0 - 0.9 && la < slot.l1 + 0.9)
   while (gi < NG) { const al = (rnd() - 0.5) * len, la = (rnd() - 0.5) * (W - 1), x = ctr[0] + f[0] * al + r[0] * la, z = ctr[2] + f[2] * al + r[2] * la; if (roadNear(x, z) && rnd() < 0.85) continue; if (inPit(al, la)) continue; e.set(0, rnd() * 6, (rnd() - 0.5) * 0.3); q.setFromEuler(e); const s = 0.6 + rnd() * 0.9; m4.compose(new THREE.Vector3(x, ctr[1] + 0.35, z), q, new THREE.Vector3(s, s, s)); grass.setMatrixAt(gi++, m4) }
   group.add(grass)
   // 同じ花が等間隔に（違和感 1）
@@ -66,7 +77,7 @@ export function buildV37(course, scene, M) {
   for (const [al, la, rot, wd] of [[0, W / 2 + 14, 0, len + 30], [0, -W / 2 - 14, 0, len + 30], [-len / 2 - 14, 0, Math.PI / 2, W + 30]]) { const p = new THREE.Mesh(new THREE.PlaneGeometry(wd, 16), fogM); p.position.set(ctr[0] + f[0] * al + r[0] * la, ctr[1] - 2, ctr[2] + f[2] * al + r[2] * la); p.rotation.y = md.yaw + rot; group.add(p) }
   // 錆びた古いバイク 3 台（乗り手なし・字幕なし。当たりなし・道の外）
   const bikes = []
-  for (let [al, la, rz, ry] of [[-len * 0.25, 6.5, 0.9, 0.4], [len * 0.02, -7.5, -1.2, 2.1], [len * 0.28, 7.2, 1.35, -0.6]]) { if (inPit(al, la)) al = pit[0] - 3 - ctrAl; const bk = rustyBike(M), x = ctr[0] + f[0] * al + r[0] * la, z = ctr[2] + f[2] * al + r[2] * la; bk.position.set(x, ctr[1] + 0.25, z); bk.rotation.set(0, md.yaw + ry, rz); group.add(bk); bikes.push([x, ctr[1], z]) }
+  for (let [al, la, rz, ry] of [[-len * 0.25, 6.5, 0.9, 0.4], [len * 0.02, -7.5, -1.2, 2.1], [len * 0.28, 7.2, 1.35, -0.6]]) { if (inPit(al, la)) al = pit[1] + 2.5 - ctrAl; const bk = rustyBike(M), x = ctr[0] + f[0] * al + r[0] * la, z = ctr[2] + f[2] * al + r[2] * la; bk.position.set(x, ctr[1] + 0.25, z); bk.rotation.set(0, md.yaw + ry, rz); group.add(bk); bikes.push([x, ctr[1], z]) }
   // 草に隠れた穴のまわりは草を濃く（近づくまで穴が見えにくい）
   { const h = md.hole, NG2 = 260, g2 = new THREE.InstancedMesh(blade, grassMat, NG2); seed = 9; for (let k = 0; k < NG2; k++) { const al = -1.2 + rnd() * 4.4, la = (rnd() - 0.5) * 6, x = h[0] + f[0] * al + r[0] * la, z = h[2] + f[2] * al + r[2] * la; e.set(0, rnd() * 6, 0); q.setFromEuler(e); const s = 1.1 + rnd() * 0.5; m4.compose(new THREE.Vector3(x, h[1] - 0.15, z), q, new THREE.Vector3(s, s * 1.3, s)); g2.setMatrixAt(k, m4) } group.add(g2) }
   // 昼の空（草原にいる時だけ）: 青空と動かない雲（違和感 3）
@@ -91,7 +102,7 @@ export function buildV37(course, scene, M) {
   }
   const gearsV = buildVGears(course, group, M)
   return {
-    group, daySky, bikes, meadowK: 0,
+    group, daySky, bikes, meadowK: 0, isl: { ctr, f, r, ctrAl, W, a0: ctrAl - len / 2, a1: ctrAl + len / 2, pit, slot, y0: ctr[1] - 6, y1: ctr[1] },
     update(dt, tm, cam, world, zone) {
       gU.time.value = tm
       for (const g of gearsV) g.rot.rotation.z = g.w * world.time
