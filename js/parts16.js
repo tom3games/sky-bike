@@ -1,8 +1,8 @@
 // SKY BIKE v16 の仕掛け: 回る歯車・ウィリーの溝・揺れる鎖の吊り橋・倒れる煙突・跳ね板・道を選ぶ横に動く床。
 // どれも course.js の Builder（B）の今の位置（B.t）から作り、B.t を仕掛けの先へ進める（Builder のメソッドと同じ約束）。
 // 見た目と当たりは同じ形の一覧（B.shapes）から。動く物は physics.js の mov（gear / wave / topple / kick / shuttle）。
-import { Builder } from './course.js?v=73'
-import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=73'
+import { Builder } from './course.js?v=74'
+import { dsin, dcos, datan2, shuttlePos, kickPos, toppleAng } from './physics.js?v=74'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -15,15 +15,25 @@ const UP = [0, 1, 0]
 // o.gears: [{ R 半径, u 道の向きの面の速さ, chord 道が通る長さ, gap 手前の歯車からの切れ目, drop 手前の歯車より低い高さ }]（1 個目の gap/drop は道からの分）
 // o: { vIn=10（上手い bot が歯車に入る速さ。9〜11 で届く）, w=3.2（道の点の幅）, thick=1.1, exit=7（出口の道の長さ）, exitGap=2.4, exitDrop=1.0, grip=170, mat='rust' }
 // 道の点: 歯車の上 'gear'（gear: {u}）、切れ目 'jump'（vJump 要る速さ・vMax 跳び越えない速さ）、出口 'landing'
+// v74 本人「歯車のサイズをもっと大きく。今はアクセル押しっぱなしで簡単に進める」: 1 つ目を大きく（半径 4.2 → 6.2、上を走る長さ 5.0 → 8.2）、2 つ目も大きく（3.2 → 4.0）。
+// 1 つ目は逆らう向きにゆっくり回る大きな歯車で、歯車を横切る鉄の腕が 2 本（arms: 腕の向きのずれ。面から armH 盛り上がり、歯車と一緒に回る。当たりも見た目もこの箱）。
+// 腕は向こうからこちらへ道を掃いてくる。2 本目の腕が入口を過ぎた直後に勢いをつけて入れば、次の腕が向こうの端に来る前に渡り切れる。押しっぱなしで入ると途中で腕に弾かれる。
 export const GEARS_DEFAULT = [
-  { R: 4.2, u: 4.5, chord: 5.0, gap: 0.12, drop: 0 }, // 乗ると運ばれる歯車
-  { R: 3.2, u: -6.5, chord: 3.2, gap: 0.15, drop: 0 }, // 逆らう歯車（止まると押し戻される。勢いのまま渡る）
-  { R: 2.6, u: 5.0, chord: 2.8, gap: 2.4, drop: 1.2, beam: true }, // 跳び移る小さい歯車（速すぎると奥の梁に頭）
+  { R: +(globalThis.__g1R ?? 6.2), u: +(globalThis.__g1u ?? -1.26), chord: 8.2, gap: 0.12, drop: 0, arms: [0, +(globalThis.__g1armB ?? 55) * DEG], armH: +(globalThis.__g1armH ?? 0.9), grip: +(globalThis.__g1grip ?? 50) },
+  { R: +(globalThis.__g2R ?? 4.0), u: +(globalThis.__g2u ?? -4.5), chord: 4.0, gap: 0.15, drop: 0, grip: +(globalThis.__g2grip ?? 110) },
+  { R: +(globalThis.__g3R ?? 3.2), u: +(globalThis.__g3u ?? 3.0), chord: 3.0, gap: 2.4, drop: 1.2, beam: true },
 ]
+export const ARM_A0 = 0.26 /* 腕（スポーク）の最初の向き。見た目のスポークと同じ */
+// 時刻 tt に、腕が道（歯車の上の弦。前後に mg の余裕）にかかっているか。腕は中心を通る棒で、向きは ARM_A0 + arms[j] + om*tt
+export function armOnChord(om, arms, yaw, half, e, tt, mg = 0.9) {
+  for (const a of arms) { const ph = ARM_A0 + a + om * tt - yaw, sn = dsin(ph), cs = dcos(ph); if (Math.abs(e * cs) < (half + mg) * Math.abs(sn)) return true }
+  return false
+}
 export function gearRun(B, o = {}) {
   const t = B.t, f = B.dir(t.yaw), R = B.right(t.yaw), w = o.w ?? 3.2, thick = o.thick ?? 1.1, grip = o.grip ?? 170
   const specs = o.gears || GEARS_DEFAULT, g = 9.81, out = []
   let side = o.side ?? 1, jump = null
+  const yawG = t.yaw
   const flush = sp => { // 跳ぶ所（跳び越える歯車を含む）の道の点
     const dropT = Math.max(0.05, jump.drop), tf = Math.sqrt(2 * dropT / g)
     const vJ = jump.drop > 0.3 ? (jump.len + 0.4) / tf : 2.0 + jump.len * 1.9, vMax = jump.drop > 0.3 ? (jump.len + sp.chord - 1.6) / tf : 99
@@ -37,9 +47,12 @@ export function gearRun(B, o = {}) {
     t.p = add3(add3(t.p, f, sp.gap), UP, -sp.drop)
     const c = add3(add3(t.p, f, half), R, -side * e) // 中心は道の線の左（side=1）か右
     const om = sp.u / (e * side)
-    const disc = B.cyl({ a: add3(c, UP, -thick), b: c, r: sp.R, mat: o.mat || 'rust', mu: 1.0, tag: 'road', mov: { type: 'gear', rate: om, om: [0, om, 0], u: sp.u, grip } })
+    const disc = B.cyl({ a: add3(c, UP, -thick), b: c, r: sp.R, mat: o.mat || 'rust', mu: 1.0, tag: 'road', mov: { type: 'gear', rate: om, om: [0, om, 0], u: sp.u, grip: sp.grip ?? grip } })
     B.cyl({ a: add3(c, UP, -thick - (o.axle ?? 1.8)), b: add3(c, UP, -thick + 0.05), r: 0.55, mat: "iron", tag: "post" }) // 軸（円板の下。下を通る道に届かない長さ o.axle）
     B.decor.push({ kind: 'gear', disc, c: c.slice(), R: sp.R, thick, rate: om })
+    const arms = []
+    for (const aj of sp.arms || []) { const hA = sp.armH ?? 0.9, a0 = ARM_A0 + aj; arms.push(B.box({ c: add3(c, UP, hA / 2), h: [sp.R - 0.3, hA / 2, 0.17], yaw: a0, mat: 'girder', mu: 0.6, tag: 'arm', mov: { type: 'spin', rate: om } })) }
+    if (arms.length) { B.decor[B.decor.length - 1].arms = arms; B.hazards.push({ kind: 'gearArm', custom: true, p: add3(t.p, f, half), yaw: t.yaw, half, w, unsafe: tt => armOnChord(om, sp.arms, yawG, half, e, tt, Math.sqrt(Math.max(0, (sp.R - 0.3) ** 2 - e * e)) + 0.7 - half) }) }
     out.push({ disc, c, R: sp.R, u: sp.u, om, skip: !!sp.skip })
     if (sp.skip) { jump.len += sp.chord; t.p = add3(t.p, f, sp.chord) }
     else {

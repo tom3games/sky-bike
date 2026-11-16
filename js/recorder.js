@@ -1,8 +1,9 @@
 // SKY BIKE v65 兄の録音機（本人の案）: 野宿の跡「ここまでは二人で来た。」の少し先の道の上に、古い携帯の録音機が落ちている。
 // 前輪が近づくと拾い、勝手に再生が始まる。声は入れない（本人「セリフだけで」）: 吹き出しに兄の言葉「ひとりじゃこれ以上はキツそうだ…」→ 主人公「…兄の声だ」
 import * as THREE from 'three'
-import { campSpot, traceSpots } from './v35view.js?v=73'
+import { campSpot, traceSpots } from './v35view.js?v=74'
 
+const REC_BACK = 5
 export function recorderSpot(course) {
   const cs = campSpot(course); if (!cs) return null
   const P = course.path, tr = traceSpots(course)
@@ -10,7 +11,9 @@ export function recorderSpot(course) {
   for (let i = cs.i + 45; i < Math.min(P.length - 10, cs.i + 900); i++) {
     let g = true; for (let j = i - 10; j <= i + 4; j++) if (!ok(P[j]) || Math.abs(P[j].p[1] - P[i].p[1]) > 0.2) { g = false; break } /* 手前 14 点は同じ高さの平らな道（段の上に置かない） */
     if (!g || (course.traps || []).some(T => Math.abs(i - T.i) < 30) || tr.some(T => Math.abs(i - T.i) < 20) || (course.chases || []).some(C => i > C.i0 - 30 && i < C.i1 + 30)) continue
-    const q = P[i]; return { i, p: q.p.slice(), yaw: q.yaw }
+    /* v74 本人「録音機の位置をもう少し手前に」: 見つけた所から、同じ高さの平らな道が続く範囲で 5 点（約 5m）手前へ */
+    let j = i; for (let k = 1; k <= REC_BACK; k++) { const z = P[i - k]; if (z && z.p && !z.branch && z.w >= 3.2 && ['road', 'orbit', 'pad'].includes(z.kind) && Math.abs(z.p[1] - P[i].p[1]) < 0.05 && !z.door) j = i - k; else break }
+    const q = P[j]; return { i: j, p: q.p.slice(), yaw: q.yaw }
   }
   return null
 }

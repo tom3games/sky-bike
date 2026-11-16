@@ -1,5 +1,5 @@
-import { hbeam } from './course.js?v=73'
-import { WATER } from './physics.js?v=73'
+import { hbeam } from './course.js?v=74'
+import { WATER } from './physics.js?v=74'
 const KICK_VMIN = +(globalThis.__kVmin ?? 6.8), KICK_TRIG = +(globalThis.__kTrig ?? 1.2) // v59 跳ね板: 遅く乗っても跳ねる強さの下限・板に乗ってから跳ねるまで
 // v13 で足した区間（塔のまわり）。どの区間も「歩くキャラクターでは成り立たない」ことが決まり:
 //   1 勢い（速さがないと越えられない）2 バイクの体の動き（ウィリー・段のよじ登り・空中の角度）
@@ -15,6 +15,7 @@ function ocrates(x, heights, gapAng = 0.16, o = {}) {
 }
 // 塔のまわりの道を横切って外へ流れる水（v73 までは進む向きと逆へ流れる水路だった）
 function ochannel(x, ang, rise, u = 2.0) {
+  u *= WATER.side
   const s = x.orbit(ang, rise, { mat: 'wetstone', mu: 0.72, kind: 'water', sweep: 0.05 })
   s.flowR = u * (globalThis.__chanK ?? 1) /* v73 本人「見た目どおり右へ押し出されて落ちる方が欲しかった」: 道に沿って押し戻すのをやめ、塔の壁から外の縁へ横切って流す（止まると外へ押し出されて落ちる）。見た目も湧き水と同じ（外へ流れて縁から滝） */
   x.B.waters.push({ arc: s, u })
@@ -22,7 +23,7 @@ function ochannel(x, ang, rise, u = 2.0) {
 }
 
 // 周を重ねて登る（v13）。v15 で長い回廊は gauntlet に置き換えた（同じ曲がり・同じ幅・同じ景色が長く続いて退屈だった）
-import { senseLift, SENSE } from './v49.js?v=73'
+import { senseLift, SENSE } from './v49.js?v=74'
 export function laps(x, n, name) {
   const { B, orbit, otorch, W } = x
   B.mark(name)
@@ -230,7 +231,7 @@ export function factoryMore(x) {
   const { B, orbit, otorch, excursion, W } = x
   x.free({ to: x.target() })
   B.cp('歯車の踊り場', { w: W, rest: true })
-  B.mark('回る歯車'); orbit(0.4, 0.2); x.P.gearRun(B, { exit: 3.6 }); x.ostep(0.7); B.road(4, { w: 3.2, mat: 'rust', thick: 1.0, noOverlap: true, back: 0 }); orbit(0.4, 0.3); otorch() // 出口は短く、先に段の壁（勢いのまま来ると当たる）
+  B.mark('回る歯車'); orbit(0.1, 0.2); orbit(0.3, 0) /* v74 歯車の手前は平らに（腕を待つ間に後ろへ転がらない）。曲がる角度と上がる高さの合計は前と同じ */; x.P.gearRun(B, { exit: 2.0, exitGap: 1.8, exitDrop: 0.3, exitW: 5.6, side: -1 }); B.noDeco = 1; B.road(2, { w: 3.2, mat: 'rust', thick: 1.0, noOverlap: true, back: 0 }); orbit(0.4, 0.3); otorch() /* v74 歯車を大きくした分（+4.4m）、出口の段の壁をやめて短い着地に。区間の終わりの位置と高さ・道の点の数は前と同じ。大きい 1 つ目は塔と反対の側（腕が回ってくるのが全部見える） */
   B.mark('倒れる煙突'); B.can(3); B.road(24, { w: 3.2, mat: 'rust', thick: 1.0, back: 0 }); x.P.chimney(B, {}); orbit(0.4, 0.3)
   B.cp('煙突の向こう', { w: W, rest: true })
   x.decoKeep(() => {
@@ -548,7 +549,7 @@ export function ruins(x) {
   x.tower({ sign: 1, r: 18, name: '廃墟の塔' })
   B.mark('湧き水の流れ')
   orbit(0.12, 0)
-  { const s = orbit(0.3, 0, { mat: 'wetstone', mu: 0.7, kind: 'water' }); s.flowR = 1.8 * WATER.uMul; B.waters.push({ arc: s, u: 1.8 * WATER.uMul }) }
+  { const s = orbit(0.3, 0, { mat: 'wetstone', mu: 0.7, kind: 'water' }); s.flowR = 1.8 * WATER.uMul * WATER.side; B.waters.push({ arc: s, u: 1.8 * WATER.uMul * WATER.side }) }
   orbit(0.5, 0.6)
   x.ogap(3.6, -0.4)
   orbit(0.5, 1.0); otorch()

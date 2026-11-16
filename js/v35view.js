@@ -168,7 +168,7 @@ export function traceSpots(course) {
   const cs = campSpot(course)
   if (cs) out.push({ ...cs, side: -1, kind: 'two', camp: true, ja: 'ここまでは二人で来た。', en: 'We made it this far together.', k: 8, shake: 0.36 })
   // v37 草原の 3 台目の錆びたバイクのそば: 「ここは静かすぎる。」
-  if (course.v37 && course.v37.meadow) { const md = course.v37.meadow, f = [Math.cos(md.yaw), 0, -Math.sin(md.yaw)], len = Math.hypot(md.b[0] - md.a[0], md.b[2] - md.a[2]) + 40, ctr = [(md.a[0] + md.b[0]) / 2, 0, (md.a[2] + md.b[2]) / 2], ctrAl = len / 2 - 20, pit = md.pit, alB = pit && ctrAl + len * 0.28 > pit[0] - 0.7 && ctrAl + len * 0.28 < pit[1] + 0.7 ? pit[1] + 2.5 - ctrAl : len * 0.28 /* v51 3 台目のバイクは歯車の裂け目の向こうへ動かした */, tgt = [ctr[0] + f[0] * alB, ctr[2] + f[2] * alB]
+  if (course.v37 && course.v37.meadow) { const md = course.v37.meadow, f = [Math.cos(md.yaw), 0, -Math.sin(md.yaw)], len = Math.hypot(md.b[0] - md.a[0], md.b[2] - md.a[2]) + 40, ctr = [(md.a[0] + md.b[0]) / 2, 0, (md.a[2] + md.b[2]) / 2], ctrAl = len / 2 - 20, pit = md.pit, alB = pit && ctrAl + len * 0.28 > pit[0] - 0.7 && ctrAl + len * 0.28 < pit[1] + 0.7 ? pit[0] - 3 - ctrAl : len * 0.28 /* v74 裂け目の向こうの緑の島をやめたので、3 台目のバイクは裂け目の手前に */, tgt = [ctr[0] + f[0] * alB, ctr[2] + f[2] * alB]
     const P = course.path; let bi = -1, bd = 1e9; P.forEach((q, i) => { if (!q.p || q.branch || !q.w || q.w < 3 || q.gearSec) return; const d = Math.hypot(q.p[0] - tgt[0], q.p[2] - tgt[1]); if (d < bd) { bd = d; bi = i } })
     if (bi >= 0) { const q = P[bi]; out.push({ i: bi, p: q.p.slice(), yaw: q.yaw, w: q.w, side: 1, kind: 'shaky', ja: 'ここは静かすぎる。', en: "It's too quiet here.", k: 10, shake: 0.8 }) } }
   // v36 2 か所目の猿を逃げ切った先: 「あれに追われた。振り返るな。」（爪の跡と、震える上向きの矢印）

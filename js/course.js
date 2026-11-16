@@ -1,19 +1,19 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=73'
-import * as P16 from './parts16.js?v=73'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=73'
-import { lab16 } from './parts16.js?v=73'
-import * as P17 from './parts17.js?v=73'
-import * as V49 from './v49.js?v=73'
-import { finale } from './finale.js?v=73'
-import { WATER } from './physics.js?v=73'
-import { chaseGroup } from './v46.js?v=73'
-import { v51post } from './v51.js?v=73'
-import { v61post } from './v61.js?v=73'
-import { v62post } from './v62.js?v=73'
-import { v36traps } from './traps.js?v=73'
-import { descent } from './v48.js?v=73'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=73'
+import * as Z from './zones.js?v=74'
+import * as P16 from './parts16.js?v=74'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=74'
+import { lab16 } from './parts16.js?v=74'
+import * as P17 from './parts17.js?v=74'
+import * as V49 from './v49.js?v=74'
+import { finale } from './finale.js?v=74'
+import { WATER } from './physics.js?v=74'
+import { chaseGroup } from './v46.js?v=74'
+import { v51post } from './v51.js?v=74'
+import { v61post } from './v61.js?v=74'
+import { v62post } from './v62.js?v=74'
+import { v36traps } from './traps.js?v=74'
+import { descent } from './v48.js?v=74'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=74'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -199,7 +199,7 @@ export class Builder {
   }
   // 湧き水の流れが道を横切る区間: 面が横へ動く（立ち止まると流される）。sgn 1 で右へ、-1 で左へ流れる
   waterRun(len, o = {}) {
-    const t = this.t, R = this.right(t.yaw), u = (o.u ?? 1.7) * (o.sgn ?? 1) * WATER.uMul // v52 横切る流れを 1.5 倍
+    const t = this.t, R = this.right(t.yaw), u = (o.u ?? 1.7) * (o.sgn ?? 1) * WATER.uMul * WATER.side // v52 横切る流れを 1.5 倍
     const s = this.road(len, { ...o, mat: o.mat || 'wetstone', mu: o.mu ?? 0.7, kind: 'water', noOverlap: true })
     s.flow = [R[0] * u, 0, R[2] * u]
     for (let k = this.path.length - Math.ceil(len); k < this.path.length; k++) this.path[k].flowU = u
@@ -309,7 +309,7 @@ export class Builder {
   }
   // 逆に流れる水路: 道の進む向きと逆へ流れる（止まると押し戻される）。坂を登りながら
   channel(len, slope, o = {}) {
-    const t = this.t, f = this.dir(t.yaw, 0), u = o.u ?? 2.2
+    const t = this.t, f = this.dir(t.yaw, 0), u = (o.u ?? 2.2) * WATER.side
     const s = this.road(len, { ...o, slope, mat: 'wetstone', mu: o.mu ?? 0.75, kind: 'water', noOverlap: true })
     { const R = this.right(t.yaw), sg = globalThis.__chanS ?? -1; s.flow = [R[0] * u * sg, 0, R[2] * u * sg] } /* v73 見た目どおり横へ流す（止まると横へ押し出されて落ちる）。前は道と逆向きに押し戻していた */
     this.waters.push({ box: s, u: -u })

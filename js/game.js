@@ -8,30 +8,30 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=73'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=73'
-import { COURSES } from './course.js?v=73'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=73'
-import { BikeView, snap } from './bikeview.js?v=73'
-import { createBot, botInput, resetBot } from './bot.js?v=73'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=73'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=73'
-import { Birds } from './birds.js?v=73'
-import { crowPush } from './strike.js?v=73'
-import { buildV35, hankieDataURL } from './v35view.js?v=73'
-import { buildRecorder } from './recorder.js?v=73'
-import { buildV36 } from './v36view.js?v=73'
-import { buildLady } from './lady.js?v=73'
-import { buildElder, ELDER } from './elder.js?v=73'
-import { buildBoulder } from './v41view.js?v=73'
-import { buildMotes } from './motes.js?v=73'
-import { buildMurals } from './murals.js?v=73'
-import { buildV37 } from './v37view.js?v=73'
-import { buildV51 } from './v51view.js?v=73'
-import { buildEpi, wheelProp } from './v48view.js?v=73'
-import { buildSenseLamps } from './v49view.js?v=73'
-import { doorAng } from './traps.js?v=73'
-import { resetDrums } from './physics.js?v=73'
+import { buildGimmicks } from './gimmicks.js?v=74'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=74'
+import { COURSES } from './course.js?v=74'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=74'
+import { BikeView, snap } from './bikeview.js?v=74'
+import { createBot, botInput, resetBot } from './bot.js?v=74'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=74'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=74'
+import { Birds } from './birds.js?v=74'
+import { crowPush } from './strike.js?v=74'
+import { buildV35, hankieDataURL } from './v35view.js?v=74'
+import { buildRecorder } from './recorder.js?v=74'
+import { buildV36 } from './v36view.js?v=74'
+import { buildLady } from './lady.js?v=74'
+import { buildElder, ELDER } from './elder.js?v=74'
+import { buildBoulder } from './v41view.js?v=74'
+import { buildMotes } from './motes.js?v=74'
+import { buildMurals } from './murals.js?v=74'
+import { buildV37 } from './v37view.js?v=74'
+import { buildV51 } from './v51view.js?v=74'
+import { buildEpi, wheelProp } from './v48view.js?v=74'
+import { buildSenseLamps } from './v49view.js?v=74'
+import { doorAng } from './traps.js?v=74'
+import { resetDrums } from './physics.js?v=74'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -1183,7 +1183,15 @@ function updateCamera(dt, alpha) {
   const path = G.course.path, si = G.steer ? G.steer.i : 0
   // 向き: 少し先の道の向き（曲がり角でバイクより先に回る）。空中・転倒中は止める
   const ah = path[Math.min(path.length - 1, si + 5)]
-  if (!air && !b.crashed && ah && ah.yaw != null) { let tgt = Math.abs(b.speed) < 0.5 ? b.psi : ah.yaw; let d = tgt - G.camYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); G.camYaw += d * Math.min(1, dt * 2.2) }
+  /* v74 本人「風車の所でカメラが切り替わって羽が見えない。いつ進めばいいか見極められない」: 風車の手前の板の道から羽根を降りるまで、カメラは来た道の向きのまま（羽根の回る面を横から見る）・少し引く。足場で 90 度曲がってもカメラは回さない */
+  if (G._mcC !== G.course) { G._mcC = G.course; const i0 = path.findIndex(q => q.kind === 'blade'); let i1 = i0; while (i1 >= 0 && path[i1 + 1] && path[i1 + 1].kind === 'blade') i1++; G.millCam = i0 > 8 ? { i0: i0 - 9, i1: i1 + 1, yaw: path[i0 - 1].yaw } : null }
+  /* v74 腕のある大きい歯車の手前〜上: 腕が回ってくるのが見えるように、カメラを少し引いて上げる（向きはそのまま） */
+  if (G._gcC !== G.course) { G._gcC = G.course; const hzA = (G.course.hazards || []).find(h => h.kind === 'gearArm'), g0 = hzA ? path.findIndex(q => q.kind === 'gear' && q.p && Math.hypot(q.p[0] - hzA.p[0], q.p[2] - hzA.p[2]) < hzA.half + 1 && Math.abs(q.p[1] - hzA.p[1]) < 1) : -1; G.gearCam = g0 > 12 ? { i0: g0 - 12, i1: g0 + 9 } : null }
+  G.gearK = (G.gearK || 0) + ((G.gearCam && si >= G.gearCam.i0 && si <= G.gearCam.i1 && !G.fallFrom ? 1 : 0) - (G.gearK || 0)) * Math.min(1, dt * 1.6)
+  const MC = G.millCam, mcOn = !!(MC && si >= MC.i0 && si <= MC.i1 && !G.fallFrom)
+  G.millK = (G.millK || 0) + ((mcOn ? 1 : 0) - (G.millK || 0)) * Math.min(1, dt * 2.5)
+  if (mcOn && !b.crashed) { let d = MC.yaw - G.camYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); G.camYaw += d * Math.min(1, dt * 2.2) }
+  else if (!air && !b.crashed && ah && ah.yaw != null) { let tgt = Math.abs(b.speed) < 0.5 ? b.psi : ah.yaw; let d = tgt - G.camYaw; d = Math.atan2(Math.sin(d), Math.cos(d)); G.camYaw += d * Math.min(1, dt * 2.2) }
   // 曲がる外側にカメラを置く（左へ曲がる道なら右）。まっすぐな所では前の側を保つ
   const cv = pathAhead(si, 18)
   if (Math.abs(cv) > 0.012) G.camSideT = cv > 0 ? 1 : -1
@@ -1201,7 +1209,7 @@ function updateCamera(dt, alpha) {
   CO.idle += dt
   if (CO.idle > 2 && Math.abs(b.speed) > 1.5 && !G.fallFrom) { const k = Math.min(1, dt * 1.2); CO.yaw -= CO.yaw * k; CO.pitch -= CO.pitch * k }
   const a = G.camYaw + Math.PI + G.camSide * G.camAng * Math.max(0, 1 - Math.abs(CO.yaw) * 1.5) + CO.yaw
-  const EK = G.epi ? 0.74 : 1 /* v51 本人「下山はカメラちょっと寄った方が爽快感ある」 */, dist = 6.4 * EK * (1 - CO.pitch * 0.25), hgt = 2.7 * (G.epi ? 0.8 : 1) + CO.pitch * 4.2
+  const EK = G.epi ? 0.74 : 1 /* v51 本人「下山はカメラちょっと寄った方が爽快感ある」 */, dist = (6.4 + 4.6 * (G.millK || 0) + 3.2 * (G.gearK || 0)) * EK * (1 - CO.pitch * 0.25), hgt = 2.7 * (G.epi ? 0.8 : 1) + CO.pitch * 4.2 + 1.0 * (G.millK || 0) + 2.4 * (G.gearK || 0)
   const lookYaw = G.camYaw + CO.yaw, hx = Math.cos(lookYaw), hz = -Math.sin(lookYaw)
   let lookUp = 0
   const ah2 = path[Math.min(path.length - 1, si + 9)]; if (ah2 && ah2.p) lookUp = Math.max(G.epi ? -4 : -1.5, Math.min(3, ah2.p[1] + 0.8 - bp.y)) // v48 下山は下りが続くので、先の道が画面の下へ切れないように少し下も見る
@@ -1218,7 +1226,7 @@ function updateCamera(dt, alpha) {
     // 壁・塔に埋まらないように手前へ（隠れ判定はバイクの胸の高さから）
     const o = [bp.x, bp.y + 1.0, bp.z]
     const dir = [_v.x - o[0], _v.y - o[1], _v.z - o[2]], L = Math.hypot(...dir)
-    const ids = G.world.near(o[0], o[1], o[2], L + 1).slice().filter(id => !['gate', 'sign', 'post', 'web', 'flange', 'rail', 'barrel', 'pillar', 'statue'].includes(G.world.shapes[id].tag))
+    const ids = G.world.near(o[0], o[1], o[2], L + 1).slice().filter(id => !['gate', 'sign', 'post', 'web', 'flange', 'rail', 'barrel', 'pillar', 'statue'].includes(G.world.shapes[id].tag) && !(mcOn && G.world.shapes[id].mov && G.world.shapes[id].mov.type === 'blade'))
     const hit = G.world.ray(o, dir.map(v => v / L), L, ids)
     if (hit < L) { const k2 = Math.max(2.6, hit - 0.4) / L; _v.set(o[0] + dir[0] * k2, o[1] + dir[1] * k2 + (1 - k2) * 1.4, o[2] + dir[2] * k2) }
   }

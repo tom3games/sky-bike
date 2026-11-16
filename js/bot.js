@@ -1,11 +1,11 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=73'
-import { VGEAR, holeOnTop } from './v51gear.js?v=73'
-import { doorAng } from './traps.js?v=73'
-import { BLADE } from './v37.js?v=73'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=73'
-import { K3 } from './v60.js?v=73'
-import { KC } from './v64.js?v=73'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=74'
+import { VGEAR, holeOnTop } from './v51gear.js?v=74'
+import { doorAng } from './traps.js?v=74'
+import { BLADE } from './v37.js?v=74'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=74'
+import { K3 } from './v60.js?v=74'
+import { KC } from './v64.js?v=74'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -20,7 +20,7 @@ export function createBot(course, o = {}) {
   for (const q of path) if (q.fork && q.fork.branchPath && q.fork.branchI == null) q.fork.branchI = path.indexOf(q.fork.branchPath[0])
   return { course, fork: o.fork || (o.skill === 'bad' ? 'L' : o.react > 0 ? 'safe' : 'hard') /* v16: 上手い bot は短い道、人の速さの bot は長い道 */, forkN: 0, path, hz: course.hazards || [], st: createSteer(path), i: 0, skill: o.skill || 'good', phase: 0, react: o.react || 0, queue: [], lat: o.lat || 0, vMul: o.vMul || 1 }
 }
-export function resetBot(bot, b) { bot.sn = null; bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
+export function resetBot(bot, b) { bot.sn = null; bot.armGo = false; bot.i = nearest(bot, b, 0, bot.path.length); resetSteer(bot.st, b); bot.phase = 0; bot.queue.length = 0; bot.jkDone = null; bot.corner = null; bot.liftGo = false; bot.backT = 0; bot.stuckT = 0; bot.creep = 0; bot.forkOn = false; bot.forkExit = false; bot.forkWant = null; bot.forkGo = false; bot.glPh = 0; bot.glGo = false }
 function nearest(bot, b, from, to) {
   let best = 1e9, bi = from
   const scan = (a, z) => { for (let i = Math.max(0, a); i < Math.min(bot.path.length, z); i++) {
@@ -478,6 +478,17 @@ function v16Input(bot, b, SQ, PV, c) {
   // 歯車: 跳ぶ所の速さの帯の真ん中。逆らう歯車の上では全開
   if (cur.kind === 'gear' && cur.gear.u < 0 && !c.air) return { thr: 1, brk: 0, lean: c.lean } // 逆らう歯車の上は全開
   const g0 = cur.kind === 'gear' ? cur : ahead(24, (q, dd) => q.kind === 'gear' && dd < 18 ? q : (q.kind === 'jump' && !q.gearJump ? null : undefined))
+  // v74 腕のある大きい歯車: 入口の 3m 手前で止まり、腕が入口を過ぎて、渡り切るまで次の腕が道にかからない時に全開で出る（止まった所から渡り切るまで 2.23 秒）
+  { const h = bot.hz.find(z => z.kind === 'gearArm' && Math.abs(z.p[1] + 0.8 - b.p[1]) < 2.5)
+    if (h && W) { const da = (h.p[0] - b.p[0]) * Math.cos(h.yaw) - (h.p[2] - b.p[2]) * Math.sin(h.yaw), dE = da - h.half, near = Math.hypot(h.p[0] - b.p[0], h.p[2] - b.p[2]) < h.half + 18
+      if (bot.armGo && (da < -h.half - 1 || !near)) bot.armGo = false
+      if (bot.armGo && !c.air) return { thr: 1, brk: 0, lean: c.lean }
+      if (near && !bot.armGo && dE > 0.8 && dE < 15 && !c.air && ahead(18, q => q.kind === 'gear' ? true : undefined)) {
+        bot.waiting = true; bot.stuckT = 0
+        if (dE < 4.4 && Math.abs(sp) < 0.6) { let ok = true; const late = (bot.react || 0) / 60; for (let t = 0.9 - late; t <= 2.35 + late + (bot.react ? 0.15 : 0); t += 0.05) if (h.unsafe(T + t)) { ok = false; break } if (ok) { bot.armGo = true; return { thr: 1, brk: 0, lean: c.lean } } return { thr: 0, brk: 0.6, lean: 0 } }
+        const stopAt = dE - 3, vMax = Math.sqrt(2 * 2.6 * Math.max(0, stopAt))
+        return stopAt > 0.3 ? { thr: sp < Math.min(vMax, 5) - 0.2 ? 0.7 : 0, brk: sp > vMax + 0.2 ? Math.min(1, (sp - vMax) * 0.5 + 0.3) : 0, lean: 0 } : { thr: 0, brk: Math.abs(sp) > 0.15 ? 1 : 0.6, lean: 0 }
+      } } }
   if (g0 && !c.air) return hold(g0.gear.vIn || 10)
   // 跳ね板: 決まった速さで入る
   const kj = ahead(24, (q, dd) => q.kickJump ? q : undefined)

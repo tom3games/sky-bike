@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=73'
+import { doorAng } from './traps.js?v=74'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -613,7 +613,7 @@ export const KICK_LEAD = +(globalThis.__kickLead ?? 0), KICK_ANY = !!(globalThis
 export const LAND = { crash: +(globalThis.__landCrashDeg ?? 35), ok: +(globalThis.__landOk ?? 20), span: 30, max: +(globalThis.__landMax ?? 0.3) } // v61 着地: 坂とのずれが ok 度までは減速なし、そこから span 度で最大 max（前向きの速さの割合）を失う
 export const NOFRONT_TIP = +(globalThis.__tip ?? 2600)
 export const NOFRONT_HOLD = 1.0 // v56 本人「脱輪から転び始めるまでを少し早く」2.0→1.0 // v51 前輪が外れてから、前へ倒れ始めるまでの秒
-export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5), fastV: +(globalThis.__waterFastV ?? 5.5), fastMax: +(globalThis.__waterFastMax ?? 6), fastP: +(globalThis.__waterFastP ?? 2) } // v52 水が押す強さ（1/秒）と上限（m/s²）
+export const WATER = { k: +(globalThis.__waterK ?? 0.8), cap: +(globalThis.__waterCap ?? 1.6), lat: +(globalThis.__waterLat ?? 0.55), uMul: +(globalThis.__waterU ?? 1.5), fastV: +(globalThis.__waterFastV ?? 5.5), fastMax: +(globalThis.__waterFastMax ?? 6), fastP: +(globalThis.__waterFastP ?? 2), side: +(globalThis.__waterSide ?? 0.87) /* v74 本人「水でバイクを押し出す力がちょっと強い。ほんの少し弱く」: 横へ流す水の速さを 13% 落とす（タイヤが流れに引かれる分も押す力も一緒に弱まる。見た目の流れも同じ速さ。止まると外へ流される性質はそのまま） */ } // v52 水が押す強さ（1/秒）と上限（m/s²）
 export const BRK_HOLD = 0.25 // v23: 急ブレーキで後輪を持ち上げるのは、ブレーキ全開をこの秒数（0.25 秒）より長く押し続けた時だけ
 export const BIKE = {
   m: 180, Ip: 60, g: 9.81,
