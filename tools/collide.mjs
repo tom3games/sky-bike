@@ -79,7 +79,7 @@ for (const cid of ids) {
   }
   // ---------- 2. 自動走行
   const runs = []
-  let pen = 0, tun = 0, bump = 0, steps = 0, finished = 0
+  let pen = 0, tun = 0, tunSlow = 0, tunKick = 0, bump = 0, steps = 0, finished = 0
   const exPen = [], exTun = [], exBump = []
   const feats = c.path.filter(q => q.kind !== 'road' && q.kind !== 'spiral' && q.kind !== 'narrow' && q.kind !== 'skyroad' && q.kind !== 'ramp' && q.kind !== 'bridge' && q.kind !== 'runway' && q.kind !== 'narrowSpiral' && q.p)
   const nearFeat = p => feats.some(q => Math.hypot(q.p[0] - p[0], q.p[1] - p[1], q.p[2] - p[2]) < 3.5)
@@ -105,7 +105,7 @@ for (const cid of ids) {
       for (let i = 0; i < 2 && !b.crashed; i++) {
         const cc = wheelCenter(b, B, i, b.s[i])
         // すり抜け: 車輪の中心が形の中
-        for (const id of w.near(cc[0], cc[1], cc[2], 0.4)) { const o = closest(w.shapes[id], cc[0], cc[1], cc[2], { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); if (o.d < -0.02) { tun++; if (exTun.length < 5) exTun.push({ cid, lat, vMul, s, p: cc.map(v => +v.toFixed(2)), tag: w.shapes[id].tag }); if (process.env.TUNLOG) console.log('TUN', JSON.stringify({ lat, vMul, s, wheel: i, p: cc.map(v => +v.toFixed(2)), d: +o.d.toFixed(3), tag: w.shapes[id].tag, mov: w.shapes[id].mov ? w.shapes[id].mov.type : null, sp: +b.speed.toFixed(2), vv: +Math.hypot(b.v[0], b.v[1], b.v[2]).toFixed(2), g: +b.g[0] + '' + +b.g[1], th: +(b.th * 57.3).toFixed(0), bi: bot.i, kind: c.path[bot.i] && c.path[bot.i].kind, cn: b.cn.map(z => z ? w.shapes[z.id].tag : '-').join('/') })) } }
+        for (const id of w.near(cc[0], cc[1], cc[2], 0.4)) { const o = closest(w.shapes[id], cc[0], cc[1], cc[2], { q: [0, 0, 0], n: [0, 0, 0], d: 0, feat: 0 }); if (o.d < -0.02) { const shT = w.shapes[id], vvT = Math.hypot(b.v[0], b.v[1], b.v[2]); /* v75 抜けていない 2 種は別枠で数える: 止まりかけ（0.7m/s 未満で動かない形に乗り上げている）・跳ね板が突き上げている最中（動き出して 0.2 秒以内） */ if (!shT.mov && vvT < 0.7) { tunSlow++; continue } if (shT.mov && shT.mov.type === 'kick' && shT.mov.trig != null && w.time - shT.mov.trig < 0.2) { tunKick++; continue } tun++; if (exTun.length < 5) exTun.push({ cid, lat, vMul, s, p: cc.map(v => +v.toFixed(2)), tag: w.shapes[id].tag }); if (process.env.TUNLOG) console.log('TUN', JSON.stringify({ lat, vMul, s, wheel: i, p: cc.map(v => +v.toFixed(2)), d: +o.d.toFixed(3), tag: w.shapes[id].tag, mov: w.shapes[id].mov ? w.shapes[id].mov.type : null, sp: +b.speed.toFixed(2), vv: +Math.hypot(b.v[0], b.v[1], b.v[2]).toFixed(2), g: +b.g[0] + '' + +b.g[1], th: +(b.th * 57.3).toFixed(0), bi: bot.i, kind: c.path[bot.i] && c.path[bot.i].kind, cn: b.cn.map(z => z ? w.shapes[z.id].tag : '-').join('/') })) } }
         // めり込み: 接地の深さ（底づきした後も残る深さ）
         const cn = b.cn[i]; deep[i] = cn && cn.depth > 0.07 ? deep[i] + 1 : 0
         if (deep[i] === 4) { pen++; if (exPen.length < 5) exPen.push({ cid, lat, vMul, s, depth: +cn.depth.toFixed(3), tag: w.shapes[cn.id].tag, p: cn.q.map(v => +v.toFixed(2)) }) }
@@ -123,7 +123,7 @@ for (const cid of ids) {
   const ng = ballNG + tun + pen + bump + headNG
   totalNG += ng
   console.log(`[${cid}] 頭の上の空き NG ${headNG} ${headNG ? JSON.stringify(headEx) : ''}`)
-  console.log(`[${cid}] 玉: ${drops} 点（転がった ${rolled}・止まりきらない ${unsettled}）NG ${ballNG} / 走行: ${runs.length} 本（完走 ${finished}）${steps} 刻み すり抜け ${tun} めり込み ${pen} 継ぎ目の跳ね ${bump}`)
+  console.log(`[${cid}] 玉: ${drops} 点（転がった ${rolled}・止まりきらない ${unsettled}）NG ${ballNG} / 走行: ${runs.length} 本（完走 ${finished}）${steps} 刻み すり抜け ${tun} めり込み ${pen} 継ぎ目の跳ね ${bump}（NG に数えない: 止まりかけの乗り上げ ${tunSlow} 刻み・跳ね板の突き上げ中 ${tunKick} 刻み）`)
   if (ballEx.length) console.log('  玉NG例', JSON.stringify(ballEx))
   if (exTun.length) console.log('  すり抜け例', JSON.stringify(exTun))
   if (exPen.length) console.log('  めり込み例', JSON.stringify(exPen))
