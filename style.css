@@ -145,6 +145,10 @@ html[lang=en] .stamp{font-size:15px}
 #touch .tb.nit{position:absolute;right:12px;bottom:102px;--n:1;background:radial-gradient(circle,rgba(13,14,12,.55) 62%,transparent 63%),conic-gradient(#5fb8ff calc(var(--n)*360deg),rgba(226,220,205,.12) 0);color:#9fd2ff}
 #touch .tb.nit span{color:#9fd2ff}
 #touch .tb.nit.empty{color:var(--ash);opacity:.6}
+/* v76 ブレーキとアクセルの境目: 親指 1 本で両方が入る細い帯（2 つのボタンの位置と大きさはそのまま。帯は境目の 12px と両側 6px ずつに重なる） */
+#touch .tb.both{position:absolute;right:78px;bottom:9px;width:24px;height:42px;border-radius:15px;z-index:2;background:rgba(13,14,12,.62);border-color:rgba(226,220,205,.3);color:var(--ash)}
+#touch .tb.both svg{width:16px;height:28px}
+#touch .tb.both.down{background:rgba(226,220,205,.3);border-color:var(--bone);color:var(--bone)}
 #touch .tb.nit.down{box-shadow:0 0 0 2px rgba(95,184,255,.5),0 0 26px rgba(95,184,255,.55)}
 #nitroHud{display:none!important;width:14px;height:36px;margin-left:12px;vertical-align:middle;filter:drop-shadow(0 0 6px rgba(95,184,255,.45))}
 #nitroHud.on{filter:drop-shadow(0 0 10px rgba(130,200,255,.95))}

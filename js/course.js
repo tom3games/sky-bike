@@ -1,19 +1,20 @@
 // コースの元データ。ここで作る形の一覧から、見た目のメッシュと物理の当たりを両方作る（同じデータ）。
-import * as Z from './zones.js?v=75'
-import * as P16 from './parts16.js?v=75'
-import { makeWorldX, addSupports, makeFork } from './world.js?v=75'
-import { lab16 } from './parts16.js?v=75'
-import * as P17 from './parts17.js?v=75'
-import * as V49 from './v49.js?v=75'
-import { finale } from './finale.js?v=75'
-import { WATER } from './physics.js?v=75'
-import { chaseGroup } from './v46.js?v=75'
-import { v51post } from './v51.js?v=75'
-import { v61post } from './v61.js?v=75'
-import { v62post } from './v62.js?v=75'
-import { v36traps } from './traps.js?v=75'
-import { descent } from './v48.js?v=75'
-import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=75'
+import * as Z from './zones.js?v=76'
+import * as P16 from './parts16.js?v=76'
+import { makeWorldX, addSupports, makeFork } from './world.js?v=76'
+import { lab16 } from './parts16.js?v=76'
+import * as P17 from './parts17.js?v=76'
+import * as V49 from './v49.js?v=76'
+import { finale } from './finale.js?v=76'
+import { WATER } from './physics.js?v=76'
+import { chaseGroup } from './v46.js?v=76'
+import { v51post } from './v51.js?v=76'
+import { v61post } from './v61.js?v=76'
+import { v62post } from './v62.js?v=76'
+import { v76post, lab76 } from './v76.js?v=76'
+import { v36traps } from './traps.js?v=76'
+import { descent } from './v48.js?v=76'
+import { makeBox, makeCyl, makeArc, makeSph, dsin, dcos, datan2, pendState, hingeAng, dropState, gustK, liftPos } from './physics.js?v=76'
 
 const DEG = Math.PI / 180
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
@@ -923,6 +924,7 @@ function finishCourse(B, o) {
   if (o.climb) v51post(B) // v51 落とし穴の一部をレーザーの床・爆発で消える床に
   if (o.climb) v61post(B) // v61 縁石の曲がり（自動の減速を外す）
   if (o.climb) v62post(B) // v62 技が要る近道（道の上のウィリー跳ね板）
-  return { ...o, v51: B.v51 || null, v61: B.v61 || null, v62: B.v62 || null, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
+  if (o.climb) v76post(B) // v76 頭を使う仕掛け 2 つ（押す石と門・ローラーの巻き上げ機。今ある道の上に足すだけ）
+  return { ...o, v51: B.v51 || null, v61: B.v61 || null, v62: B.v62 || null, v76: B.v76 || null, boulder: B.boulder || null, towers: B.towers || [], pillars: B.pillars || [], torches: B.torches, tuts: B.tuts, plats: B.plats || [], props: B.props || [], lavaY: B.lavaY, lavaKill: B.lavaKill, marks: B.marks || [], winds: B.winds || [], risers: B.risers || [], doors: B.doors || [], hazards: B.hazards || [], waters: B.waters || [], flags: B.flags || [], shapes, cps, path: B.path, signs: B.signs, decor: B.decor, notes: B.notes, cans: B.cans || [], drums: B.drums || [], traps: B.traps || [], chases: B.chases || [], v37: B.v37 || null, v37added: B.v37added || 0, epi: B.epi || null, tower: B.tower, castleAt: B.castleAt, spawn: { p: sp.p, yaw: sp.yaw } }
 }
-export const COURSES = { practice, stage1, lab16, lab17: P17.lab17, lab49: (...a) => V49.lab49(...a) }
+export const COURSES = { practice, stage1, lab16, lab17: P17.lab17, lab49: (...a) => V49.lab49(...a), lab76: (...a) => lab76(...a) }

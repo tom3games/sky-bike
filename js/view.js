@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=75'
+import { arcPoint } from './physics.js?v=76'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -269,7 +269,8 @@ export function buildCourse(course, scene, nowZones = null) {
       else { g = shapeGeometry(s).side; g.translate(-(s.a[0] + s.b[0]) / 2, -(s.a[1] + s.b[1]) / 2, -(s.a[2] + s.b[2]) / 2) }
       if (g.index) g = g.toNonIndexed()
       const mat = M[s.mat] || M.rock // 材料は同じ物を使い回す（動く物が多くても、読み込みと描画を重くしない）
-      if (s.type === 'box') { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * s.h[0] * 2 / mat.userData.rep, uv.getY(i) * s.h[2] * 2 / mat.userData.rep) }
+      if (s.type === 'box' && s.mov.g76) { const uv = g.attributes.uv, n = uv.count / 6, D = [[s.h[2], s.h[1]], [s.h[2], s.h[1]], [s.h[0], s.h[2]], [s.h[0], s.h[2]], [s.h[0], s.h[1]], [s.h[0], s.h[1]]]; for (let i = 0; i < uv.count; i++) { const d = D[Math.floor(i / n)]; uv.setXY(i, uv.getX(i) * d[0] * 2 / mat.userData.rep, uv.getY(i) * d[1] * 2 / mat.userData.rep) } } /* v76 石・門の板: 面ごとの大きさで模様を貼る（縦の広い面で模様が伸びない） */
+      else if (s.type === 'box') { const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * s.h[0] * 2 / mat.userData.rep, uv.getY(i) * s.h[2] * 2 / mat.userData.rep) }
       else if (s.type !== 'sph') worldUV(g, s.type === 'arc' ? (mat.userData.rep || 2) : 1)
       const mesh = new THREE.Mesh(g, mat); mesh.castShadow = true; mesh.receiveShadow = true; mesh.matrixAutoUpdate = false
       mesh.userData.shape = s; mesh.name = 'mover'

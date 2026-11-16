@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=75'
+import { doorAng } from './traps.js?v=76'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -293,7 +293,7 @@ function spikeTrack(world, b, ev) {
       break }
   }
 }
-export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'spike') m.t0 = null; if (m.type === 'fuse') { m.t0 = null; m.done = false; s.gone = false } if (m.type === 'blast') { m.G.t0 = null; s.gone = false } if (m.type === 'blastLip') s.gone = true; if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world) }
+export function resetFallen(world) { for (const s of world.moving) { const m = s.mov; if (m.type === 'sense') { m.st = 'wait'; m.load = 0; m.idle = 0; m.t0 = 0 } if (m.type === 'spike') m.t0 = null; if (m.type === 'fuse') { m.t0 = null; m.done = false; s.gone = false } if (m.type === 'blast') { m.G.t0 = null; s.gone = false } if (m.type === 'blastLip') s.gone = true; if (m.type === 'trap' || (m.type === 'crumble' && (m.once || m.chase))) { s.gone = false; s.touch = 0; s.warnT = null; if (m.chase) { s.goneAt = -1e9; m.chase.G.t0 = null } } } resetDrums(world); if (world.g76) for (const G of world.g76) { G.wheelOn = false; G.hold = false; G.on = false; G.spin = 0 } /* v76 出し直し: 石の場所・門・格子の高さはそのまま（押した分・巻き上げた分は残る）。前のバイクが載っていた・真下にいた、という覚えだけ消す */ }
 // v35 回る筒: 口の板の開け閉め。最初は入口 A が開き（板なし）、出口 B が閉じている。真上を越えたら A が閉じ B が開く（js/drum.js）
 export function resetDrums(world) { for (const D of world.drums) D.open = false; setGates(world); resetGirders(world); for (const s of world.moving) if (s.mov.type === 'blade') { s.mov.t0 = null; s.mov.tBack = null } }
 // v37 風車の羽根: 乗ると回り始め（w rad/s）、先が aTop で止まる。降りて 1.5 秒で元へ戻る
@@ -388,6 +388,70 @@ function flowTan(sh, q) { const dx = q[0] - sh.cx, dz = q[2] - sh.cz, L = Math.s
 // 突風の強さ 0..1（周期の 3 割ほどだけ強く吹く。ほかは凪）
 export function gustK(g, t) { const v = dsin(t * g.w + g.ph); return v > 0.55 ? ((v - 0.55) / 0.45) : 0 }
 
+// ------------------------------------------------------------ v76 頭を使う仕掛け 2 つ（置くのは js/v76.js。道の形は変えず、今ある道の上に足す）
+// A 押す石・床のボタン・上から閉じる門: G = { kind: 'A', ax（道の向き）, len（石が溝の端まで動ける長さ）, pressAt（石の先がボタンに掛かる所）, Hopen, vUp, vDown, M, mu, block, btn, gate }
+//   石は道の向きにだけ動く（床の溝）。バイクの当たりの力と、深く当たった時の勢いの受け渡しで進む。後ろへは戻らない（溝の歯）。溝の端＝ボタンの上で止まる
+//   ボタンは石か車輪が載っている間だけ沈む。沈んでいる間は門が vUp で上がり、離れると vDown でゆっくり下りる。門の下に何かいる間は下りない
+// B 後輪で回すローラーと落とし格子: G = { kind: 'B', c（2 本のローラーの真ん中）, f, half, w, T（全開の空転で上がり切るまでの秒）, Hopen, grate }
+//   平らな所でブレーキとアクセルを同時に押すと、前輪だけ止まって後輪が空転する（b.burn・b.spin）。ローラーの上でやると巻き上げ機が回って格子が上がる。離しても歯止めで下がらない
+export const V76 = { M: +(globalThis.__pbM ?? 150), mu: +(globalThis.__pbMu ?? 0.45), spinMax: 16, burnV: 1.5, grip: 0.2, btnDrop: 0.05 }
+export function reset76(G) { if (G.kind === 'A') { G.x = 0; G.v = 0; G.fAcc = 0; G.k = 0; G.h = 0; G.vh = 0; G.pressed = false; G.wheelOn = false; G.hold = false; G.hitV = 0; G._pp = false; G._ph = 0; G._pv = 0 } else { G.prog = 0; G.h = 0; G.vh = 0; G.on = false; G.rollT = -9; G.spin = 0; G.turn = 0; G._pn = 0; G._top = false } }
+function place76(s) { const m = s.mov, G = m.g76, c0 = s.base.c
+  if (m.type === 'pblock') { s.c[0] = c0[0] + G.ax[0] * G.x; s.c[2] = c0[2] + G.ax[2] * G.x }
+  else if (m.type === 'pbtn') s.c[1] = c0[1] - V76.btnDrop * G.k
+  else s.c[1] = c0[1] + G.h
+  for (let k = 0; k < 3; k++) { s.min[k] = s.c[k] - s.bb[k]; s.max[k] = s.c[k] + s.bb[k] } }
+// 石を 1 刻み進める（前へだけ。止まっている時は、摩擦より強く押された時だけ動き出す）
+function blockStep(G) {
+  const fr = G.mu * G.M * 9.81, F = G.fAcc; G.fAcc = 0
+  if (G.x >= G.len) { G.v = 0; return }
+  if (G.v <= 1e-4) { if (F <= fr) { G.v = 0; return } G.v = (F - fr) / G.M * H } else { G.v += (F - fr) / G.M * H; if (G.v < 0) G.v = 0 }
+  G.x += G.v * H
+  if (G.x >= G.len) { G.x = G.len; G.hitV = G.v; G.v = 0 }
+  place76(G.block)
+}
+// 1 コマ分（60Hz）: ボタンと門、格子の高さ
+function step76(world) {
+  for (const G of world.g76) {
+    const h0 = G.h
+    if (G.kind === 'A') {
+      G.pressed = G.x >= G.pressAt || !!G.wheelOn
+      G.k += clamp((G.pressed ? 1 : 0) - G.k, -DT / 0.12, DT / 0.12)
+      if (G.pressed) G.h = Math.min(G.Hopen, G.h + G.vUp * DT); else if (!G.hold) G.h = Math.max(0, G.h - G.vDown * DT)
+    } else G.h = G.Hopen * Math.min(1, G.prog)
+    G.vh = (G.h - h0) / DT
+  }
+}
+// 1 コマに 1 回、バイクとの関わりを見る: ボタンに車輪が載っているか・門の下にいるか・ローラーの上で後輪を空転させているか
+function track76(world, b, ev) {
+  for (const G of world.g76) {
+    if (G.kind === 'A') {
+      G.wheelOn = [0, 1].some(i => b.g[i] && b.cn[i] && b.cn[i].id === G.btn.id)
+      const gc = G.gate.base.c, dx = b.p[0] - gc[0], dz = b.p[2] - gc[2], al = dx * G.ax[0] + dz * G.ax[2], la = -dx * G.ax[2] + dz * G.ax[0]
+      G.hold = al > -0.55 && al < 1.3 && Math.abs(la) < 4 && b.p[1] > G.y0 - 1 && b.p[1] < G.y0 + 4 /* 車体が門の真下にいる間だけ（手前に近づいただけでは止めない） */
+      if (ev) {
+        if (G.pressed !== G._pp) ev.push({ t: G.pressed ? 'pbPress' : 'pbRelease', byBlock: G.x >= G.pressAt })
+        if (G.h >= G.Hopen && G._ph < G.Hopen) ev.push({ t: 'pgTop' }); if (G.h <= 0 && G._ph > 0) ev.push({ t: 'pgShut' })
+        if (G.v > 0.25 && G._pv <= 0.25) ev.push({ t: 'pbPush', v: G.v }); if (G.hitV > 0) ev.push({ t: 'pbStop', v: G.hitV })
+      }
+      G.hitV = 0; G._pp = G.pressed; G._ph = G.h; G._pv = G.v
+    } else {
+      const B = basis(b), c = wheelCenter(b, B, 0, b.s[0]), dx = c[0] - G.c[0], dz = c[2] - G.c[2], al = dx * G.f[0] + dz * G.f[2], la = -dx * G.f[2] + dz * G.f[0]
+      G.on = !b.crashed && b.g[0] && Math.abs(al) < G.half && Math.abs(la) < G.w / 2 && Math.abs(c[1] - G.c[1]) < 0.7
+      G.spin = G.on && b.burn ? (b.spin || 0) : 0
+      if (G.spin > 0 && G.prog < 1) G.prog = Math.min(1, G.prog + G.spin / V76.spinMax * DT / G.T)
+      G.turn += G.spin * DT
+      if (ev) {
+        const n = Math.floor(G.prog * G.notch); if (n > G._pn) ev.push({ t: 'wNotch', n })
+        if (G.prog >= 1 && !G._top) ev.push({ t: 'wTop' })
+        if (G.on && !b.burn && Math.abs(b.speed) > 1.5 && world.time - G.rollT > 1.2) { G.rollT = world.time; ev.push({ t: 'wRoll', v: b.speed }) }
+        G._pn = n
+      }
+      G._top = G.prog >= 1
+    }
+  }
+}
+
 // ------------------------------------------------------------ 世界（形の一覧と格子）
 const CELL = 4
 const key = (i, j, k) => (i + 1024) * 4194304 + (j + 1024) * 2048 + (k + 1024)
@@ -408,6 +472,7 @@ export class World {
       if (s.mov && s.mov.type === 'fuse') { (this.fuses = this.fuses || []).push(s); s.mov.t0 = null; s.mov.done = false; s.gone = false }
       if (s.mov && s.mov.type === 'blastLip') { s.gone = true }
       if (s.mov && s.mov.type === 'blast') { this.blasts = this.blasts || []; if (!this.blasts.includes(s.mov.G)) this.blasts.push(s.mov.G); s.mov.G.t0 = null; (s.mov.G.boxes = s.mov.G.boxes || []).includes(s) || s.mov.G.boxes.push(s) }
+      if (s.mov && s.mov.g76) { this.g76 = this.g76 || []; if (!this.g76.includes(s.mov.g76)) { this.g76.push(s.mov.g76); reset76(s.mov.g76) } if (s.mov.type === 'pblock') (this.pblocks = this.pblocks || []).push(s.mov.g76) }
       if (s.mov && s.mov.type === 'sense') { (this.senses = this.senses || []).push(s); s.mov.st = 'wait'; s.mov.load = 0; s.mov.idle = 0; s.mov.t0 = 0 }
       if (s.mov && s.type === 'cyl') { s.c = [(s.a[0] + s.b[0]) / 2, (s.a[1] + s.b[1]) / 2, (s.a[2] + s.b[2]) / 2]; this.moving.push(s) }
       else if (s.mov) {
@@ -459,6 +524,7 @@ export class World {
       else if (m.type === 'blast') { if (t === 0 || (m.G.t0 != null && t - m.G.t0 > m.G.back)) { if (s.gone || m.G.t0 != null) { s.gone = false } } if (t === 0) m.G.t0 = null }
       else if (m.type === 'spike') { if (t === 0) m.t0 = null; const k = spikeK(m, t); s.c = [B0.c[0] + m.up[0] * m.rise * k, B0.c[1] + m.up[1] * m.rise * k, B0.c[2] + m.up[2] * m.rise * k]; if (m.t0 != null && t - m.t0 > 2.6) m.t0 = null } // v51 レーザーで突き上がる床
       else if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle' || m.type === 'topple') v16Pose(s, t, dtT)
+      else if (m.g76) { if (t === 0) reset76(m.g76); place76(s) }
       if (m.type === 'crumble') { if (s.gone && t - s.goneAt > m.back) { s.gone = false; s.touch = 0 } else if (!s.gone && s.touch > 0 && s.lastTouch !== undefined && t - s.lastTouch > 1.5) s.touch = 0 }
     }
     for (const G of this.chases || []) { if (t === 0 || (G.t0 != null && t - G.t0 > G.reset)) G.t0 = null }
@@ -472,6 +538,7 @@ export class World {
         m.w += (tq + (m.ang0 - m.ang) * m.k - m.w * m.damp) / m.I * H; m.ang += m.w * H
         if (m.ang < m.min) { m.ang = m.min; if (m.w < 0) m.w = 0 } if (m.ang > m.max) { m.ang = m.max; if (m.w > 0) m.w = 0 }
       } }
+    if (this.g76) step76(this)
     this.setTime(this.time + DT)
   }
   // 動く足場の、点 q での速さ
@@ -489,6 +556,8 @@ export class World {
     if (m.type === 'gear') { const o = m.om, r = [q[0] - s.a[0], q[1] - s.a[1], q[2] - s.a[2]]; return [o[1] * r[2] - o[2] * r[1], o[2] * r[0] - o[0] * r[2], o[0] * r[1] - o[1] * r[0]] }
     if (m.type === 'topple') { const w = m.wNow || 0, R0 = m.right, r = [q[0] - m.hinge[0], q[1] - m.hinge[1], q[2] - m.hinge[2]]; return [w * (R0[1] * r[2] - R0[2] * r[1]), w * (R0[2] * r[0] - R0[0] * r[2]), w * (R0[0] * r[1] - R0[1] * r[0])] }
     if (m.type === 'wave' || m.type === 'kick' || m.type === 'shuttle') return s.vel ? s.vel.slice() : [0, 0, 0]
+    if (m.type === 'pblock') return [m.g76.ax[0] * m.g76.v, 0, m.g76.ax[2] * m.g76.v]
+    if (m.type === 'pgate' || m.type === 'wgrate') return [0, m.g76.vh, 0]
     return null
   }
   near(x, y, z, rad) {
@@ -701,6 +770,7 @@ export function stepBike(world, b, inp, ev) {
   if (!b.ghost && world.blasts) blastTrack(world, b, ev)
   if (!b.ghost && world.fuses) fuseTrack(world, b, ev)
   if (!b.ghost) v16Track(world, b, ev)
+  if (!b.ghost && world.g76) track76(world, b, ev)
   if (b._kickSpin) { if (!b.g[0] && !b.g[1]) { b.w += b._kickSpin; b._kickSpin = 0 } else if (world.time - b._kickT > 1.5) b._kickSpin = 0 }
   b.steps++
 }
@@ -750,6 +820,12 @@ function sub(world, b, inpIn, ev) {
   const velAt = q => { const v = velAt0(q); if (curId < 0 || curId === b.carryId) return v; const sh = world.shapes[curId]; const u = sh.mov ? world.shapeVel(sh, q) : sh.flow || (sh.flowR ? flowRad(sh, q) : sh.flowT ? flowTan(sh, q) : null); return u ? [v[0] - u[0], v[1] - u[1], v[2] - u[2]] : v } // 湧き水の流れの上は、水と一緒に動く面として扱う
   if (b.carryId >= 0) { const sh = world.shapes[b.carryId]; if (sh.mov && FICT.has(sh.mov.type)) { const a = frameAcc(sh, b.p); fx -= P.m * a[0]; fy -= P.m * a[1]; fz -= P.m * a[2] } }
   const ids = world.near(b.p[0], b.p[1], b.p[2], 2.4)
+  const pbOf = id => { const m = world.shapes[id].mov; return m && m.type === 'pblock' ? m.g76 : null }
+  const pbPush = (id, F) => { if (b.ghost || !world.pblocks) return; const G = pbOf(id); if (G) G.fAcc -= F[0] * G.ax[0] + F[2] * G.ax[2] } /* v76 石がバイクから受ける力（バイクが受けた力の逆向き） */
+  // v76 平らな所でブレーキとアクセルを同時に押すと、前輪だけ止まって後輪が空転する（その場で煙。前へはほとんど進まない）
+  { /* 平らかどうかは車体の傾きで見る（約 7 度まで。ローラーの丸い面に載っていても同じ） */
+    b.burn = !b.crashed && !b.hang && inp.thr > 0.5 && inp.brk > 0.5 && !inp._auto && b.g[0] && b.g[1] && Math.abs(B.f[1]) < 0.12 && B.u[1] > 0 /* 角度そのもの（b.th）は宙返りや回る筒で 1 回転ぶん増えているので、車体の前向きの傾きで見る */ && Math.abs(b.speed) < V76.burnV
+    b.spin = b.burn ? Math.min(V76.spinMax * inp.thr, (b.spin || 0) + 40 * H) : Math.max(0, (b.spin || 0) - 60 * H) }
   // 深く沈んだ接触は、沈む向きの速さをその場で打ち消す（強い着地でも面の奥へ入り込ませない）
   const stopSink = (q, n, depth) => {
     if (depth < 0.05) return
@@ -758,9 +834,11 @@ function sub(world, b, inpIn, ev) {
     const rx = q[0] - b.p[0], ry = q[1] - b.p[1], rz = q[2] - b.p[2]
     const cx = ry * n[2] - rz * n[1], cy = rz * n[0] - rx * n[2], cz = rx * n[1] - ry * n[0]
     const rn = cx * B.R[0] + cy * B.R[1] + cz * B.R[2]
-    const j = -vn / (1 / P.m + rn * rn / P.Ip) * Math.min(1, (depth - 0.05) / 0.04 + 0.25)
+    const pb = curId >= 0 && !b.ghost && world.pblocks ? pbOf(curId) : null, na = pb ? n[0] * pb.ax[0] + n[2] * pb.ax[2] : 0, free = pb && pb.x < pb.len && na < 0 /* v76 押す石: 止まった壁でなく、重さ M の物として勢いを分け合う（速く当たるほど石が進む） */
+    const j = -vn / (1 / P.m + rn * rn / P.Ip + (free ? na * na / pb.M : 0)) * Math.min(1, (depth - 0.05) / 0.04 + 0.25)
     b.v[0] += n[0] * j / P.m; b.v[1] += n[1] * j / P.m; b.v[2] += n[2] * j / P.m
     b.w += rn * j / P.Ip
+    if (free) pb.v -= na * j / pb.M
   }
 
   // ---- 車輪
@@ -784,7 +862,8 @@ function sub(world, b, inpIn, ev) {
       // 低いギア: 段の角や壁を後輪で登る時（接地の向きが立っている時）は力が増える
       const nR = Math.abs(n[0] * B.R[0] + n[1] * B.R[1] + n[2] * B.R[2]), nF = n[0] * B.f[0] + n[1] * B.f[1] + n[2] * B.f[2]
       const climb = n[1] < 0.9 && nR < 0.5 && nF < 0 ? 1 + 0.9 * Math.min(1, (0.9 - n[1]) / 0.5) : 1
-      if (inp.thr > 0) {
+      if (b.burn) Ft += V76.grip * lim * inp.thr /* v76 空転しているタイヤが地面を掻く分だけ */
+      else if (inp.thr > 0) {
         const nk = b.nitroOn ? 1 : 0
         const drv = P.drive * climb, pwr = P.power, top = nk ? P.nitroTop : P.vtop
         let fd = inp.thr * Math.min(drv, pwr / Math.max(1, vt))
@@ -810,7 +889,8 @@ function sub(world, b, inpIn, ev) {
     if (inp.thr > 0 && vt < -0.15 && b.wasRev) Ft += clamp(-vt * 3000, 0, 1) * 0.7 * lim * inp.thr // ブレーキで下がっていた時だけ（段に当たって戻された時などは今まで通り）
     // 曲がりの手前の自動の減速（後輪だけ。前に傾かない）。steer.js の assist が入れる
     if (i === 0 && inp.ab > 0 && vt > 0.5) Ft -= 0.9 * lim * inp.ab
-    if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
+    if (b.burn) { if (i) Ft += -clamp(vt * 3000, -1, 1) * lim * inp.brk } /* v76 空転中: 前輪のブレーキだけで止める */
+    else if (inp.brk > 0 && !(i === 0 && vt < 0.6 && !b.onMov) && !(b.revT > revHold(b) && vt < 0.6)) Ft += -clamp(vt * 3000, -1, 1) * (i ? fb : 0.95) * lim * inp.brk
     Ft -= vt * 6 + (vt > 0 ? 1 : -1) * 0.012 * N // 転がり
     if (b.carryId >= 0 && con.id === b.carryId && inp.thr <= 0.05 && inp.brk <= 0.05 && !NOIDLE.has(world.shapes[con.id].mov.type)) Ft -= clamp(vt * 900, -0.6 * lim, 0.6 * lim) // 動く床の上で何もしない時は、床と一緒に止まる（転がって取り残されない）
     { const sh = world.shapes[con.id]; if (sh.mud) Ft -= clamp(vt, -3, 3) * sh.mud } // 泥: 車輪が沈んで重い
@@ -824,6 +904,7 @@ function sub(world, b, inpIn, ev) {
     if (tot > lim) { Ft *= lim / tot; Fl *= lim / tot }
     const Fw = [n[0] * N + t[0] * Ft + lat[0] * Fl, n[1] * N + t[1] * Ft + lat[1] * Fl, n[2] * N + t[2] * Ft + lat[2] * Fl]
     addF(Fw, q, 'w' + i + (con.side ? 's' : ''))
+    pbPush(con.id, Fw)
     { const sh = world.shapes[con.id], m = sh.mov; if (m && m.type === 'seesaw' && !b.ghost) { const r = [q[0] - m.pivot[0], q[1] - m.pivot[1], q[2] - m.pivot[2]]; m.tqSum = (m.tqSum || 0) - ((r[1] * Fw[2] - r[2] * Fw[1]) * m.right[0] + (r[2] * Fw[0] - r[0] * Fw[2]) * m.right[1] + (r[0] * Fw[1] - r[1] * Fw[0]) * m.right[2]); m.tqN = (m.tqN || 0) + 0.5 } }
     return vt
   }
@@ -883,7 +964,7 @@ function sub(world, b, inpIn, ev) {
       stopSink(side.q, side.n, side.depth)
       if (!con) vt = v2
     }
-    b.wheelRot[i] += vt * H / (P.R + P.rt)
+    b.wheelRot[i] += (vt + (i === 0 ? b.spin || 0 : 0)) * H / (P.R + P.rt)
     if (i === 0) b.vtRel = (con || side) ? vt : null
   }
   // ---- v36 油だまり: 油の上でアクセル・ブレーキ（自動の減速も）・体重のどれかを押すと、後輪が滑って横へ流れ道から外れる。何も押さずに惰性で抜ければまっすぐ
@@ -912,7 +993,7 @@ function sub(world, b, inpIn, ev) {
 }
   // ---- 止まってブレーキを押し続けた時間（下がるかどうか）
   // 動く床の上か（床の速さに対する速さで止まっているかを見る。床の上では、止まっているブレーキは床と一緒に運ばれるだけ。下がるのは長押しした時だけ）
-  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; const still = sh => sh.mov.type === 'crumble' || sh.mov.type === 'brk' || sh.mov.type === 'gate' || (sh.mov.type === 'kick' && sh.mov.trig == null) // v29: 下りて止まっている跳ね板の上はふつうの床（ブレーキ長押しで下がれる）
+  { const sh0 = b.cn[0] && world.shapes[b.cn[0].id], sh1 = b.cn[1] && world.shapes[b.cn[1].id]; const still = sh => sh.mov.type === 'crumble' || sh.mov.type === 'brk' || sh.mov.type === 'gate' || !!sh.mov.g76 || (sh.mov.type === 'kick' && sh.mov.trig == null) // v29: 下りて止まっている跳ね板の上はふつうの床（ブレーキ長押しで下がれる）
     b.onMov = !!((sh0 && sh0.mov && !still(sh0)) || (sh1 && sh1.mov && !still(sh1))) }
   const vr = b.vtRel != null ? b.vtRel : b.speed
   // v29 本人「ジャンプ台に乗ったままバックできない」: 登り坂（車体が 8 度より上を向いている）では、前体重のままでも・少し動いていても下がれる
@@ -960,7 +1041,7 @@ function sub(world, b, inpIn, ev) {
     const N = Math.max(0, P.kr * con.depth - P.cr * vn)
     const vt = [vq[0] - n[0] * vn, vq[1] - n[1] * vn, vq[2] - n[2] * vn], vtl = Math.sqrt(vt[0] * vt[0] + vt[1] * vt[1] + vt[2] * vt[2]) || 1
     const Ff = Math.min(0.5 * N, vtl * 3000)
-    addF([n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff], con.q, 'frame')
+    { const Fq = [n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff]; addF(Fq, con.q, 'frame'); pbPush(con.id, Fq) }
     b.scrape = Math.max(b.scrape, con.depth)
     stopSink(con.q, n, con.depth + 0.03)
     if (-vn > P.hardLand * 0.8 && !b.crashed && ev && !(b.thudT > 0)) { ev.push({ t: 'thud', v: -vn }); b.thudT = 0.3 }
@@ -1002,7 +1083,9 @@ function sub(world, b, inpIn, ev) {
     const rp = riderPts(b, B)
     for (let k = 0; k < rp.length; k++) {
       const con = world.sphere(rp[k].c[0], rp[k].c[1], rp[k].c[2], rp[k].r, ids)
-      if (con && con.depth > 0.01 && !world.shapes[con.id].knock && !smash(world, b, con, velAt0, ev)) { crash(b, k === 2 ? 'head' : 'body', 0, ev); break }
+      if (con && con.depth > 0.01 && !world.shapes[con.id].knock && !smash(world, b, con, velAt0, ev)) { crash(b, k === 2 ? 'head' : 'body', 0, ev)
+        { const m76 = world.shapes[con.id].mov; if (m76 && (m76.type === 'pgate' || m76.type === 'wgrate')) { const ax = m76.g76.ax || m76.g76.f, vf = b.v[0] * ax[0] + b.v[2] * ax[2]; if (vf > 0) { b.v[0] -= ax[0] * vf * 1.2; b.v[2] -= ax[2] * vf * 1.2 } b.w += 3.2; b.crashed.gate = true } } /* v76 門の下端・格子に頭や胸が当たった: 重い板は動かないので、はね返されて（当たった速さの 2 割で戻る）後ろへ倒れる。門の手前に残る */
+        break }
     }
   } else {
     // 転倒後は人の当たりも柔らかく入れる（車体が地面に沈まないように）
@@ -1014,6 +1097,7 @@ function sub(world, b, inpIn, ev) {
       const vt = [vq[0] - n[0] * vn, vq[1] - n[1] * vn, vq[2] - n[2] * vn], vtl = Math.sqrt(vt[0] * vt[0] + vt[1] * vt[1] + vt[2] * vt[2]) || 1
       const Ff = Math.min(0.6 * N, vtl * 2000)
       addF([n[0] * N - vt[0] / vtl * Ff, n[1] * N - vt[1] / vtl * Ff, n[2] * N - vt[2] / vtl * Ff], con.q)
+      { const m76 = world.shapes[con.id].mov; if (m76 && (m76.type === 'pgate' || m76.type === 'wgrate')) stopSink(con.q, n, con.depth + 0.05) } /* v76 門の板・落とし格子は体がすり抜けない硬い物: 当たった所（頭・胸）の勢いをその場で止める → 頭を支点に車体が後ろへ回って倒れる */
     }
   }
   // ---- 空気
@@ -1197,6 +1281,7 @@ function sub(world, b, inpIn, ev) {
     if (b.airT > 0.25 && ev) ev.push({ t: 'land', air: b.airT, impact: b.impact, mis, loss }); b.airT = 0 }
   if (b.crashed) b.crashed.t += H
   if (b.thudT > 0) b.thudT -= H
+  if (!b.ghost && world.pblocks) for (const G of world.pblocks) blockStep(G)
 }
 function crash(b, why, v, ev) {
   b.crashed = { why, v, t: 0, at: b.p.slice() }

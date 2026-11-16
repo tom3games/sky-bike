@@ -8,30 +8,31 @@ import { ShaderPass } from '../vendor/jsm/postprocessing/ShaderPass.js'
 import { GTAOPass } from '../vendor/jsm/postprocessing/GTAOPass.js'
 import { HDRLoader } from '../vendor/jsm/loaders/HDRLoader.js'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { buildGimmicks } from './gimmicks.js?v=75'
-import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=75'
-import { COURSES } from './course.js?v=75'
-import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=75'
-import { BikeView, snap } from './bikeview.js?v=75'
-import { createBot, botInput, resetBot } from './bot.js?v=75'
-import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=75'
-import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=75'
-import { Birds } from './birds.js?v=75'
-import { crowPush } from './strike.js?v=75'
-import { buildV35, hankieDataURL } from './v35view.js?v=75'
-import { buildRecorder } from './recorder.js?v=75'
-import { buildV36 } from './v36view.js?v=75'
-import { buildLady } from './lady.js?v=75'
-import { buildElder, ELDER } from './elder.js?v=75'
-import { buildBoulder } from './v41view.js?v=75'
-import { buildMotes } from './motes.js?v=75'
-import { buildMurals } from './murals.js?v=75'
-import { buildV37 } from './v37view.js?v=75'
-import { buildV51 } from './v51view.js?v=75'
-import { buildEpi, wheelProp } from './v48view.js?v=75'
-import { buildSenseLamps } from './v49view.js?v=75'
-import { doorAng } from './traps.js?v=75'
-import { resetDrums } from './physics.js?v=75'
+import { buildGimmicks } from './gimmicks.js?v=76'
+import { DT, World, createBike, stepBike, basis, hashBike, BIKE, wheelCenter, closest } from './physics.js?v=76'
+import { COURSES } from './course.js?v=76'
+import { buildCourse, buildDecor, buildMountains, buildChains, buildUnderRocks, buildFloaters, buildGrass, buildTitleIsland, buildCards, buildLava, buildFogLayers, buildFlames, updateFlames, buildSigns, buildSky, setAniso, updateMovers, updateLOD, buildValley, buildCrown, buildSupportDecor, FOG_FACTOR, PAL } from './view.js?v=76'
+import { BikeView, snap } from './bikeview.js?v=76'
+import { createBot, botInput, resetBot } from './bot.js?v=76'
+import { judge, doRespawn, spawnAtCp, riserY, rerollTraps } from './run.js?v=76'
+import { createSteer, steerFor, resetSteer, assist } from './steer.js?v=76'
+import { Birds } from './birds.js?v=76'
+import { crowPush } from './strike.js?v=76'
+import { buildV35, hankieDataURL } from './v35view.js?v=76'
+import { buildRecorder } from './recorder.js?v=76'
+import { buildV36 } from './v36view.js?v=76'
+import { buildLady } from './lady.js?v=76'
+import { buildElder, ELDER } from './elder.js?v=76'
+import { buildBoulder } from './v41view.js?v=76'
+import { buildMotes } from './motes.js?v=76'
+import { buildMurals } from './murals.js?v=76'
+import { buildV37 } from './v37view.js?v=76'
+import { buildV51 } from './v51view.js?v=76'
+import { buildEpi, wheelProp } from './v48view.js?v=76'
+import { buildSenseLamps } from './v49view.js?v=76'
+import { buildV76 } from './v76view.js?v=76'
+import { doorAng } from './traps.js?v=76'
+import { resetDrums } from './physics.js?v=76'
 
 window.__jsUp = true
 const $ = id => document.getElementById(id)
@@ -217,6 +218,7 @@ function soundUpdate(dt) {
     const spin = b && b.g[0] && thr > 0 && Math.abs(b.speed) < 2.5 // 登れずに後輪が空回り
     let tgt = gr ? 0.18 + 0.7 * frac * (0.4 + 0.6 * thr) + thr * 0.12 : (thr ? 1.05 : 0.3)
     if (spin) tgt = Math.max(tgt, 0.85)
+    if (b && b.burn) tgt = 1.12 /* v76 ブレーキ＋アクセルで後輪が空転 */
     if (b && b.nitroOn) tgt = Math.min(1.25, tgt + 0.22)
     G.rpm += (tgt - G.rpm) * Math.min(1, dt * (thr ? (gr ? 7 : 11) : 2.6))
     if (G.prevThr > 0 && !thr) G.burble = 0.7
@@ -338,6 +340,7 @@ function loadCourse(id) {
   if (G.v51) scene.remove(G.v51.group); G.v51 = c.climb ? buildV51(c, scene) : null // v51 黄色いレーザーの床・爆発で消える床
   if (G.epiV) scene.remove(G.epiV.group); G.epiV = c.epi ? buildEpi(c, scene, M) : null; if (!G.wheelProp) G.wheelProp = wheelProp(scene); G.wheelProp.hide() // v48 下山の終わりの小屋 // v51 外れた前輪
   if (G.lampV) scene.remove(G.lampV.group); G.lampV = buildSenseLamps(c, scene) // v50 後輪で乗る台のランプ
+  if (G.v76) scene.remove(G.v76.group); G.v76 = c.climb ? buildV76(c, scene, M) : null // v76 押す石と門・ローラーの巻き上げ機
   LM.gim = Math.round(lt() - l0); l0 = lt()
   const spot = wide ? { q: c.path[spotI], side: -1 } : null
   const signs = buildSigns(c, scene)
@@ -700,10 +703,11 @@ function readPad() {
   return p
 }
 // スマホ: どのボタンも押している間だけ効く。押した指を捕まえておくので、指がボタンの外へずれても切れない。指ごとに別のボタンを同時に押せる
+const tbHeld = {}, tbSet = (k, d) => { tbHeld[k] = Math.max(0, (tbHeld[k] || 0) + d); G.touch[k] = tbHeld[k] > 0; const el = document.querySelector('.tb[data-k="' + k + '"]'); if (el) el.classList.toggle('down', G.touch[k]) } /* v76 境目の帯（data-k="both"）はブレーキとアクセルの両方を押す。同じボタンを別の指・帯から重ねて押しても、全部離すまで切れない */
 document.querySelectorAll('.tb').forEach(btn => {
-  const k = btn.dataset.k, ids = new Set()
-  const down = e => { e.preventDefault(); startAudio(); if (talking()) talkNext(); ids.add(e.pointerId); try { btn.setPointerCapture(e.pointerId) } catch (err) {} G.touch[k] = true; btn.classList.add('down') }
-  const up = e => { e.preventDefault(); ids.delete(e.pointerId); if (!ids.size) { G.touch[k] = false; btn.classList.remove('down') } }
+  const k = btn.dataset.k, ids = new Set(), ks = k === 'both' ? ['brk', 'thr'] : [k]
+  const down = e => { e.preventDefault(); startAudio(); if (talking()) talkNext(); if (ids.has(e.pointerId)) return; ids.add(e.pointerId); try { btn.setPointerCapture(e.pointerId) } catch (err) {} if (ids.size === 1) { for (const kk of ks) tbSet(kk, 1); btn.classList.add('down') } }
+  const up = e => { e.preventDefault(); if (!ids.delete(e.pointerId)) return; if (!ids.size) { for (const kk of ks) tbSet(kk, -1); btn.classList.remove('down') } }
   btn.addEventListener('pointerdown', down); btn.addEventListener('pointerup', up); btn.addEventListener('pointercancel', up); btn.addEventListener('lostpointercapture', up)
 })
 function gatherInput() {
@@ -715,7 +719,7 @@ function gatherInput() {
   let lean = (K.has('fwd') || T.fwd ? 1 : 0) - (K.has('back') || T.back ? 1 : 0)
   let nit = K.has('nit') || T.nit ? 1 : 0
   if (pad) { thr = Math.max(thr, pad.thr); brk = Math.max(brk, pad.brk); if (pad.lean) lean = pad.lean; if (pad.nit) nit = 1 }
-  if (T.brk && T.thr) thr = 0
+  /* v76 スマホでもブレーキとアクセルの同時押しをそのまま通す（PC と同じ。平らな所で止まっていれば後輪が空転する）。v75 まではスマホだけブレーキ優先でアクセルを切っていた */
   // v17: ニトロを押している間は、アクセルを押していなくても全開（2 つ同時に押さなくていい）。ブレーキ（バック）を押している時はブレーキが先（ニトロは点かない）
   if (nit && !brk) thr = 1
   const steer = G.bike && !G.bike.crashed && G.steer ? steerFor(G.steer, G.bike) : 0
@@ -960,6 +964,8 @@ function fixedStep() {
   const inp = G.epi && G.epi.ph === 'end' ? { thr: 0, brk: b.speed > 0.2 ? 1 : 0, lean: b.noFront ? -1 : 0, steer: 0 } : gatherInput() // v51 前輪が外れたまま着いたら、ウィリーのまま止まる // 止まったらブレーキを離す（押し続けると下がる） // v48 小屋の前で止まる
   G.inp = inp
   if (inp.skid && (b.g[0] || b.g[1])) { G.skidT = (G.skidT || 0) - DT; if (G.skidT <= 0) { G.skidT = 0.22; Snd.play('gravel', { vol: 0.8, rate: 1.2 }); G.shake = Math.max(G.shake, 0.03) } if (b.cn[0]) dust.emit(b.cn[0].q, 2, 1.6); { const yv = Math.atan2(-b.v[2], b.v[0]); for (let i = 0; i < 2; i++) { const cn = b.cn[i]; if (b.g[i] && cn) { slideMk[i].mark(cn.q, cn.nw || cn.n, yv); if (inp.slide) dust.emit(cn.q, 1, 0.9, { col: 0xc9c4b8, up: 1.6, size: 1.5 }) } else slideMk[i].lift() } } /* v68 滑っている間はタイヤの跡（進む向き）と白い煙 */ } else { G.skidT = 0; slideMk[0].lift(); slideMk[1].lift() }
+  { const A76 = G.course.v76 && G.course.v76.A; if (A76 && A76.v > 0.3) { G.pbS = (G.pbS || 0) - DT; if (G.pbS <= 0) { G.pbS = 0.28; Snd.play('gravel', { vol: 0.35 + Math.min(0.4, A76.v * 0.08), rate: 0.6 }); dust.emit([A76.block.c[0], A76.y0 + 0.04, A76.block.c[2]], 3, 1.2, { col: 0x8a857a, up: 0.6, size: 1.1 }) } } else G.pbS = 0 } /* v76 石が床をこすって進んでいる間の音と砂 */
+  if (b.burn && b.cn[0] && G.running) { /* v76 後輪の空転: その場で白い煙と黒い跡。音は砂利を掻く録音を速めて */ G.burnT = (G.burnT || 0) - DT; if (G.burnT <= 0) { G.burnT = 0.16; Snd.play('gravel', { vol: 0.55, rate: 1.7 }) } dust.emit(b.cn[0].q, 2, 1.1, { col: 0xc9c4b8, up: 1.8, size: 1.6 }); slideMk[0].mark(b.cn[0].q, b.cn[0].nw || b.cn[0].n, b.psi) } else G.burnT = 0
   { let hit = null; for (const sd of b.side || []) if (sd && sd.depth > 0.004 && G.world.shapes[sd.id] && G.world.shapes[sd.id].tag === 'parapet') hit = sd /* v69 滑って石の縁に当たった瞬間: 石と金属の音・火花・石のかけら（強さは当たる前の速さ） */
     if (hit && !G.wallHitOn && inp.skid) { const k = Math.min(1, Math.max(Math.abs(b.speed), G.wallHitV || 0) / 14); Snd.play('rockbreak', { vol: 0.35 + k * 0.5, rate: 1.15 }); Snd.play('clank', { vol: 0.5 + k * 0.4 }); Snd.play('pebbles', { vol: 0.3 + k * 0.4 }); G.shake = Math.max(G.shake, 0.08 + k * 0.12); dust.emit(hit.q, 14 + Math.round(k * 22), 5, { col: 0xffb347, up: 5, heavy: 0.9, size: 0.7 }); dust.emit(hit.q, 10, 3, { col: 0x8a857a, up: 2.5, heavy: 1.2, size: 1.1 }); G.wallHits = (G.wallHits || 0) + 1; if (bikeView && bikeView.stagger) bikeView.stagger(G.steer && G.steer.curbOut || 1) }
     G.wallHitOn = !!hit; G.wallHitV = Math.abs(b.speed) } // v61 縁石の曲がりで速すぎた: 横滑りの音と砂ぼこり
@@ -1002,6 +1008,16 @@ function fixedStep() {
         for (const x of G.crumbles) { if (x.gone || x.preWarn != null && G.world.time - x.preWarn < 4) continue; const c1 = x.c || x.tc; if (!c1) continue; const dx = c1[0] - c0[0], dz = c1[2] - c0[2], al = dx * hx + dz * hz; if (al > 0.5 && al < 8 && Math.abs(-dx * hz + dz * hx) < 3 && Math.abs(c1[1] - c0[1]) < 1.5) { x.preWarn = G.world.time; dust.emit([c1[0], c1[1] + 0.1, c1[2]], 6, 2.4, { col: 0x6a5a48, heavy: 1, up: 2.2, size: 0.6 }) } } } }
     if (e.t === 'trapwarn') { Snd.play('pebbles', { vol: 0.9 }); Snd.play('creak', { vol: 0.6 }); dust.emit(e.p, 10, 1.5) }
     if (e.t === 'trapfall') { Snd.play('crack', { vol: 0.9 }); Snd.play('rockfall', { vol: 0.6 }); dust.emit(e.p, 22, 3) }
+    if (G.v76) G.v76.onEv(e, G.world.time)
+    if (e.t === 'pbPush' && !(G.world.time - (G.pbT || -9) < 0.6)) { G.pbT = G.world.time; Snd.play('rumble', { vol: 0.5 + Math.min(0.5, e.v * 0.1), rate: 1.3 }); Snd.play('gravel', { vol: 0.6, rate: 0.7 }); const A = G.course.v76 && G.course.v76.A; if (A) dust.emit([A.block.c[0], A.y0 + 0.05, A.block.c[2]], 8, 1.6, { col: 0x8a857a, up: 0.8, size: 1.2 }) } /* v76 石が床をこすって動き出す */
+    if (e.t === 'pbStop') { Snd.play('clank', { vol: 0.9, rate: 0.6 }); Snd.play('rockbreak', { vol: 0.4, rate: 0.8 }); G.shake = Math.max(G.shake, 0.05) } /* 石が溝の端（ボタンの上）で止まる */
+    if (e.t === 'pbPress') { Snd.play('clank', { vol: 0.8, rate: 0.75 }); Snd.play('chain', { vol: 0.9 }); Snd.play('rumble', { vol: 0.5, rate: 0.8, delay: 0.1 }) } /* ボタンが沈む・鎖が張る・門が上がり始める */
+    if (e.t === 'pbRelease') { Snd.play('chain', { vol: 0.6, rate: 0.8 }); Snd.play('creak', { vol: 0.7, rate: 0.6 }) } /* 離れた: 鎖がゆるみ、門がゆっくり下り始める */
+    if (e.t === 'pgTop') { Snd.play('clank', { vol: 1, rate: 0.5 }); G.shake = Math.max(G.shake, 0.04) } /* 門が上がり切って止まる */
+    if (e.t === 'pgShut') { Snd.play('rockbreak', { vol: 0.7, rate: 0.6 }); Snd.play('clank', { vol: 0.8, rate: 0.45 }); G.shake = Math.max(G.shake, 0.06) }
+    if (e.t === 'wNotch') { Snd.play('clank', { vol: 0.6, rate: 1.5 + e.n * 0.03 }); if (e.n % 3 === 0) Snd.play('chain', { vol: 0.6 }) } /* 巻き上げ機の歯止めがカチカチ進む */
+    if (e.t === 'wTop') { Snd.play('clank', { vol: 1, rate: 0.5 }); Snd.play('chain', { vol: 0.9, rate: 0.8 }); G.shake = Math.max(G.shake, 0.05) } /* 格子が上がり切って歯止めが掛かる */
+    if (e.t === 'wRoll') { Snd.play('chain', { vol: 0.45, rate: 1.2 }); Snd.play('clank', { vol: 0.3, rate: 1.8 }) } /* ローラーの上を通っただけ: 少し回って鎖が一瞬だけ鳴る（手がかり） */
     if (e.t === 'break') { Snd.play('crack', { vol: 1 }); Snd.play('rockbreak', { vol: 0.7 }); G.shake = Math.max(G.shake, 0.12); dust.emit(b.p, 30, 5) }
     if (e.t === 'knock') { Snd.play(e.tag === 'rock' ? 'rockbreak' : 'ballhit', { vol: 1 }); Snd.play('clank', { vol: 0.6, delay: 0.05 }); G.shake = Math.max(G.shake, 0.2); flash('bad'); dust.emit(b.p, 12, 3) }
   }
@@ -1467,6 +1483,7 @@ function frame(now) {
     if (G.v35) G.v35.update(Math.min(dt, 0.05), tm, camera.position)
     if (G.bv) { G.bv.update(G.R && G.R.bo); boulderAmbient(Math.min(dt, 0.05)) }
     if (G.lampV) G.lampV.update(camera)
+    if (G.v76) G.v76.update(Math.min(dt, 0.05), G.world)
     if (G.elder) G.elder.update(Math.min(dt, 0.05), G.state === 'play' || G.state === 'pause' ? G.bike : null)
     if (G.ladyV) G.ladyV.update(Math.min(dt, 0.05), camera.position, G.state === 'play' || G.state === 'pause' ? G.bike : null)
     if (G.v36) { G.v36.update(Math.min(dt, 0.05), tm, camera.position, G.world, G.R, G.state === 'play' ? G.bike : null); for (const k of G.v36.impEvents()) if (G.state === 'play') { monkeyCall(2, 0.95); monkeyCall(2, 0.8, 0.25) } for (const e of G.v36.pressEvents()) { Snd.play('clank', { vol: 1, rate: 0.55 }); Snd.play('rockbreak', { vol: 0.7, rate: 0.8 }); Snd.play('crack', { vol: 0.6 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 30, 2.5, { col: 0x6a5a48, up: 0.5, size: 1.2 }); dust.emit([e.p[0], e.p[1] + 2.4, e.p[2]], 14, 1.6, { col: 0x8a7a68, heavy: 1, size: 0.6 }) } }

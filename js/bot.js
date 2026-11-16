@@ -1,11 +1,11 @@
 // 自動で走る bot（検査・デモ用）。skill: 'good'（ウィリー・空中の角度合わせ・速さの調整）/ 'bad'（アクセルとハンドルだけ）
-import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=75'
-import { VGEAR, holeOnTop } from './v51gear.js?v=75'
-import { doorAng } from './traps.js?v=75'
-import { BLADE } from './v37.js?v=75'
-import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=75'
-import { K3 } from './v60.js?v=75'
-import { KC } from './v64.js?v=75'
+import { basis, wheelCenter, BIKE, liftPos, shuttlePos, bladeAng } from './physics.js?v=76'
+import { VGEAR, holeOnTop } from './v51gear.js?v=76'
+import { doorAng } from './traps.js?v=76'
+import { BLADE } from './v37.js?v=76'
+import { createSteer, steerFor, resetSteer, assist, cornerCap } from './steer.js?v=76'
+import { K3 } from './v60.js?v=76'
+import { KC } from './v64.js?v=76'
 
 const wrap = a => { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a }
 // 道の点を先へたどる（合流の nx をたどる。枝道の境目で止まる）
@@ -75,6 +75,9 @@ export function botInput(bot, b) {
     if (!turnAhead && jj > 0 && !q.curv && Math.abs(wrap((q.yaw ?? b.psi) - (path[bot.i].yaw ?? b.psi))) > 0.9 && dsum < 9) { turnAhead = true; if (bot.corner == null || bot.corner.j !== j) bot.corner = { j, d: dsum, yaw: q.yaw, narrow: (q.w || 9) < 2 } ; else bot.corner.d = dsum }
   }
   const cur = path[bot.i]
+  // v76 押す石と門・ローラーの巻き上げ機（上手い bot と人の速さの bot。解き方を知っている）
+  const p76 = bot.skill === 'good' && !b.hang ? v76Plan(bot, b, sp) : null
+  if (p76 && p76.step && (stepAt == null || p76.step.d < stepAt.d)) { stepAt = p76.step; need(3.4, p76.step.d) }
   if (cur.kind === 'spiral' || cur.kind === 'narrowSpiral' || cur.kind === 'orbit') vT = 10
   if (narrow) vT = 3.6
   if (turnAhead) vT = Math.min(vT, narrow || (bot.corner && bot.corner.narrow) ? 2.6 : 2.9)
@@ -369,6 +372,7 @@ export function botInput(bot, b) {
   if (bot.skill === 'good' && !air) { for (let j = bot.i; j < Math.min(path.length, bot.i + 30); j++) { if (!path[j].blast && !['road', 'orbit', 'curve', 'pad', 'spin', 'trap', 'spike'].includes(path[j].kind)) break; if (path[j].blast) { const G = path[j].blast; if (G.t0 == null || bot.world && bot.world.time - G.t0 < 1.5) { thr = 1; brk = 0; lean = 0; if (G.t0 != null) blastNit = true } break } } }
   // v62 技が要る近道のウィリー跳ね板（js/v62.js）: 決まった速さで近づき、前輪が板の手前に来たら惰性のウィリー（約 33 度）のまま後輪を板へ
   if (bot.skill === "good" && bot.world && !b.hang && !globalThis.__noV62bot && !((bot.react || 0) > 0 && bot.i > 4000 && bot.i < 4200)) { /* v66 人の速さの bot は工場の近道を使わない（扉の後の間に合わず転ぶ。ふつうの道は通れる） */ const v6 = v62Step(bot, b, SQ, sp, air); if (v6) { thr = v6.thr; brk = v6.brk; lean = v6.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0 } }
+  if (p76 && p76.inp) { thr = p76.inp.thr; brk = p76.inp.brk; lean = p76.inp.lean; bot.waiting = true; bot.stuckT = 0; bot.backT = 0; bot.phase = 0; nitroNeed = false }
   const nitro = (nitroNeed || (nitroLip && sp < nitroLip - 0.3)) && thr > 0.5 && sp > 6 && bot.skill === 'good' && (nitroLip || cornerCap({ path, i: bot.i }, b) > sp + 4) || (blastNit && b.nitro > 0) ? 1 : 0 // v51 ニトロを強くしたので、先の曲がりで曲がれる速さを超えそうなら使わない
   // ゲームと同じ、曲がりの手前の自動の減速を通す
   let inp = assist(bot.st, b, { thr, brk, lean: Math.round(lean * 16) / 16, steer: Math.round(steer * 16) / 16, nitro })
@@ -659,4 +663,37 @@ function v62Step(bot, b, SQ, sp, air) {
   if (sp > 3.95) return bot.v62pw ? { ...hold, thr: 0, brk: 0.2 } : { thr: 0, brk: 0.3, lean: 0 }
   if (sp < 2.6 || bot.v62pw) { bot.v62pw = true; return hold } // 遅い（旗から出た所など）: 惰性では前輪が上がらないので、アクセルで上げる
   return { thr: 0, brk: 0, lean: b.th > m.pitchT + 6 * Math.PI / 180 ? 0 : -1 }
+}
+
+// v76 頭を使う仕掛けの解き方（js/v76.js）。返り: { inp }（入力を置き換える）か { step }（石を段として越える）か null
+//  A: 石が溝の端（ボタンの上）に着くまで、ウィリーせずに体当たりして押し続ける → 着いたら石を 0.5m の段としてウィリーで越える → 門が上がり切ってからくぐる
+//  B: 後輪をローラーの上に止める（行き過ぎたらバックで戻る）→ ブレーキとアクセルを同時に押して格子が上がり切るまで空転 → 進む
+function v76Plan(bot, b, sp) {
+  const W = bot.world, path = bot.path; if (!W || !W.g76) return null
+  let G = null; for (let j = Math.max(0, bot.i - 2); j < Math.min(path.length, bot.i + 16); j++) if (path[j].v76) { G = path[j].v76; break }
+  if (!G || path[bot.i].kind === 'drum' || path[bot.i].branch) return null
+  if (Math.abs(b.p[1] - 0.79 - G.y0) > 2.5) return null
+  if (G.kind === 'A') {
+    const s = (b.p[0] - G.a[0]) * G.ax[0] + (b.p[2] - G.a[2]) * G.ax[2], sf = s + 0.72
+    if (s < -4 || s > G.sGate + 1) return null
+    const face = G.sBlock + G.x - 0.5
+    if (bot.unaware76) return sf < face + 0.3 || bot.phase ? { step: { d: Math.max(0, face - s), q: { kind: 'stepUp', dy: 0.5, p: [G.a[0] + G.ax[0] * face, G.y0 + 0.5, G.a[2] + G.ax[2] * face] } } } : null // 検査用「気づかない人」: 石をただの段としてウィリーで越える（押さない）
+    if (G.x < G.len - 0.02) return sf < face + 0.4 ? { inp: b.th > 0.25 ? { thr: 0, brk: 0, lean: 1 } : { thr: face - sf > 1.5 && sp > 8 ? 0 : 1, brk: face - sf > 1.5 && sp > 9.5 ? 0.45 : 0, lean: 0 } } : null /* 当てる速さは 8m/s ほどまで（12m/s で当てて押し続けると前輪が石に乗り上げて後ろへ回る）。前輪が上がったらアクセルを戻す */ // 石を押す（前体重も後ろ体重も掛けない＝前輪を上げない）
+    if (sf < face + 0.1 && !bot.phase) { // 石の手前: 石の面に前輪を押し付けたままだと前輪が上がらないので、少し下がってから段として越える
+      if (face - sf < 0.5 && !bot.a76back) bot.a76back = true
+      if (bot.a76back) { if (face - sf > 1.3) bot.a76back = false; else return { inp: { thr: 0, brk: 1, lean: 0 } } }
+    }
+    if (sf < face + 0.3 || bot.phase) return { step: { d: Math.max(0, face - s), q: { kind: 'stepUp', dy: 0.5, p: [G.a[0] + G.ax[0] * face, G.y0 + 0.5, G.a[2] + G.ax[2] * face] } } }
+    if (G.h < G.Hopen - 0.01 && s > G.sGate - 7) return { inp: { thr: 0, brk: sp > 0.3 ? 1 : 0, lean: 0 } } // 門が上がり切るのを待つ
+    return null
+  }
+  if (G.prog >= 1 || bot.unaware76) return null
+  const s = (b.p[0] - G.a[0]) * G.f[0] + (b.p[2] - G.a[2]) * G.f[2], e = G.sRoll - (s - 0.70)
+  if (e > 10 || e < -9) return null
+  if (Math.abs(e) > 0.4) bot.b76on = false // 空転を始めたら、後輪がローラーから外れる（±0.45m）手前までは押し続ける（少し動いても止めない）
+  if (Math.abs(e) < (bot.b76on ? 0.4 : 0.2)) { if (Math.abs(sp) < 1.2) { bot.b76on = true; return { inp: { thr: 1, brk: 1, lean: 0 } } } return { inp: { thr: 0, brk: sp > 13.8 ? 0.45 : 1, lean: 0 } } } // 後輪がローラーの上: 同時押し
+  if (e > 0) { const vt = Math.min(5, Math.sqrt(2 * 2.2 * e) + 0.3); return { inp: { thr: sp < vt - 0.3 ? 0.6 : 0, brk: sp > vt + 0.3 ? (sp > 13.8 ? 0.45 : 0.9) : 0, lean: 0 } } } // ニトロの残りで 14.5m/s より速く出てきた時は、強いブレーキで前へ回って転ぶ（v20 の決まり）ので弱く
+  // 行き過ぎた: ブレーキを押し続けて下がる。近づいたらゆっくり
+  const vb = -Math.min(3, Math.sqrt(2 * 1.2 * -e) + 0.25)
+  return { inp: sp > 0.3 ? { thr: 0, brk: 1, lean: 0 } : sp < vb - 0.15 ? { thr: 0.5, brk: 0, lean: 0 } : { thr: 0, brk: 1, lean: 0 } }
 }

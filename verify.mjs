@@ -80,7 +80,7 @@ const visCheck = (p, cid, step) => p.evaluate(async ({ cid, step }) => {
       for (let g = 0; g < 1400; g++) { let inside = false; for (const id of w.near(x, yTop, z, 0.05)) { const o = A.closest(w.shapes[id], x, yTop, z); if (o.d < 0.01) { inside = true; break } } if (!inside) break; yTop += 0.5 }
       const rr = w.rayDown(x, z, yTop, s.min[1] - 0.5), ph = rr.y
       // 樽・像は模型で見せる（当たりは模型を包む円柱）。高さの比べ方が合わないので数を別に数える
-      if (rr.id >= 0 && (['statue', 'barrel'].includes(w.shapes[rr.id].tag) || w.shapes[rr.id].mov)) { models++; continue }
+      if (rr.id >= 0 && (['statue', 'barrel', 'roller'].includes(w.shapes[rr.id].tag) || w.shapes[rr.id].mov)) { models++; continue }
       // 形の縦の縁から 1cm 以内は、円柱の多角形の誤差（6mm 以内）でどちらにも転ぶので数えない
       let edgy = false
       for (const [ox, oz] of [[0.012, 0], [-0.012, 0], [0, 0.012], [0, -0.012]]) { const p2 = w.rayDown(x + ox, z + oz, yTop, s.min[1] - 0.5).y; if (!(Math.abs(p2 - ph) < 0.02) && !(p2 === ph)) { edgy = true; break } }
@@ -190,7 +190,7 @@ for (const [name, eng] of [['chromium', chromium], ['webkit', webkit]].filter(e 
         await q.dispatchEvent('.tb[data-k="thr"]', 'pointerup', { pointerId: 7, isPrimary: true, pointerType: 'touch' }); const off = await q.evaluate(() => window.sky.touch.thr)
         expect(on.on && on.v > 1 && !off, JSON.stringify({ on, off }))
         // ボタン同士が重ならない
-        const ov = await q.evaluate(() => { const r = [...document.querySelectorAll('.tb')].map(b => b.getBoundingClientRect()); let n = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) if (!(r[i].right <= r[j].left || r[j].right <= r[i].left || r[i].bottom <= r[j].top || r[j].bottom <= r[i].top)) n++; return n })
+        const ov = await q.evaluate(() => { const r = [...document.querySelectorAll('.tb:not(.both)')].map(b => b.getBoundingClientRect()) /* v76 ブレーキとアクセルの境目の帯は、わざと両方に重ねてある（tools/v76web.mjs で位置を見る） */; let n = 0; for (let i = 0; i < r.length; i++) for (let j = i + 1; j < r.length; j++) if (!(r[i].right <= r[j].left || r[j].right <= r[i].left || r[i].bottom <= r[j].top || r[j].bottom <= r[i].top)) n++; return n })
         expect(ov === 0, 'overlap ' + ov)
       }
       await q.evaluate(() => document.getElementById('bMenu').click()); await q.waitForTimeout(100)
