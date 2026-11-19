@@ -30,7 +30,7 @@ export function runSim(cid, skill, o = {}) {
     const j = judge(w, c, R, b, prev)
     if (R.rest !== restB || o._rs == null) o._rs = steps // v36: 休憩所を通った時刻（失敗までの秒を出す）
     if (j.gate != null && perCp[j.gate] == null) perCp[j.gate] = +(steps * DT).toFixed(1)
-    if (j.finish) return { cid, skill, time: steps * DT, faults, finished: true, log, perCp, hash: hashBike(b), inputs, maxY, nets }
+    if (j.finish) return { cid, skill, time: steps * DT, faults, finished: true, log, perCp, hash: hashBike(b), inputs, maxY, nets, R }
     // 人なら 40 秒（分かれ道の床を待つ分）進めなければ R で休憩所からやり直す
     const pi = c.path[bot.i].branch ? (brNx[c.path[bot.i].br] ?? bot.i) - 1 : bot.i // 枝道の点は合流する本線の点の手前として数える
     if (pi > (o._bi || 0)) { o._bi = pi; o._bs = steps }
@@ -45,7 +45,7 @@ export function runSim(cid, skill, o = {}) {
       if (faults > (o.maxFaults || 80)) break
     }
   }
-  return { log, endP: b.p.map(v => +v.toFixed(2)), endBot: bot.i + ":" + (c.path[bot.i] && c.path[bot.i].kind), cid, skill, time: steps * DT, faults, finished: false, cp: R.cp, cpName: c.cps[R.cp].name, log, perCp, hash: hashBike(b), inputs, maxY, nets }
+  return { log, endP: b.p.map(v => +v.toFixed(2)), endBot: bot.i + ":" + (c.path[bot.i] && c.path[bot.i].kind), cid, skill, time: steps * DT, faults, finished: false, cp: R.cp, cpName: c.cps[R.cp].name, log, perCp, hash: hashBike(b), inputs, maxY, nets, R }
 }
 if ((process.argv[1] || '').endsWith('sim.mjs')) {
   const [cid = 'practice', skill = 'good', maxSec = 300] = process.argv.slice(2)

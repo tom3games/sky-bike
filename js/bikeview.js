@@ -3,7 +3,7 @@
 // 2本の骨の IK で、足をステップ・手をグリップに合わせて立ち乗りさせる。
 import * as THREE from 'three'
 import { GLTFLoader } from '../vendor/jsm/loaders/GLTFLoader.js'
-import { BIKE, basis, wheelCenter } from './physics.js?v=76'
+import { BIKE, basis, wheelCenter } from './physics.js?v=77'
 
 const P = BIKE
 const V = (x, y, z) => new THREE.Vector3(x, y, z)
@@ -266,6 +266,15 @@ BikeView.prototype.knockOff = function (b, scene, side) {
   if (!this.fly) return
   const R = [Math.sin(b.psi), 0, Math.cos(b.psi)]
   this.fly.v.set(R[0] * side * 6.5, 3.6, R[2] * side * 6.5); this.fly.w.set(-Math.cos(b.psi) * side * 6, 1.5, Math.sin(b.psi) * side * 6)
+}
+// v77 隕石の爆風: 乗り手だけが、落ちた所から離れる向き（後ろ）へ斜め上に吹き飛ぶ。後ろへ回りながら（バイクはその場）
+BikeView.prototype.blastOff = function (b, scene, from, lat) {
+  if (this.fly || !this.ready) return
+  this.throwRider(b, scene)
+  if (!this.fly) return
+  const dx = b.p[0] - from[0], dz = b.p[2] - from[2], L = Math.hypot(dx, dz) || 1, ax = dx / L, az = dz / L, sx = lat[0], sz = lat[1] /* lat: カメラと反対の横（カメラへ飛び込まない） */
+  this.fly.v.set(ax * 4.2 + sx * 6.2, 8.4, az * 4.2 + sz * 6.2)
+  this.fly.w.set(-az * 9 + ax * 1.5, (Math.random() - 0.5) * 2, ax * 9 + az * 1.5)
 }
 BikeView.prototype.updateRider = function (dt, world) {
   const f = this.fly; if (!f) return

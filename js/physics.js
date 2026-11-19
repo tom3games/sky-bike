@@ -1,4 +1,4 @@
-import { doorAng } from './traps.js?v=76'
+import { doorAng } from './traps.js?v=77'
 // SKY BIKE — 物理（ブラウザと node の両方で動く。three に依存しない）
 // 決まった刻み: 入力 60Hz × 8 分割 = 480Hz。Math.sin/cos/atan2/pow/hypot を使わない（端末差を出さない）。
 // ステージの形は box（傾けた箱）/ cyl（円柱）/ arc（らせんの道の板）だけ。見た目も同じデータから作る。
@@ -732,6 +732,7 @@ export function framePts(b, B) { return BIKE.frame.map(([x, y, r]) => ({ c: body
 
 // 入力 inp = { thr 0..1, brk 0..1, lean -1(後ろ)..1(前), steer -1(左)..1(右) }
 export function stepBike(world, b, inp, ev) {
+  b.act = inp.thr > 0.05 || inp.brk > 0.05 || !!inp.nitro /* v77 アクセル・ブレーキ・ニトロを押しているか（隕石の「止まっている」の判定だけが見る。物理には使わない） */
   // v33 本人「アクセルもブレーキも押してない状態でも前に傾けるように」: 止まっていて前体重だけの時は、前輪に軽くブレーキを当てたことにして前輪で立つ（約 33 度。後ろ体重だけのウィリーと対称）。
   // この自動のブレーキでは下がらない（_auto）。走っている時（0.9m/s 以上）は今まで通り
   b.fwdOnlyT = inp.lean > 0.6 && inp.thr <= 0.05 && inp.brk <= 0.05 ? (b.fwdOnlyT || 0) + DT : 0 // v36: 惰性（3m/s まで）で前体重だけを 0.3 秒押し続けた時も前輪で立つ（走りながら一瞬だけ前体重にした時は今まで通り）

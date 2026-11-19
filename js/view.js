@@ -3,7 +3,7 @@
 // 色はコンセプト画 B（霧の青緑と松明の橙）から取った: 石 #21221d #3b3b36 / 霧 #3a585f #497580 / もや #90afb3 / 火 #c27a40
 import * as THREE from 'three'
 import { mergeGeometries } from '../vendor/jsm/utils/BufferGeometryUtils.js'
-import { arcPoint } from './physics.js?v=76'
+import { arcPoint } from './physics.js?v=77'
 
 export const PAL = { stoneD: 0x21221d, stone: 0x3b3b36, fogD: 0x3a585f, fog: 0x497580, mist: 0x90afb3, fire: 0xc27a40 }
 const TEX = {}
@@ -1201,9 +1201,9 @@ export function buildSigns(course, scene) {
 export function buildSky(scene) {
   const mat = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, fog: false,
-    uniforms: { pano: { value: null }, hasPano: { value: 0 }, panoGain: { value: 1.0 }, panoRot: { value: 0 }, top: { value: new THREE.Color(0x0f1a1d) }, mid: { value: new THREE.Color(0x2f5058) }, bot: { value: new THREE.Color(0x3a585f) }, moonDir: { value: new THREE.Vector3(-0.5, 0.55, -0.4).normalize() }, time: { value: 0 }, flash: { value: 0 } },
+    uniforms: { heat: { value: 0 }, heatDir: { value: new THREE.Vector3(0, 1, 0) }, pano: { value: null }, hasPano: { value: 0 }, panoGain: { value: 1.0 }, panoRot: { value: 0 }, top: { value: new THREE.Color(0x0f1a1d) }, mid: { value: new THREE.Color(0x2f5058) }, bot: { value: new THREE.Color(0x3a585f) }, moonDir: { value: new THREE.Vector3(-0.5, 0.55, -0.4).normalize() }, time: { value: 0 }, flash: { value: 0 } },
     vertexShader: 'varying vec3 vW; void main(){ vW = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-    fragmentShader: `uniform sampler2D pano; uniform float hasPano; uniform float panoGain; uniform float panoRot; uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform vec3 moonDir; uniform float time; uniform float flash; varying vec3 vW;
+    fragmentShader: `uniform float heat; uniform vec3 heatDir; uniform sampler2D pano; uniform float hasPano; uniform float panoGain; uniform float panoRot; uniform vec3 top; uniform vec3 mid; uniform vec3 bot; uniform vec3 moonDir; uniform float time; uniform float flash; varying vec3 vW;
       float h(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7))) * 43758.5453); }
       float n(vec3 p){ vec3 i = floor(p), f = fract(p); vec3 u = f*f*(3.0-2.0*f);
         return mix(mix(mix(h(i), h(i+vec3(1,0,0)), u.x), mix(h(i+vec3(0,1,0)), h(i+vec3(1,1,0)), u.x), u.y), mix(mix(h(i+vec3(0,0,1)), h(i+vec3(1,0,1)), u.x), mix(h(i+vec3(0,1,1)), h(i+vec3(1,1,1)), u.x), u.y), u.z); }
@@ -1222,6 +1222,7 @@ export function buildSky(scene) {
         c += vec3(0.85, 0.9, 0.86) * disc * (1.0 - clouds * 0.7);
         c += vec3(0.5, 0.6, 0.65) * flash * smoothstep(0.0, 0.6, clouds);
         if (hasPano > 0.5) { vec2 uv = vec2(fract(atan(d.z, d.x) / 6.2831853 + 0.5 + panoRot), clamp(asin(clamp(y, -1.0, 1.0)) / 3.1415927 * 1.5 + 0.64, 0.002, 0.998)); c = texture2D(pano, uv).rgb * panoGain; }
+        if (heat > 0.001) { float hg = pow(max(dot(d, heatDir), 0.0), 4.0); c = mix(c, c * vec3(1.5, 0.72, 0.5) + vec3(0.30, 0.09, 0.03) * (0.35 + 1.6 * hg), heat); }
         gl_FragColor = vec4(c, 1.0); }`,
   })
   const m = new THREE.Mesh(new THREE.SphereGeometry(1800, 32, 16), mat); m.name = 'sky'; m.renderOrder = -1

@@ -1,9 +1,10 @@
 // 遊びのルール（ゲームと検査で同じものを使う）
 // 練習場: 門（チェックポイント）からやり直す。
 // 第1面（climb）: 落ちた所・転んだ所から登り直す。休憩所は一度触れたら、そこより大きく下に落ちた時だけ戻す。
-import { createBike, stepBike, resetFallen } from './physics.js?v=76'
-import { ROCK as ROCK0 } from './v41.js?v=76'
-import { nextI } from './steer.js?v=76'
+import { createBike, stepBike, resetFallen } from './physics.js?v=77'
+import { ROCK as ROCK0 } from './v41.js?v=77'
+import { nextI } from './steer.js?v=77'
+import { meteorStep, meteorReset, METEOR } from './meteor.js?v=77'
 
 export const NET_DROP = 14 // 休憩所より何 m 下まで落ちたら休憩所へ戻すか
 
@@ -120,6 +121,8 @@ export function judge(world, course, R, b, prevP) {
   // v36 小さな猿のような生き物の追いかけ（js/traps.js の chases）
   if (course.chases && course.chases.length && !b.ghost) chaseStep(world, course, R, b, out)
   if (course.boulder && !b.ghost) boulderStep(world, course, R, b, out)
+  if (!b.ghost) meteorStep(world, course, R, b, out) /* v77 高い所で 5 秒止まると隕石 */
+  if (b.crashed && b.crashed.why === 'meteor' && b.crashed.t < METEOR.wait) return out /* 乗り手が吹き飛んで落ちていくのを見せる */
   if (b.crashed && b.crashed.why === 'boulder' && b.crashed.t < 4.5) return out // はね飛ばされた: 道の外へ飛んで落ちていく（長い落下は飛ばしで旗へ）
   if (b.crashed && (b.crashed.why === 'monkey' || b.crashed.why === 'curb') && b.crashed.t < 2.4) return out /* v67 縁石に当たって投げ出された時も、落ちていくのを見せる */ // はたかれた: 乗り手が落ちていく間は待つ
   if (b.crashed && b.crashed.t > 0.8) {
@@ -247,6 +250,7 @@ export function doRespawn(world, course, R, rs) {
   if (rs.cp != null && world.rng) rerollTraps(world, R) // v47 旗からの出し直しで、罠の間合いを変える
   if (R.ch) for (const k in R.ch) if (R.ch[k].ph !== 'done') delete R.ch[k] // 猿は元の場所へ
   if (R.bo && R.bo.ph !== 'broken') delete R.bo // 落石: 割れる前に出し直したら、また来る
+  meteorReset(R) /* v77 */
   resetFallen(world) // 抜けた床・崩れた敷石を元に戻す（戻らないと登れなくなる）
   for (const s of world.moving) if (s.mov.type === 'seesaw') { s.mov.ang = s.mov.ang0 || 0; s.mov.w = 0 } // 傾いたままのシーソーも元へ（出し直した所の先で、上がった端に当たらない）
   if (rs.safe) { const b = spawnAt(world, { p: rs.safe.p, yaw: rs.safe.yaw }); if (rs.safe.nitro != null) b.nitro = rs.safe.nitro; if (!b.crashed) return b; R.safe = []; return spawnAtCp(world, course, R.rest || 0) } // 出した所で転んでいたら旗から
