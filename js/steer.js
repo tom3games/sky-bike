@@ -89,16 +89,17 @@ export function steerFor(st, b, lat = 0) {
 export const ALAT = 8, ADEC = 7
 export const ICE_ALAT = 2.2 // v51 氷の曲がり: 横に踏ん張れる加速度（氷の摩擦 0.25 ほど）
 export const CURB_K = 1.1
+export const CURB_GRIP = +(globalThis.__curbGrip ?? 2.0) /* 縁石の曲がりで曲がれる速さの係数（大きいほど速くても曲がれる） */
 export const SLIDE_AB = +(globalThis.__slideAb ?? 0.3) /* v67 滑っている間の減速（踏ん張れないので弱い） */
 // v61 縁石の曲がり: 今いる曲がりで、曲がれる速さ（自動減速の 1.07 倍）を超えたら横滑り（1）、さらにその 1.2 倍を超えたら乗り手が外へ投げ出される（2）
-export const CURB_THROW = +(globalThis.__curbThrow ?? 1.2)
-export const CURB_HIT = +(globalThis.__curbHit ?? 2.5) /* v67 縁石へ外向きにこの速さ（m/s）以上で当たると投げ出される */
+export const CURB_THROW = +(globalThis.__curbThrow ?? 1.4)
+export const CURB_HIT = +(globalThis.__curbHit ?? 4) /* v67 縁石へ外向きにこの速さ（m/s）以上で当たると投げ出される */
 export function curbSkid(st, b) {
   const path = st.path, q = path[st.i]
   if (!q || !q.curb) { if (st.skid === 2 && st.curbI != null && st.i >= st.curbI && st.i <= st.curbI + 4 && b.speed > (st.curbLim || 99)) return 2; /* 曲がりの出口: 滑り出していたら、縁石の終わりまで滑り続ける */ return (st.skid = 0) }
   let kmax = 0, turn = 0; for (let k = st.i, n = 0; k >= 0 && n < 6; k = nextI(path, k), n++) if (path[k].curb) { kmax = Math.max(kmax, path[k].kap || 0); const z = path[nextI(path, k)]; if (z && z.yaw != null) { let d = z.yaw - path[k].yaw; turn += Math.atan2(Math.sin(d), Math.cos(d)) } }
   if (kmax < 0.015) return (st.skid = 0)
-  const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4)), lim = Math.sqrt(alat * 1.15 / kmax)
+  const wmin = q.w || 4, alat = ALAT * Math.max(0.45, Math.min(1, (wmin - 0.6) / 2.4)), lim = Math.sqrt(alat * CURB_GRIP / kmax)
   st.curbOut = turn > 0 ? 1 : -1 /* 外側（右手 [sin, cos] の向きの符号）。v67: 向きが逆だった（yaw が増える＝左へ曲がる＝外は右。内側へ投げ出されていた） */
   st.curbI = st.i; st.curbLim = lim
   // v67 本人「文字だけで勝手に殺すな。曲がりきれずにコースアウト、縁石に勢いよく当たって投げ出される、を映像で」:

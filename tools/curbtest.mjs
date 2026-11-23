@@ -3,6 +3,7 @@
 //   「曲がりに入る前に投げ出される」「縁石から離れた所で投げ出される」が 0 であることを見る
 if (process.env.HIT) globalThis.__curbHit = +process.env.HIT
 if (process.env.THROW) globalThis.__curbThrow = +process.env.THROW
+if (process.env.K) globalThis.__curbGrip = +process.env.K
 const { World, createBike, stepBike } = await import('../js/physics.js')
 const { COURSES } = await import('../js/course.js')
 const { settle } = await import('../js/run.js')
