@@ -7,9 +7,9 @@
 //    床に埋まった 2 本の鉄のローラー。走って通るだけでは何も起きない。後輪をローラーに載せて、ブレーキ（前輪が止まる）とアクセルを同時に押すと
 //    後輪だけが空転してローラーが回り、鎖で落とし格子が上がる。離しても歯止めで止まる
 // 動きは js/physics.js（V76・step76・track76・blockStep）。見た目は js/v76view.js。形の一覧（当たり）は全部ここで作る
-import { V76 } from './physics.js?v=77'
-import { Builder } from './course.js?v=77'
-import { finish16 } from './parts16.js?v=77'
+import { V76 } from './physics.js?v=78'
+import { Builder } from './course.js?v=78'
+import { finish16 } from './parts16.js?v=78'
 const add3 = (a, b, k = 1) => [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]
 const num = (k, d) => +(globalThis[k] ?? d)
 // A の寸法（m）。flag からの道のり s で置く

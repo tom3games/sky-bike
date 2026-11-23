@@ -1,7 +1,7 @@
 // SKY BIKE v76 押す石と門・ローラーの巻き上げ機の見た目（当たりのある形は js/v76.js。石・ボタン・門の板そのものは view.js の動く形として描かれる）
 // ここで足すのは当たりのない物だけ: 床の溝・ボタンの枠・鎖と滑車・石と門の鉄の帯・ローラー（回る）・タイヤの跡・巻き上げ機の歯車・落とし格子の鉄格子
 import * as THREE from 'three'
-import { PA, PB } from './v76.js?v=77'
+import { PA, PB } from './v76.js?v=78'
 
 function canvasT(w, h, draw) { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t }
 // ローラーの面: 錆びた鉄に、真ん中だけ黒いタイヤの跡。筒に沿った傷（回っているのが見える）
