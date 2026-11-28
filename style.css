@@ -210,3 +210,16 @@ body:has(#result:not([hidden])) #keysMini,body:has(#result:not([hidden])) #tut,b
 body:has(#result:not([hidden])) #hud,body:has(#result:not([hidden])) #touch{display:none!important}
 
 #speedFx{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:4}
+
+/* 2026-11-28 背の低い画面（X のアプリの中）で広告を出す時だけ横丁が html に tm-adlift を付ける。結果を詰めて広告の場所を作る */
+.tm-adlift #result{padding-top:max(16px,env(safe-area-inset-top))}
+.tm-adlift #result .tk-title{font-size:44px;margin:4px 0 8px}
+.tm-adlift #result .tk-row{margin:0 0 2px;padding:2px 0 2px 16px}
+.tm-adlift #result .tk-row b{font-size:22px}
+.tm-adlift #result .tk-row:first-of-type b{font-size:30px}
+.tm-adlift #result .stamp{margin:0 0 6px 18px}
+.tm-adlift #result .tk-btns{margin-top:0;gap:0}
+.tm-adlift #result .tk-btns .go,.tm-adlift #result .tk-btns .go2{padding:5px 2px 5px 18px}
+.tm-adlift #result .tk-btns .link{padding:6px 2px 2px 20px}
+.tm-adlift #result #tmSupport{margin-top:8px!important}
+.tm-adlift #result #tmHome,.tm-adlift #result #tmFollow{margin-top:4px!important}
